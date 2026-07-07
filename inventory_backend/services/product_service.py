@@ -114,3 +114,23 @@ def delete_product(id):
     return jsonify({
         "message": "Product Deleted"
     })
+def get_active_products():
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT
+            product_id,
+            product_name
+        FROM Product
+        WHERE status = 'Active'
+        ORDER BY product_name
+    """)
+
+    products = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify(products)

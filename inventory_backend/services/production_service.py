@@ -60,7 +60,8 @@ def add_production():
             return jsonify({
                 "message": "Cannot add production. Product is Inactive."
             }), 400
-
+        print(data)
+        print("Unit received:", data["unit"])
         qty = unit_convertor(
             data["unit"],
             data["quantity_tons"]
