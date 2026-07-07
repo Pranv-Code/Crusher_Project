@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "backend": "inventory_backend\\venv\\Scripts\\python.exe inventory_backend\\app.py",
+    "frontend": "cd inventory_frontend && npm run dev",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.3"
+  }
+}
