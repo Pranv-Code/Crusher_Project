@@ -78,18 +78,11 @@ def update_product(id):
 
     cursor.execute("""
         UPDATE Product
-<<<<<<< HEAD
-        SET status=%s
-        WHERE product_id=%s
-    """, (
-        data["status"],
-=======
         SET status=%s,
             product_name=%s
         WHERE product_id=%s
     """, (
         data["status"],data["product_name"],
->>>>>>> 21b50d7 (update product added)
         id
     ))
 
