@@ -8,7 +8,10 @@ function Navbar() {
 
         <header className="navbar">
 
-            <h2>Crusher Inventory Management System</h2>
+            <div class="nav-logo">
+    <h2>WHITE CLOUD</h2>
+    <p>GLOBAL SOLUTIONS</p>
+</div>
 
             <span>{today}</span>
 

@@ -157,7 +157,7 @@ function Products() {
 
                 <div className="add-form">
 
-                    <input
+                    <input 
                         type="text"
                         placeholder="Product Name"
                         value={newProduct.product_name}
@@ -181,7 +181,7 @@ function Products() {
                         }
                     />
 
-                    <select
+                    <select 
                         value={newProduct.unit}
                         onChange={(e) =>
                             setNewProduct({
@@ -250,7 +250,7 @@ function Products() {
 
                                         {editingId === product.product_id ? (
 
-                                            <input
+                                            <input className="edit-input"
                                                 value={editData.product_name}
                                                 onChange={(e) =>
                                                     setEditData({
@@ -274,7 +274,7 @@ function Products() {
 
                                         {editingId === product.product_id ? (
 
-                                            <select
+                                            <select className="edit-select"
                                                 value={editData.status}
                                                 onChange={(e) =>
                                                     setEditData({
@@ -308,12 +308,13 @@ function Products() {
                                             <>
 
                                                 <button
+                                                className="save-btn"
                                                     onClick={() => handleSave(product.product_id)}
                                                 >
                                                     Save
                                                 </button>
 
-                                                <button
+                                                <button className="cancel-btn"
                                                     onClick={handleCancel}
                                                 >
                                                     Cancel
@@ -325,13 +326,13 @@ function Products() {
 
                                             <>
 
-                                                <button
+                                                <button className="edit-btn"
                                                     onClick={() => handleEdit(product)}
                                                 >
                                                     Edit
                                                 </button>
 
-                                                <button
+                                                <button className="delete-btn"
                                                     onClick={() => handleDelete(product.product_id)}
                                                 >
                                                     Delete

@@ -14,6 +14,7 @@ def view_production():
     cursor.execute("""
         SELECT 
         p.production_id,
+        p.product_id,
         pr.product_name,
         p.production_date,
         p.unit,
@@ -26,7 +27,6 @@ def view_production():
         """)
     
     production = cursor.fetchall()
-    print(production)
     cursor.close()
     conn.close()
 
@@ -109,6 +109,153 @@ def add_production():
         return jsonify({
             "error": str(e)
         }), 500
+
+    finally:
+
+        cursor.close()
+        conn.close()
+
+def update_production(id):
+
+    data = request.json
+    print("Update Request:", data)
+    print("Production ID:", id)
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+
+        # Get old production
+        cursor.execute("""
+            SELECT *
+            FROM Production
+            WHERE production_id=%s
+        """, (id,))
+
+        old = cursor.fetchone()
+        print("Old Record:", old)
+        if not old:
+            return jsonify({
+                "message": "Production not found"
+            }), 404
+
+        # Convert new quantity
+        new_qty = unit_convertor(
+            data["unit"],
+            data["quantity_tons"]
+        )
+        print("Converted Quantity:", new_qty)
+
+        # Remove old quantity from old product
+        cursor.execute("""
+            UPDATE Product
+            SET quantity_tons = quantity_tons - %s
+            WHERE product_id=%s
+        """, (
+            old["quantity_tons"],
+            old["product_id"]
+        ))
+
+        # Add new quantity to selected product
+        cursor.execute("""
+            UPDATE Product
+            SET quantity_tons = quantity_tons + %s
+            WHERE product_id=%s
+        """, (
+            new_qty,
+            data["product_id"]
+        ))
+
+        # Update production
+        cursor.execute("""
+            UPDATE Production
+            SET
+                production_date=%s,
+                product_id=%s,
+                unit=%s,
+                quantity_tons=%s,
+                production_cost=%s
+            WHERE production_id=%s
+        """, (
+            data["production_date"],
+            data["product_id"],
+            data["unit"],
+            new_qty,
+            data["production_cost"],
+            id
+        ))
+
+        conn.commit()
+
+        return jsonify({
+            "message": "Production Updated Successfully"
+        })
+
+    except Exception as e:
+
+        conn.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "error": str(e)
+        }),500
+
+    finally:
+
+        cursor.close()
+        conn.close()
+
+
+def delete_production(id):
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+
+        cursor.execute("""
+            SELECT *
+            FROM Production
+            WHERE production_id=%s
+        """,(id,))
+
+        production = cursor.fetchone()
+
+        if not production:
+
+            return jsonify({
+                "message":"Production not found"
+            }),404
+
+        # Reverse stock
+        cursor.execute("""
+            UPDATE Product
+            SET quantity_tons = quantity_tons - %s
+            WHERE product_id=%s
+        """,(
+            production["quantity_tons"],
+            production["product_id"]
+        ))
+
+        # Delete record
+        cursor.execute("""
+            DELETE FROM Production
+            WHERE production_id=%s
+        """,(id,))
+
+        conn.commit()
+
+        return jsonify({
+            "message":"Production Deleted Successfully"
+        })
+
+    except Exception as e:
+
+        conn.rollback()
+
+        return jsonify({
+            "error":str(e)
+        }),500
 
     finally:
 
