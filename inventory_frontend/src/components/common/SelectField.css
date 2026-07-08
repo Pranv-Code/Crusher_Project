@@ -1,0 +1,34 @@
+.select-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.select-field label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.select-field select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+    transition: .2s ease;
+    box-sizing: border-box;
+}
+
+.select-field select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.15);
+}
+
+.select-field select:disabled {
+    background: #f3f4f6;
+    cursor: not-allowed;
+}

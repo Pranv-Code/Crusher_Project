@@ -8,6 +8,19 @@ import {
     deleteProduct,
 } from "../services/productApi";
 
+// Component Imports
+import Button from "../components/common/Button";
+import InputField from "../components/common/InputField";
+import SelectField from "../components/common/SelectField";
+import PageHeader from "../components/common/PageHeader";
+import EmptyState from "../components/common/EmptyState";
+
+import CrudTable from "../components/table/CrudTable";
+import ActionButtons from "../components/table/ActionButtons";
+
+import ConfirmModal from "../components/modal/ConfirmModal";
+import EditModal from "../components/modal/EditModal";
+
 function Products() {
     const [products, setProducts] = useState([]);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -24,6 +37,10 @@ function Products() {
         product_name: "",
         status: "",
     });
+
+    // Confirmation modal states to replace window.confirm
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState(null);
 
     // ---------------- Fetch Products ----------------
 
@@ -43,7 +60,6 @@ function Products() {
     // ---------------- Add Product ----------------
 
     const handleAddProduct = async () => {
-
         if (
             newProduct.product_name.trim() === "" ||
             newProduct.quantity_tons === ""
@@ -53,111 +69,102 @@ function Products() {
         }
 
         try {
-
             await addProduct(newProduct);
-
             fetchProducts();
-
             setNewProduct({
                 product_name: "",
                 quantity_tons: "",
                 unit: "Tons",
             });
-
             setShowAddForm(false);
-
         } catch (err) {
-
             console.error(err);
-
         }
-
     };
 
     // ---------------- Edit ----------------
 
     const handleEdit = (product) => {
-
         setEditingId(product.product_id);
-
         setEditData({
             product_name: product.product_name,
             status: product.status,
         });
-
     };
 
     const handleCancel = () => {
-
         setEditingId(null);
-
         setEditData({
             product_name: "",
             status: "",
         });
-
     };
 
-    const handleSave = async (id) => {
-
+    const handleSave = async () => {
         try {
-
-            await updateProduct(id, editData);
-
+            await updateProduct(editingId, editData);
             fetchProducts();
-
             setEditingId(null);
-
         } catch (err) {
-
             console.error(err);
-
         }
-
     };
 
     // ---------------- Delete ----------------
 
-    const handleDelete = async (id) => {
-
-        if (!window.confirm("Delete this product?"))
-            return;
-
-        try {
-
-            await deleteProduct(id);
-
-            fetchProducts();
-
-        } catch (err) {
-
-            console.error(err);
-
-        }
-
+    const handleDeleteClick = (id) => {
+        setDeleteTargetId(id);
+        setShowConfirm(true);
     };
+
+    const confirmDelete = async () => {
+        setShowConfirm(false);
+        try {
+            await deleteProduct(deleteTargetId);
+            fetchProducts();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setDeleteTargetId(null);
+        }
+    };
+
+    // Configuration schemas for structural mapping
+    const unitOptions = [
+        { value: "Tons", label: "Tons" },
+        { value: "Brass", label: "Brass" },
+    ];
+
+    const statusOptions = [
+        { value: "Active", label: "Active" },
+        { value: "Inactive", label: "Inactive" },
+    ];
+
+    const columns = [
+        { key: "product_id", label: "ID" },
+        { key: "product_name", label: "Product Name" },
+        { key: "quantity_tons", label: "Quantity" },
+        { key: "status", label: "Status" },
+    ];
 
     return (
         <Layout>
-
-            <div className="page-header">
-
-                <h1>Products</h1>
-
-                <button
-                    className="primary-btn"
-                    onClick={() => setShowAddForm(!showAddForm)}
-                >
-                    {showAddForm ? "Cancel" : "+ Add Product"}
-                </button>
-
-            </div>
+            <PageHeader
+                title="Products"
+                subtitle="Manage Products"
+                actions={
+                    <Button
+                        variant={showAddForm ? "secondary" : "primary"}
+                        onClick={() => setShowAddForm(!showAddForm)}
+                    >
+                        {showAddForm ? "Cancel" : "+ Add Product"}
+                    </Button>
+                }
+            />
 
             {showAddForm && (
-
                 <div className="add-form">
-
-                    <input 
+                    <InputField
                         type="text"
                         placeholder="Product Name"
                         value={newProduct.product_name}
@@ -169,7 +176,7 @@ function Products() {
                         }
                     />
 
-                    <input
+                    <InputField
                         type="number"
                         placeholder="Quantity"
                         value={newProduct.quantity_tons}
@@ -181,7 +188,9 @@ function Products() {
                         }
                     />
 
-                    <select 
+                    <SelectField
+                        label="Unit"
+                        name="unit"
                         value={newProduct.unit}
                         onChange={(e) =>
                             setNewProduct({
@@ -189,173 +198,81 @@ function Products() {
                                 unit: e.target.value,
                             })
                         }
-                    >
-                        <option value="Tons">Tons</option>
-                        <option value="Brass">Brass</option>
-                    </select>
+                        options={unitOptions}
+                    />
 
-                    <button
-                        className="primary-btn"
-                        onClick={handleAddProduct}
-                    >
+                    <Button variant="success" onClick={handleAddProduct}>
                         Save Product
-                    </button>
-
+                    </Button>
                 </div>
-
             )}
 
             <div className="table-container">
-
-                <table>
-
-                    <thead>
-
-                        <tr>
-
-                            <th>ID</th>
-                            <th>Product Name</th>
-                            <th>Quantity</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        {products.length === 0 ? (
-
-                            <tr>
-
-                                <td
-                                    colSpan="5"
-                                    style={{ textAlign: "center" }}
-                                >
-                                    No Products Found
-                                </td>
-
-                            </tr>
-
-                        ) : (
-
-                            products.map((product) => (
-
-                                <tr key={product.product_id}>
-
-                                    <td>{product.product_id}</td>
-
-                                    <td>
-
-                                        {editingId === product.product_id ? (
-
-                                            <input className="edit-input"
-                                                value={editData.product_name}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        product_name: e.target.value,
-                                                    })
-                                                }
-                                            />
-
-                                        ) : (
-
-                                            product.product_name
-
-                                        )}
-
-                                    </td>
-
-                                    <td>{product.quantity_tons}</td>
-
-                                    <td>
-
-                                        {editingId === product.product_id ? (
-
-                                            <select className="edit-select"
-                                                value={editData.status}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        status: e.target.value,
-                                                    })
-                                                }
-                                            >
-                                                <option value="Active">
-                                                    Active
-                                                </option>
-
-                                                <option value="Inactive">
-                                                    Inactive
-                                                </option>
-
-                                            </select>
-
-                                        ) : (
-
-                                            product.status
-
-                                        )}
-
-                                    </td>
-
-                                    <td>
-
-                                        {editingId === product.product_id ? (
-
-                                            <>
-
-                                                <button
-                                                className="save-btn"
-                                                    onClick={() => handleSave(product.product_id)}
-                                                >
-                                                    Save
-                                                </button>
-
-                                                <button className="cancel-btn"
-                                                    onClick={handleCancel}
-                                                >
-                                                    Cancel
-                                                </button>
-
-                                            </>
-
-                                        ) : (
-
-                                            <>
-
-                                                <button className="edit-btn"
-                                                    onClick={() => handleEdit(product)}
-                                                >
-                                                    Edit
-                                                </button>
-
-                                                <button className="delete-btn"
-                                                    onClick={() => handleDelete(product.product_id)}
-                                                >
-                                                    Delete
-                                                </button>
-
-                                            </>
-
-                                        )}
-
-                                    </td>
-
-                                </tr>
-
-                            ))
-
+                {products.length === 0 ? (
+                    <EmptyState
+                        title="No Products Found"
+                        message="Click Add Product to create one."
+                    />
+                ) : (
+                    <CrudTable
+                        columns={columns}
+                        data={products}
+                        keyField="product_id"
+                        renderActions={(row) => (
+                            <ActionButtons
+                                onEdit={() => handleEdit(row)}
+                                onDelete={() => handleDeleteClick(row.product_id)}
+                            />
                         )}
-
-                    </tbody>
-
-                </table>
-
+                    />
+                )}
             </div>
 
+            {/* Edit Modal (Replaces old primitive table row layout inline inputs) */}
+            <EditModal
+                isOpen={editingId !== null}
+                title="Edit Product"
+                onSave={handleSave}
+                onClose={handleCancel}
+            >
+                <InputField
+                    label="Product Name"
+                    name="product_name"
+                    type="text"
+                    value={editData.product_name}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            product_name: e.target.value,
+                        })
+                    }
+                />
+
+                <SelectField
+                    label="Status"
+                    name="status"
+                    value={editData.status}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            status: e.target.value,
+                        })
+                    }
+                    options={statusOptions}
+                />
+            </EditModal>
+
+            {/* Confirm Modal (Replaces old window.confirm popup dialog) */}
+            <ConfirmModal
+                isOpen={showConfirm}
+                title="Delete Product"
+                message="Delete this product?"
+                onConfirm={confirmDelete}
+                onCancel={() => {
+                    setShowConfirm(false);
+                    setDeleteTargetId(null);
+                }}
+            />
         </Layout>
     );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
+
 import {
     getProduction,
     addProduction,
@@ -11,6 +12,18 @@ import {
     getActiveProducts,
 } from "../services/productApi";
 
+// Reusable Component Imports
+import Button from "../components/common/Button";
+import InputField from "../components/common/InputField";
+import SelectField from "../components/common/SelectField";
+import PageHeader from "../components/common/PageHeader";
+import EmptyState from "../components/common/EmptyState";
+
+import CrudTable from "../components/table/CrudTable";
+import ActionButtons from "../components/table/ActionButtons";
+
+import ConfirmModal from "../components/modal/ConfirmModal";
+import EditModal from "../components/modal/EditModal";
 
 function Production() {
     const [productions, setProductions] = useState([]);
@@ -25,6 +38,7 @@ function Production() {
         unit: "",
         production_cost: "",
     });
+    
     const [editingId, setEditingId] = useState(null);
 
     const [editData, setEditData] = useState({
@@ -34,6 +48,10 @@ function Production() {
         unit: "",
         production_cost: "",
     });
+
+    // Modal Confirmation local state variables
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState(null);
 
     const fetchProduction = async () => {
         try {
@@ -52,8 +70,8 @@ function Production() {
             console.error(err);
         }
     };
-    const handleAddProduction = async () => {
 
+    const handleAddProduction = async () => {
         if (
             !newProduction.product_id ||
             newProduction.quantity_tons === "" ||
@@ -64,31 +82,22 @@ function Production() {
         }
         console.log("Sending to backend:", newProduction);
         try {
-
             await addProduction(newProduction);
-
             fetchProduction();
-
             setNewProduction({
                 product_id: "",
                 quantity_tons: "",
                 unit: "Tons",
                 production_cost: "",
             });
-
             setShowAddForm(false);
-
         } catch (err) {
-
             console.error(err);
-
         }
-
     };
+
     const handleEdit = (production) => {
-
         setEditingId(production.production_id);
-
         setEditData({
             production_date: production.production_date,
             product_id: production.product_id,
@@ -96,329 +105,240 @@ function Production() {
             unit: production.unit,
             production_cost: production.production_cost,
         });
-
     };
-    const handleSave = async (id) => {
 
+    const handleSave = async () => {
         try {
-
-            await updateProduction(id, editData);
-
+            await updateProduction(editingId, editData);
             fetchProduction();
-
             setEditingId(null);
-
         } catch (err) {
-
             console.error(err);
-
         }
-
     };
-    const handleDelete = async (id) => {
 
-        if (!window.confirm("Delete this production record?"))
-            return;
+    const handleDeleteClick = (id) => {
+        setDeleteTargetId(id);
+        setShowConfirm(true);
+    };
 
+    const confirmDelete = async () => {
+        setShowConfirm(false);
         try {
-
-            await deleteProduction(id);
-
+            await deleteProduction(deleteTargetId);
             fetchProduction();
-
         } catch (err) {
-
             console.error(err);
-
+        } finally {
+            setDeleteTargetId(null);
         }
-
     };
+
     const handleCancel = () => {
-
         setEditingId(null);
-
     };
+
     useEffect(() => {
         fetchProduction();
         fetchProducts();
     }, []);
 
+    // Configuration formatting structures
+    const productOptions = products.map((p) => ({
+        value: p.product_id,
+        label: p.product_name,
+    }));
+
+    const unitOptions = [
+        { value: "tons", label: "Tons" },
+        { value: "brass", label: "Brass" },
+    ];
+
+    const columns = [
+        { key: "production_date", label: "Production Date" },
+        { key: "product_name", label: "Product Name" },
+        { key: "quantity_tons", label: "Quantity" },
+        { key: "unit", label: "Units" },
+        { key: "production_cost", label: "Production Cost" },
+    ];
+
     return (
         <Layout>
-            <div className="page-header">
-                <h1>Production</h1>
-
-                <button
-                    className="primary-btn"
-                    onClick={() => setShowAddForm(!showAddForm)}
-                >
-                    {showAddForm ? "Cancel" : "+ Add Production"}
-                </button>
-            </div>
+            <PageHeader
+                title="Production"
+                subtitle="Manage Production Records"
+                actions={
+                    <Button
+                        variant="primary"
+                        onClick={() => setShowAddForm(!showAddForm)}
+                    >
+                        {showAddForm ? "Cancel" : "+ Add Production"}
+                    </Button>
+                }
+            />
 
             <div className="table-container">
-                {
-                    showAddForm && (
+                {showAddForm && (
+                    <div className="add-form">
+                        <InputField
+                            type="date"
+                            value={newProduction.production_date}
+                            onChange={(e) =>
+                                setNewProduction({
+                                    ...newProduction,
+                                    production_date: e.target.value,
+                                })
+                            }
+                        />
+                        <SelectField
+                            label="Select Product"
+                            name="product_id"
+                            value={newProduction.product_id}
+                            onChange={(e) =>
+                                setNewProduction({
+                                    ...newProduction,
+                                    product_id: e.target.value,
+                                })
+                            }
+                            options={productOptions}
+                        />
+                        <InputField
+                            type="number"
+                            placeholder="Quantity"
+                            value={newProduction.quantity_tons}
+                            onChange={(e) =>
+                                setNewProduction({
+                                    ...newProduction,
+                                    quantity_tons: e.target.value,
+                                })
+                            }
+                        />
+                        <SelectField
+                            label="Unit"
+                            name="unit"
+                            value={newProduction.unit}
+                            onChange={(e) =>
+                                setNewProduction({
+                                    ...newProduction,
+                                    unit: e.target.value,
+                                })
+                            }
+                            options={unitOptions}
+                        />
+                        <InputField
+                            type="number"
+                            placeholder="Production Cost"
+                            value={newProduction.production_cost}
+                            onChange={(e) =>
+                                setNewProduction({
+                                    ...newProduction,
+                                    production_cost: e.target.value,
+                                })
+                            }
+                        />
+                        <Button variant="success" onClick={handleAddProduction}>
+                            Save Production
+                        </Button>
+                    </div>
+                )}
 
-                        <div className="add-form">
-                            <input className="edit-input"
-                                type="date"
-                                value={newProduction.production_date}
-                                onChange={(e) =>
-                                    setNewProduction({
-                                        ...newProduction,
-                                        production_date: e.target.value,
-                                    })
-                                }
+                {productions.length === 0 ? (
+                    <EmptyState
+                        title="No Products Found"
+                        message="Click Add Production to create a record."
+                    />
+                ) : (
+                    <CrudTable
+                        columns={columns}
+                        data={productions}
+                        keyField="production_id"
+                        renderActions={(row) => (
+                            <ActionButtons
+                                onEdit={() => handleEdit(row)}
+                                onDelete={() => handleDeleteClick(row.production_id)}
                             />
-                            <select className="edit-select"
-                                value={newProduction.product_id}
-                                onChange={(e) =>
-                                    setNewProduction({
-                                        ...newProduction,
-                                        product_id: e.target.value
-                                    })
-                                }
-                            >
-
-                                <option value="">
-                                    Select Product
-                                </option>
-
-                                {products.map(product => (
-
-                                    <option
-                                        key={product.product_id}
-                                        value={product.product_id}
-                                    >
-                                        {product.product_name}
-                                    </option>
-
-                                ))}
-
-                            </select>
-
-                            <input className="edit-input"
-                                type="number"
-                                placeholder="Quantity"
-                                value={newProduction.quantity_tons}
-                                onChange={(e) =>
-                                    setNewProduction({
-                                        ...newProduction,
-                                        quantity_tons: e.target.value
-                                    })
-                                }
-                            />
-
-                            <select className="edit-select"
-                                value={newProduction.unit}
-                                onChange={(e) =>
-                                    setNewProduction({
-                                        ...newProduction,
-                                        unit: e.target.value
-                                    })
-                                }
-                            >
-
-                                <option value="tons">
-                                    Tons
-                                </option>
-
-                                <option value="brass">
-                                    Brass
-                                </option>
-
-                            </select>
-
-                            <input className="edit-input"
-                                type="number"
-                                placeholder="Production Cost"
-                                value={newProduction.production_cost}
-                                onChange={(e) =>
-                                    setNewProduction({
-                                        ...newProduction,
-                                        production_cost: e.target.value
-                                    })
-                                }
-                            />
-
-                            <button
-                                className="save-btn"
-                                onClick={handleAddProduction}
-                            >
-                                Save Production
-                            </button>
-
-                        </div>
-
-                    )
-                }
-                <table>
-
-                    <thead>
-                        <tr>
-                            {/* <th>Production ID</th> */}
-                            <th>Production Date</th>
-                            <th>Product Name</th>
-                            <th>Quantity</th>
-                            <th>Units</th>
-                            <th>Production Cost</th>
-                            <th>Action</th>
-
-                        </tr>
-                    </thead>
-
-                    <tbody>
-
-                        {productions.length === 0 ? (
-                            <tr>
-                                <td colSpan="5" style={{ textAlign: "center" }}>
-                                    No Products Found
-                                </td>
-                            </tr>
-                        ) : (
-                            productions.map((production) => (
-                                <tr key={production.production_id}>
-                                    {/* <td>{product.production_id}</td> */}
-                                    <td>
-                                        {editingId === production.production_id ? (
-                                            <input className="edit-input"
-                                                type="date"
-                                                value={editData.production_date}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        production_date: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            production.production_date
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === production.production_id ? (
-                                            <select
-                                                value={editData.product_id}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        product_id: e.target.value,
-                                                    })
-                                                }
-                                            >
-                                                {products.map((product) => (
-                                                    <option
-                                                        key={product.product_id}
-                                                        value={product.product_id}
-                                                    >
-                                                        {product.product_name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        ) : (
-                                            production.product_name
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === production.production_id ? (
-                                            <input className="edit-input"
-                                                type="number"
-                                                value={editData.quantity_tons}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        quantity_tons: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            production.quantity_tons
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === production.production_id ? (
-                                            <select
-                                                value={editData.unit}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        unit: e.target.value,
-                                                    })
-                                                }
-                                            >
-                                                <option value="tons">Tons</option>
-                                                <option value="brass">Brass</option>
-                                            </select>
-                                        ) : (
-                                            production.unit
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === production.production_id ? (
-                                            <input className="edit-input"
-                                                type="number"
-                                                value={editData.production_cost}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        production_cost: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            production.production_cost
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === production.production_id ? (
-                                            <>
-                                                <button
-                                                className="save-btn"
-                                                    onClick={() =>
-                                                        handleSave(production.production_id)
-                                                    }
-                                                >
-                                                    Save
-                                                </button>
-
-                                                <button
-                                                className="cancel-btn"
-                                                    onClick={handleCancel}
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <button className="edit-btn"
-                                                    onClick={() =>
-                                                        handleEdit(production)
-                                                    }
-                                                >
-                                                    Edit
-                                                </button>
-
-                                                <button className="delete-btn"
-                                                    onClick={() =>
-                                                        handleDelete(production.production_id)
-                                                    }
-                                                >
-                                                    Delete
-                                                </button>
-                                            </>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))
                         )}
-
-                    </tbody>
-
-                </table>
-
+                    />
+                )}
             </div>
 
+            {/* Edit Modal architecture replacing inline layout table fields */}
+            <EditModal
+                isOpen={editingId !== null}
+                title="Edit Production"
+                onSave={handleSave}
+                onClose={handleCancel}
+            >
+                <InputField
+                    label="Production Date"
+                    type="date"
+                    value={editData.production_date}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            production_date: e.target.value,
+                        })
+                    }
+                />
+                <SelectField
+                    label="Product Name"
+                    name="product_id"
+                    value={editData.product_id}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            product_id: e.target.value,
+                        })
+                    }
+                    options={productOptions}
+                />
+                <InputField
+                    label="Quantity"
+                    type="number"
+                    value={editData.quantity_tons}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            quantity_tons: e.target.value,
+                        })
+                    }
+                />
+                <SelectField
+                    label="Units"
+                    name="unit"
+                    value={editData.unit}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            unit: e.target.value,
+                        })
+                    }
+                    options={unitOptions}
+                />
+                <InputField
+                    label="Production Cost"
+                    type="number"
+                    value={editData.production_cost}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            production_cost: e.target.value,
+                        })
+                    }
+                />
+            </EditModal>
+
+            {/* Confirm Modal replacing window.confirm */}
+            <ConfirmModal
+                isOpen={showConfirm}
+                title="Delete Production"
+                message="Delete this production record?"
+                onConfirm={confirmDelete}
+                onCancel={() => {
+                    setShowConfirm(false);
+                    setDeleteTargetId(null);
+                }}
+            />
         </Layout>
     );
 }

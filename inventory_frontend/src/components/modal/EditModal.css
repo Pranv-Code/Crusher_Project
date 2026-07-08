@@ -1,0 +1,48 @@
+.edit-modal {
+    width: 100%;
+    max-width: 700px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    animation: modalFade .2s ease;
+    overflow: hidden;
+}
+
+.edit-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 24px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.edit-modal-header h2 {
+    margin: 0;
+    color: #1f2937;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #6b7280;
+}
+
+.close-btn:hover {
+    color: #111827;
+}
+
+.edit-modal-body {
+    padding: 24px;
+    max-height: 65vh;
+    overflow-y: auto;
+}
+
+.edit-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 18px 24px;
+    border-top: 1px solid #e5e7eb;
+}

@@ -8,12 +8,22 @@ import {
     deleteParty,
 } from "../services/partyApi";
 
+// Component Imports
+import Button from "../components/common/Button";
+import InputField from "../components/common/InputField";
+import SearchBar from "../components/common/SearchBar";
+import PageHeader from "../components/common/PageHeader";
+import EmptyState from "../components/common/EmptyState";
+
+import CrudTable from "../components/table/CrudTable";
+import ActionButtons from "../components/table/ActionButtons";
+
+import ConfirmModal from "../components/modal/ConfirmModal";
+import EditModal from "../components/modal/EditModal";
+
 function Parties() {
-
     const [parties, setParties] = useState([]);
-
     const [search, setSearch] = useState("");
-
     const [showAddForm, setShowAddForm] = useState(false);
 
     const [newParty, setNewParty] = useState({
@@ -24,466 +34,253 @@ function Parties() {
     });
 
     const [editingId, setEditingId] = useState(null);
-
     const [editData, setEditData] = useState({
         party_name: "",
         gst_no: "",
         address: "",
         pan_no: "",
     });
-        const fetchParties = async () => {
 
+    // Confirmation modal states to replace window.confirm
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState(null);
+
+    const fetchParties = async () => {
         try {
-
             const res = await getParties();
-
             setParties(res.data);
-
         } catch (err) {
-
             console.error(err);
-
         }
-
     };
 
     useEffect(() => {
-
         fetchParties();
-
     }, []);
-        const filteredParties = parties.filter((party) =>
 
-        party.party_name
-            .toLowerCase()
-            .includes(search.toLowerCase())
-
+    const filteredParties = parties.filter((party) =>
+        party.party_name.toLowerCase().includes(search.toLowerCase())
     );
-        const handleAddParty = async () => {
 
+    const handleAddParty = async () => {
         if (!newParty.party_name.trim()) {
-
             alert("Party Name is required");
-
             return;
-
         }
-
         try {
-
             await addParty(newParty);
-
             fetchParties();
-
             setNewParty({
                 party_name: "",
                 gst_no: "",
                 address: "",
                 pan_no: "",
             });
-
             setShowAddForm(false);
-
         } catch (err) {
-
             console.error(err);
-
         }
-
     };
-        const handleEdit = (party) => {
 
+    const handleEdit = (party) => {
         setEditingId(party.party_id);
-
         setEditData({
-
             party_name: party.party_name,
-
             gst_no: party.gst_no,
-
             address: party.address,
-
             pan_no: party.pan_no,
-
         });
-
     };
-        const handleSave = async (id) => {
 
+    const handleSave = async () => {
         try {
-
-            await updateParty(id, editData);
-
+            await updateParty(editingId, editData);
             fetchParties();
-
             setEditingId(null);
-
         } catch (err) {
-
             console.error(err);
-
-        }};
-
-           const handleDelete = async (id) => {
-
-    const confirmDelete = window.confirm(
-        "Are you sure you want to delete this party?"
-    );
-
-    if (!confirmDelete) return;
-
-    try {
-
-        await deleteParty(id);
-
-        fetchParties();
-
-    } catch (err) {
-
-        console.error(err);
-
-        alert(
-            err.response?.data?.message ||
-            "Failed to delete party."
-        );
-
-    }
-
-};
-
-        const handleCancel = () => {
-
-        setEditingId(null);
-
+        }
     };
+
+    const handleDeleteClick = (id) => {
+        setDeleteTargetId(id);
+        setShowConfirm(true);
+    };
+
+    const confirmDelete = async () => {
+        setShowConfirm(false);
+        try {
+            await deleteParty(deleteTargetId);
+            fetchParties();
+        } catch (err) {
+            console.error(err);
+            alert(
+                err.response?.data?.message ||
+                "Failed to delete party."
+            );
+        } finally {
+            setDeleteTargetId(null);
+        }
+    };
+
+    const handleCancel = () => {
+        setEditingId(null);
+    };
+
+    // Configuration schema for CrudTable structural mapping
+    const columns = [
+        { key: "party_name", label: "Party Name" },
+        { key: "gst_no", label: "GST No" },
+        { key: "pan_no", label: "PAN No" },
+        { key: "address", label: "Address" }
+    ];
+
     return (
-    <Layout>
+        <Layout>
+            <PageHeader
+                title="Parties"
+                subtitle="Manage Parties"
+                actions={
+                    <Button
+                        variant={showAddForm ? "secondary" : "primary"}
+                        onClick={() => setShowAddForm(!showAddForm)}
+                    >
+                        {showAddForm ? "Cancel" : "+ Add Party"}
+                    </Button>
+                }
+            />
 
-        <div className="page-header">
-
-            <h1>Parties</h1>
-
-            <button
-                className="primary-btn"
-                onClick={() => setShowAddForm(!showAddForm)}
-            >
-                {showAddForm ? "Cancel" : "+ Add Party"}
-            </button>
-
-        </div>
-
-        {showAddForm && (
-
-            <div className="form-card">
-
-                <div className="form-grid">
-
-                    <div className="form-group">
-
-                        <label>Party Name</label>
-
-                        <input
+            {showAddForm && (
+                <div className="form-card">
+                    <div className="form-grid">
+                        <InputField
+                            label="Party Name"
+                            name="party_name"
                             type="text"
                             value={newParty.party_name}
                             onChange={(e) =>
-                                setNewParty({
-                                    ...newParty,
-                                    party_name: e.target.value,
-                                })
+                                setNewParty({ ...newParty, party_name: e.target.value })
                             }
                         />
-
-                    </div>
-
-                    <div className="form-group">
-
-                        <label>GST No</label>
-
-                        <input
+                        <InputField
+                            label="GST No"
+                            name="gst_no"
                             type="text"
                             value={newParty.gst_no}
                             onChange={(e) =>
-                                setNewParty({
-                                    ...newParty,
-                                    gst_no: e.target.value,
-                                })
+                                setNewParty({ ...newParty, gst_no: e.target.value })
                             }
                         />
-
-                    </div>
-
-                    <div className="form-group">
-
-                        <label>PAN No</label>
-
-                        <input
+                        <InputField
+                            label="PAN No"
+                            name="pan_no"
                             type="text"
                             value={newParty.pan_no}
                             onChange={(e) =>
-                                setNewParty({
-                                    ...newParty,
-                                    pan_no: e.target.value,
-                                })
+                                setNewParty({ ...newParty, pan_no: e.target.value })
                             }
                         />
-
-                    </div>
-
-                    <div className="form-group">
-
-                        <label>Address</label>
-
-                        <input
+                        <InputField
+                            label="Address"
+                            name="address"
                             type="text"
                             value={newParty.address}
                             onChange={(e) =>
-                                setNewParty({
-                                    ...newParty,
-                                    address: e.target.value,
-                                })
+                                setNewParty({ ...newParty, address: e.target.value })
                             }
                         />
-
                     </div>
-
+                    <Button variant="success" onClick={handleAddParty}>
+                        Save Party
+                    </Button>
                 </div>
+            )}
 
-                <button
-                    className="primary-btn"
-                    onClick={handleAddParty}
-                >
-                    Save Party
-                </button>
-
-            </div>
-
-        )}
-
-        <div className="table-container">
-
-            <div style={{ marginBottom: "20px" }}>
-
-                <input
-                    className="edit-input"
-                    placeholder="Search Party..."
+            <div className="table-container">
+                <SearchBar
                     value={search}
-                    onChange={(e) =>
-                        setSearch(e.target.value)
-                    }
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search Party..."
                 />
 
+                {filteredParties.length === 0 ? (
+                    <EmptyState
+                        title="No Parties Found"
+                        message="Click Add Party to create one."
+                    />
+                ) : (
+                    <CrudTable
+                        columns={columns}
+                        data={filteredParties}
+                        keyField="party_id"
+                        renderActions={(row) => (
+                            <ActionButtons
+                                onEdit={() => handleEdit(row)}
+                                onDelete={() => handleDeleteClick(row.party_id)}
+                            />
+                        )}
+                    />
+                )}
             </div>
 
-            <table>
-
-                <thead>
-
-                    <tr>
-
-                        <th>Party Name</th>
-
-                        <th>GST No</th>
-
-                        <th>PAN No</th>
-
-                        <th>Address</th>
-
-                        <th>Action</th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    {
-                        filteredParties.length === 0 ?
-
-                            <tr>
-
-                                <td
-                                    colSpan="5"
-                                    style={{ textAlign: "center" }}
-                                >
-
-                                    No Parties Found
-
-                                </td>
-
-                            </tr>
-
-                            :
-
-                            filteredParties.map((party) => (
-
-                                <tr key={party.party_id}>
-
-                                    <td>
-
-                                        {
-
-                                            editingId === party.party_id ?
-
-                                                <input
-                                                    className="edit-input"
-                                                    value={editData.party_name}
-                                                    onChange={(e) =>
-                                                        setEditData({
-                                                            ...editData,
-                                                            party_name: e.target.value,
-                                                        })
-                                                    }
-                                                />
-
-                                                :
-
-                                                party.party_name
-
-                                        }
-
-                                    </td>
-
-                                    <td>
-
-                                        {
-
-                                            editingId === party.party_id ?
-
-                                                <input
-                                                    className="edit-input"
-                                                    value={editData.gst_no}
-                                                    onChange={(e) =>
-                                                        setEditData({
-                                                            ...editData,
-                                                            gst_no: e.target.value,
-                                                        })
-                                                    }
-                                                />
-
-                                                :
-
-                                                party.gst_no
-
-                                        }
-
-                                    </td>
-
-                                    <td>
-
-                                        {
-
-                                            editingId === party.party_id ?
-
-                                                <input
-                                                    className="edit-input"
-                                                    value={editData.pan_no}
-                                                    onChange={(e) =>
-                                                        setEditData({
-                                                            ...editData,
-                                                            pan_no: e.target.value,
-                                                        })
-                                                    }
-                                                />
-
-                                                :
-
-                                                party.pan_no
-
-                                        }
-
-                                    </td>
-
-                                    <td>
-
-                                        {
-
-                                            editingId === party.party_id ?
-
-                                                <input
-                                                    className="edit-input"
-                                                    value={editData.address}
-                                                    onChange={(e) =>
-                                                        setEditData({
-                                                            ...editData,
-                                                            address: e.target.value,
-                                                        })
-                                                    }
-                                                />
-
-                                                :
-
-                                                party.address
-
-                                        }
-
-                                    </td>
-
-                                    <td>
-
-                                        {
-
-                                            editingId === party.party_id ?
-
-                                                <>
-
-                                                    <button
-                                                        className="save-btn"
-                                                        onClick={() =>
-                                                            handleSave(party.party_id)
-                                                        }
-                                                    >
-                                                        Save
-                                                    </button>
-
-                                                    <button
-                                                        className="cancel-btn"
-                                                        onClick={handleCancel}
-                                                    >
-                                                        Cancel
-                                                    </button>
-
-                                                </>
-
-                                                :
-
-                                                <>
-
-                                                    <button
-                                                        className="edit-btn"
-                                                        onClick={() =>
-                                                            handleEdit(party)
-                                                        }
-                                                    >
-                                                        Edit
-                                                    </button>
-
-                                                    <button
-                                                        className="delete-btn"
-                                                        onClick={() =>
-                                                            handleDelete(party.party_id)
-                                                        }
-                                                    >
-                                                        Delete
-                                                    </button>
-
-                                                </>
-
-                                        }
-
-                                    </td>
-
-                                </tr>
-
-                            ))
-
+            {/* Edit Modal (Replaces old primitive table row layout inline inputs) */}
+            <EditModal
+                isOpen={editingId !== null}
+                title="Edit Party"
+                onSave={handleSave}
+                onClose={handleCancel}
+            >
+                <InputField
+                    label="Party Name"
+                    name="party_name"
+                    type="text"
+                    value={editData.party_name}
+                    onChange={(e) =>
+                        setEditData({ ...editData, party_name: e.target.value })
                     }
+                />
+                <InputField
+                    label="GST No"
+                    name="gst_no"
+                    type="text"
+                    value={editData.gst_no}
+                    onChange={(e) =>
+                        setEditData({ ...editData, gst_no: e.target.value })
+                    }
+                />
+                <InputField
+                    label="PAN No"
+                    name="pan_no"
+                    type="text"
+                    value={editData.pan_no}
+                    onChange={(e) =>
+                        setEditData({ ...editData, pan_no: e.target.value })
+                    }
+                />
+                <InputField
+                    label="Address"
+                    name="address"
+                    type="text"
+                    value={editData.address}
+                    onChange={(e) =>
+                        setEditData({ ...editData, address: e.target.value })
+                    }
+                />
+            </EditModal>
 
-                </tbody>
+            {/* Confirm Modal (Replaces old window.confirm popup dialog) */}
+            <ConfirmModal
+                isOpen={showConfirm}
+                title="Delete Party"
+                message="Are you sure you want to delete this party?"
+                onConfirm={confirmDelete}
+                onCancel={() => {
+                    setShowConfirm(false);
+                    setDeleteTargetId(null);
+                }}
+            />
+        </Layout>
+    );
+}
 
-            </table>
-
-        </div>
-
-    </Layout>
-);}
 export default Parties;
