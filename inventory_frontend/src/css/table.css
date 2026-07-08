@@ -47,3 +47,48 @@ table button{
     color:white;
     border-radius:5px;
 }
+.table-container{
+
+    background:#fff;
+
+    border-radius:12px;
+
+    padding:20px;
+
+    box-shadow:0 3px 10px rgba(0,0,0,.08);
+
+}
+
+.table-container table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+    table-layout:fixed;
+
+}
+
+.table-container th{
+
+    background:#f8fafc;
+
+    color:#374151;
+
+    font-size:14px;
+
+    font-weight:600;
+
+    padding:14px;
+
+}
+
+.table-container td{
+
+    padding:14px;
+
+    border-top:1px solid #e5e7eb;
+
+    vertical-align:middle;
+
+}

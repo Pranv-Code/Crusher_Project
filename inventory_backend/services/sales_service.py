@@ -59,7 +59,7 @@ def add_sale():
             INSERT INTO Sales
             (
                 sales_date,
-                party_name,
+                party_id,
                 product_id,
                 vehicle_number,
                 quantity_tons,
@@ -70,7 +70,7 @@ def add_sale():
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             data["sale_date"],
-            data["party_name"],
+            data["party_id"],
             data["product_id"],
             data["vehicle_number"],
             qty,

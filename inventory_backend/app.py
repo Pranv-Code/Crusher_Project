@@ -6,6 +6,7 @@ from routes.product_routes import product_bp
 from routes.production_routes import production_bp
 from routes.vehicle_routes import vehicle_bp
 from routes.vehicle_activity_routes import vehicle_activity_bp
+from routes.party_routes import party_bp
 from routes.sales_routes import sales_bp
 
 
@@ -40,6 +41,7 @@ app.register_blueprint(product_bp)
 app.register_blueprint(production_bp)
 app.register_blueprint(vehicle_bp)
 app.register_blueprint(vehicle_activity_bp)
+app.register_blueprint(party_bp)
 app.register_blueprint(sales_bp)
 
 

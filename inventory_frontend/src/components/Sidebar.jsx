@@ -10,7 +10,7 @@ function Sidebar() {
         { name: "Production", path: "/production" },
         { name: "Vehicles", path: "/vehicles" },
         { name: "Sales", path: "/sales" },
-        { name: "Party", path: "/party" },
+        { name: "Parties", path: "/parties" },
         { name: "Reports", path: "/reports" },
     ];
 

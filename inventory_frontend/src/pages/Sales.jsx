@@ -4,7 +4,25 @@ import api from "../services/api";
 
 function Sales() {
     const [sales, setSales] = useState([]);
+    const [newSale, setNewSale] = useState({
 
+        sales_date: "",
+
+        party_id: "",
+
+        product_id: "",
+
+        vehicle_number: "",
+
+        quantity_tons: "",
+
+        unit: "tons",
+
+        site: "",
+
+        price: "",
+
+    });
     useEffect(() => {
         api.get("/sales")
             .then((res) => {
