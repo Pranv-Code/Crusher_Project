@@ -54,9 +54,14 @@
 
     border-radius:6px;
 
-    min-width:180px;
-    font-size: 15px;
+    min-width:120px;
+
+    font-size: 14px;
+
+    width:100%;
+
 }
+
 .save-btn{
 
     background:#16a34a;

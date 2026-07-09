@@ -1,23 +1,36 @@
 import React, { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
+import { useInventory } from "../context/InventoryContext";
 
 import {
-    getSales,
     addSale,
     updateSale,
     deleteSale,
 } from "../services/salesApi";
 
-import { getActiveProducts } from "../services/productApi";
-import { getParties } from "../services/partyApi";
-import { getVehicles } from "../services/vehicleApi";
+// Reusable Component Imports
+import Button from "../components/common/Button";
+import InputField from "../components/common/InputField";
+import SelectField from "../components/common/SelectField";
+import EditModal from "../components/modal/EditModal";
 
 const Sales = () => {
+    // --- Context Hook ---
+    const {
+        sales,
+        fetchSales,
+        activeProducts,
+        fetchActiveProducts,
+        parties,
+        fetchParties,
+        vehicles,
+        fetchVehicles,
+        fetchProducts
+    } = useInventory();
+
+    const products = activeProducts;
+
     // --- State Declarations ---
-    const [sales, setSales] = useState([]);
-    const [products, setProducts] = useState([]);
-    const [parties, setParties] = useState([]);
-    const [vehicles, setVehicles] = useState([]);
     const [search, setSearch] = useState("");
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -35,47 +48,10 @@ const Sales = () => {
 
     const [editData, setEditData] = useState({});
 
-    // --- API Fetching Functions ---
-    const fetchSales = async () => {
-        try {
-            const res = await getSales();
-            setSales(res.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    const fetchProducts = async () => {
-        try {
-            const res = await getActiveProducts();
-            setProducts(res.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    const fetchParties = async () => {
-        try {
-            const res = await getParties();
-            setParties(res.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    const fetchVehicles = async () => {
-        try {
-            const res = await getVehicles();
-            setVehicles(res.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
     // --- Lifecycle Hook ---
     useEffect(() => {
         fetchSales();
-        fetchProducts();
+        fetchActiveProducts();
         fetchParties();
         fetchVehicles();
     }, []);
@@ -89,7 +65,9 @@ const Sales = () => {
     const handleAddSale = async () => {
         try {
             await addSale(newSale);
-            fetchSales();
+            await fetchSales(true);
+            await fetchProducts(true);
+            await fetchActiveProducts(true);
             setShowAddForm(false);
             setNewSale({
                 sales_date: "",
@@ -123,7 +101,9 @@ const Sales = () => {
     const handleSave = async (id) => {
         try {
             await updateSale(id, editData);
-            fetchSales();
+            await fetchSales(true);
+            await fetchProducts(true);
+            await fetchActiveProducts(true);
             setEditingId(null);
         } catch (err) {
             console.error(err);
@@ -134,7 +114,9 @@ const Sales = () => {
         if (!window.confirm("Delete Sale?")) return;
         try {
             await deleteSale(id);
-            fetchSales();
+            await fetchSales(true);
+            await fetchProducts(true);
+            await fetchActiveProducts(true);
         } catch (err) {
             console.error(err);
         }
@@ -329,174 +311,24 @@ const Sales = () => {
                         ) : (
                             filteredSales.map((sale) => (
                                 <tr key={sale.sales_id}>
+                                    <td>{sale.sales_date}</td>
+                                    <td>{sale.party_name}</td>
+                                    <td>{sale.product_name}</td>
+                                    <td>{sale.vehicle_number}</td>
                                     <td>
-                                        {editingId === sale.sales_id ? (
-                                            <input
-                                                className="edit-input"
-                                                type="date"
-                                                value={editData.sales_date || ""}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        sales_date: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            sale.sales_date
-                                        )}
+                                        {`${sale.display_quantity || sale.quantity} ${sale.unit}`}
                                     </td>
+                                    <td>{sale.site}</td>
+                                    <td>{sale.price}</td>
                                     <td>
-                                        {editingId === sale.sales_id ? (
-                                            <select
-                                                className="edit-select"
-                                                value={editData.party_id || ""}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        party_id: e.target.value,
-                                                    })
-                                                }
-                                            >
-                                                {parties.map((party) => (
-                                                    <option key={party.party_id} value={party.party_id}>
-                                                        {party.party_name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        ) : (
-                                            sale.party_name
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === sale.sales_id ? (
-                                            <select
-                                                className="edit-select"
-                                                value={editData.product_id || ""}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        product_id: e.target.value,
-                                                    })
-                                                }
-                                            >
-                                                {products.map((product) => (
-                                                    <option key={product.product_id} value={product.product_id}>
-                                                        {product.product_name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        ) : (
-                                            sale.product_name
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === sale.sales_id ? (
-                                            <select
-                                                className="edit-select"
-                                                value={editData.vehicle_number || ""}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        vehicle_number: e.target.value,
-                                                    })
-                                                }
-                                            >
-                                                {vehicles.map((vehicle) => (
-                                                    <option key={vehicle.vehicle_number} value={vehicle.vehicle_number}>
-                                                        {vehicle.vehicle_number}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        ) : (
-                                            sale.vehicle_number
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === sale.sales_id ? (
-                                            <>
-                                                <input
-                                                    className="edit-input"
-                                                    type="number"
-                                                    value={editData.quantity || ""}
-                                                    onChange={(e) =>
-                                                        setEditData({
-                                                            ...editData,
-                                                            quantity: e.target.value,
-                                                        })
-                                                    }
-                                                />
-                                                <select
-                                                    className="edit-select"
-                                                    value={editData.unit || "tons"}
-                                                    onChange={(e) =>
-                                                        setEditData({
-                                                            ...editData,
-                                                            unit: e.target.value,
-                                                        })
-                                                    }
-                                                >
-                                                    <option value="tons">Tons</option>
-                                                    <option value="brass">Brass</option>
-                                                </select>
-                                            </>
-                                        ) : (
-                                            `${sale.display_quantity || sale.quantity} ${sale.unit}`
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === sale.sales_id ? (
-                                            <input
-                                                className="edit-input"
-                                                value={editData.site || ""}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        site: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            sale.site
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === sale.sales_id ? (
-                                            <input
-                                                className="edit-input"
-                                                type="number"
-                                                value={editData.price || ""}
-                                                onChange={(e) =>
-                                                    setEditData({
-                                                        ...editData,
-                                                        price: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            sale.price
-                                        )}
-                                    </td>
-                                    <td>
-                                        {editingId === sale.sales_id ? (
-                                            <>
-                                                <button className="save-btn" onClick={() => handleSave(sale.sales_id)}>
-                                                    Save
-                                                </button>
-                                                <button className="cancel-btn" onClick={handleCancel}>
-                                                    Cancel
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <button className="edit-btn" onClick={() => handleEdit(sale)}>
-                                                    Edit
-                                                </button>
-                                                <button className="delete-btn" onClick={() => handleDelete(sale.sales_id)}>
-                                                    Delete
-                                                </button>
-                                            </>
-                                        )}
+                                        <>
+                                            <button className="edit-btn" onClick={() => handleEdit(sale)}>
+                                                Edit
+                                            </button>
+                                            <button className="delete-btn" onClick={() => handleDelete(sale.sales_id)}>
+                                                Delete
+                                            </button>
+                                        </>
                                     </td>
                                 </tr>
                             ))
@@ -504,8 +336,129 @@ const Sales = () => {
                     </tbody>
                 </table>
             </div>
+
+            {/* Edit modal (replaces inline row editing) */}
+            <EditModal
+                isOpen={editingId !== null}
+                title="Edit Sale"
+                onSave={() => handleSave(editingId)}
+                onClose={handleCancel}
+            >
+                <InputField
+                    label="Sale Date"
+                    type="date"
+                    value={editData.sales_date || ""}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            sales_date: e.target.value,
+                        })
+                    }
+                />
+
+                <SelectField
+                    label="Party"
+                    name="party_id"
+                    value={editData.party_id || ""}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            party_id: e.target.value,
+                        })
+                    }
+                    options={parties.map((p) => ({
+                        value: p.party_id,
+                        label: p.party_name,
+                    }))}
+                />
+
+                <SelectField
+                    label="Product"
+                    name="product_id"
+                    value={editData.product_id || ""}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            product_id: e.target.value,
+                        })
+                    }
+                    options={products.map((p) => ({
+                        value: p.product_id,
+                        label: p.product_name,
+                    }))}
+                />
+
+                <SelectField
+                    label="Vehicle"
+                    name="vehicle_number"
+                    value={editData.vehicle_number || ""}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            vehicle_number: e.target.value,
+                        })
+                    }
+                    options={vehicles.map((v) => ({
+                        value: v.vehicle_number,
+                        label: v.vehicle_number,
+                    }))}
+                />
+
+                <InputField
+                    label="Quantity"
+                    type="number"
+                    value={editData.quantity || ""}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            quantity: e.target.value,
+                        })
+                    }
+                />
+
+                <SelectField
+                    label="Unit"
+                    name="unit"
+                    value={editData.unit || "tons"}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            unit: e.target.value,
+                        })
+                    }
+                    options={[
+                        { value: "tons", label: "Tons" },
+                        { value: "brass", label: "Brass" },
+                    ]}
+                />
+
+                <InputField
+                    label="Site"
+                    type="text"
+                    value={editData.site || ""}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            site: e.target.value,
+                        })
+                    }
+                />
+
+                <InputField
+                    label="Price"
+                    type="number"
+                    value={editData.price || ""}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            price: e.target.value,
+                        })
+                    }
+                />
+            </EditModal>
         </Layout>
     );
 };
+
 
 export default Sales;

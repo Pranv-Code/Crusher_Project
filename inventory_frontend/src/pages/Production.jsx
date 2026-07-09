@@ -1,16 +1,12 @@
 import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
+import { useInventory } from "../context/InventoryContext";
 
 import {
-    getProduction,
     addProduction,
     updateProduction,
     deleteProduction
 } from "../services/productionApi";
-
-import {
-    getActiveProducts,
-} from "../services/productApi";
 
 // Reusable Component Imports
 import Button from "../components/common/Button";
@@ -26,8 +22,13 @@ import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
 
 function Production() {
-    const [productions, setProductions] = useState([]);
-    const [products, setProducts] = useState([]);
+    const {
+        production: productions,
+        fetchProduction,
+        activeProducts,
+        fetchActiveProducts,
+        fetchProducts
+    } = useInventory();
 
     const [showAddForm, setShowAddForm] = useState(false);
 
@@ -53,24 +54,6 @@ function Production() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
 
-    const fetchProduction = async () => {
-        try {
-            const res = await getProduction();
-            setProductions(res.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    const fetchProducts = async () => {
-        try {
-            const res = await getActiveProducts();
-            setProducts(res.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
     const handleAddProduction = async () => {
         if (
             !newProduction.product_id ||
@@ -83,7 +66,9 @@ function Production() {
         console.log("Sending to backend:", newProduction);
         try {
             await addProduction(newProduction);
-            fetchProduction();
+            await fetchProduction(true);
+            await fetchProducts(true);
+            await fetchActiveProducts(true);
             setNewProduction({
                 product_id: "",
                 quantity_tons: "",
@@ -110,7 +95,9 @@ function Production() {
     const handleSave = async () => {
         try {
             await updateProduction(editingId, editData);
-            fetchProduction();
+            await fetchProduction(true);
+            await fetchProducts(true);
+            await fetchActiveProducts(true);
             setEditingId(null);
         } catch (err) {
             console.error(err);
@@ -126,7 +113,9 @@ function Production() {
         setShowConfirm(false);
         try {
             await deleteProduction(deleteTargetId);
-            fetchProduction();
+            await fetchProduction(true);
+            await fetchProducts(true);
+            await fetchActiveProducts(true);
         } catch (err) {
             console.error(err);
         } finally {
@@ -140,11 +129,11 @@ function Production() {
 
     useEffect(() => {
         fetchProduction();
-        fetchProducts();
+        fetchActiveProducts();
     }, []);
 
     // Configuration formatting structures
-    const productOptions = products.map((p) => ({
+    const productOptions = activeProducts.map((p) => ({
         value: p.product_id,
         label: p.product_name,
     }));

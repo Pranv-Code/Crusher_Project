@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
+import { useInventory } from "../context/InventoryContext";
 
 import {
-    getVehicles,
     addVehicle,
     updateVehicle,
     deleteVehicle,
@@ -21,7 +21,7 @@ import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
 
 function Vehicles() {
-    const [vehicles, setVehicles] = useState([]);
+    const { vehicles, fetchVehicles } = useInventory();
     const [showAddForm, setShowAddForm] = useState(false);
 
     const [newVehicle, setNewVehicle] = useState({
@@ -40,15 +40,6 @@ function Vehicles() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [deleteTargetNumber, setDeleteTargetNumber] = useState(null);
 
-    const fetchVehicles = async () => {
-        try {
-            const res = await getVehicles();
-            setVehicles(res.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
     useEffect(() => {
         fetchVehicles();
     }, []);
@@ -64,7 +55,7 @@ function Vehicles() {
 
         try {
             await addVehicle(newVehicle);
-            fetchVehicles();
+            await fetchVehicles(true);
             setNewVehicle({
                 vehicle_number: "",
                 owner: "",
@@ -89,7 +80,7 @@ function Vehicles() {
                 editingVehicle,
                 editData
             );
-            fetchVehicles();
+            await fetchVehicles(true);
             setEditingVehicle(null);
         } catch (err) {
             console.error(err);
@@ -105,7 +96,7 @@ function Vehicles() {
         setShowConfirm(false);
         try {
             await deleteVehicle(deleteTargetNumber);
-            fetchVehicles();
+            await fetchVehicles(true);
         } catch (err) {
             console.error(err);
         } finally {

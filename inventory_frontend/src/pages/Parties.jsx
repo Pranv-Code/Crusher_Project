@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
+import { useInventory } from "../context/InventoryContext";
 
 import {
-    getParties,
     addParty,
     updateParty,
     deleteParty,
@@ -22,7 +22,7 @@ import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
 
 function Parties() {
-    const [parties, setParties] = useState([]);
+    const { parties, fetchParties } = useInventory();
     const [search, setSearch] = useState("");
     const [showAddForm, setShowAddForm] = useState(false);
 
@@ -45,15 +45,6 @@ function Parties() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
 
-    const fetchParties = async () => {
-        try {
-            const res = await getParties();
-            setParties(res.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
     useEffect(() => {
         fetchParties();
     }, []);
@@ -69,7 +60,7 @@ function Parties() {
         }
         try {
             await addParty(newParty);
-            fetchParties();
+            await fetchParties(true);
             setNewParty({
                 party_name: "",
                 gst_no: "",
@@ -95,7 +86,7 @@ function Parties() {
     const handleSave = async () => {
         try {
             await updateParty(editingId, editData);
-            fetchParties();
+            await fetchParties(true);
             setEditingId(null);
         } catch (err) {
             console.error(err);
@@ -111,7 +102,7 @@ function Parties() {
         setShowConfirm(false);
         try {
             await deleteParty(deleteTargetId);
-            fetchParties();
+            await fetchParties(true);
         } catch (err) {
             console.error(err);
             alert(

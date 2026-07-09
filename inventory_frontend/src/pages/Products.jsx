@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
+import { useInventory } from "../context/InventoryContext";
 
 import {
-    getProducts,
     addProduct,
     updateProduct,
     deleteProduct,
@@ -22,7 +22,7 @@ import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
 
 function Products() {
-    const [products, setProducts] = useState([]);
+    const { products, fetchProducts, fetchActiveProducts } = useInventory();
     const [showAddForm, setShowAddForm] = useState(false);
 
     const [newProduct, setNewProduct] = useState({
@@ -42,17 +42,6 @@ function Products() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
 
-    // ---------------- Fetch Products ----------------
-
-    const fetchProducts = async () => {
-        try {
-            const res = await getProducts();
-            setProducts(res.data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
     useEffect(() => {
         fetchProducts();
     }, []);
@@ -70,7 +59,8 @@ function Products() {
 
         try {
             await addProduct(newProduct);
-            fetchProducts();
+            await fetchProducts(true);
+            await fetchActiveProducts(true);
             setNewProduct({
                 product_name: "",
                 quantity_tons: "",
@@ -103,7 +93,8 @@ function Products() {
     const handleSave = async () => {
         try {
             await updateProduct(editingId, editData);
-            fetchProducts();
+            await fetchProducts(true);
+            await fetchActiveProducts(true);
             setEditingId(null);
         } catch (err) {
             console.error(err);
@@ -121,7 +112,8 @@ function Products() {
         setShowConfirm(false);
         try {
             await deleteProduct(deleteTargetId);
-            fetchProducts();
+            await fetchProducts(true);
+            await fetchActiveProducts(true);
         } catch (err) {
             console.error(err);
         } finally {
