@@ -9,6 +9,7 @@ from routes.vehicle_activity_routes import vehicle_activity_bp
 from routes.party_routes import party_bp
 from routes.sales_routes import sales_bp
 
+import os
 
 app = Flask(__name__)
 
@@ -46,4 +47,5 @@ app.register_blueprint(sales_bp)
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
