@@ -20,13 +20,16 @@ def view_production():
         p.unit,
         p.quantity_tons,
         p.production_cost
-         FROM production p 
+         FROM Production p 
         JOIN Product pr
             ON p.product_id = pr.product_id
         ORDER BY p.production_date DESC         
         """)
     
     production = cursor.fetchall()
+    for prd in production:
+        if prd["production_date"]:
+                prd["production_date"] = prd["production_date"].strftime("%Y-%m-%d")
     cursor.close()
     conn.close()
 
@@ -261,3 +264,7 @@ def delete_production(id):
 
         cursor.close()
         conn.close()
+
+        # vnhmE0nGQfsw4M -infinityfree password
+        # kafka-33603052 - aiven serviece name 
+        # 
