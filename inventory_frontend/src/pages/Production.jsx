@@ -118,6 +118,7 @@ function Production() {
             await fetchActiveProducts(true);
         } catch (err) {
             console.error(err);
+            alert(err.response?.data?.error || err.response?.data?.message || "Failed to delete production record.");
         } finally {
             setDeleteTargetId(null);
         }

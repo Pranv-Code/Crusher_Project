@@ -8,6 +8,7 @@ from routes.vehicle_routes import vehicle_bp
 from routes.vehicle_activity_routes import vehicle_activity_bp
 from routes.party_routes import party_bp
 from routes.sales_routes import sales_bp
+from routes.vehicle_sale_routes import vehicle_sale_bp
 
 import os
 
@@ -44,6 +45,7 @@ app.register_blueprint(vehicle_bp)
 app.register_blueprint(vehicle_activity_bp)
 app.register_blueprint(party_bp)
 app.register_blueprint(sales_bp)
+app.register_blueprint(vehicle_sale_bp)
 
 
 if __name__ == "__main__":

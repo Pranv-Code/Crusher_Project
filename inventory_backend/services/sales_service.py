@@ -1,6 +1,7 @@
 from flask import request, jsonify
 from db import get_connection
-from utils.unit_converter import unit_convertor,ton_to_brass
+from utils.unit_converter import unit_convertor, ton_to_brass
+
 
 def add_sale():
 
@@ -39,10 +40,12 @@ def add_sale():
 
         if cursor.fetchone() is None:
             return jsonify({"message": "Vehicle not found"}), 404
+
         qty = unit_convertor(
             data['unit'],
             data['quantity']
         )
+
         # ----------------------------
         # *Check Stock
         # ----------------------------
@@ -50,7 +53,7 @@ def add_sale():
             return jsonify({
                 "message": "Insufficient Stock"
             }), 400
-        
+
         # ----------------------------
         # *Check Party
         # ----------------------------
@@ -76,9 +79,12 @@ def add_sale():
                 quantity_tons,
                 unit,
                 site,
-                price
+                price,
+                loading_time,
+                unloading_time,
+                remarks
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             data["sales_date"],
             data["party_id"],
@@ -87,8 +93,21 @@ def add_sale():
             qty,
             data["unit"],
             data["site"],
-            data["price"]
+            data["price"],
+            data.get("loading_time") or None,
+            data.get("unloading_time") or None,
+            data.get("remarks") or None,
         ))
+
+        sales_id = cursor.lastrowid
+
+        # ----------------------------
+        # *Insert into VehicleSale
+        # ----------------------------
+        cursor.execute("""
+            INSERT INTO VehicleSale (sales_id, vehicle_number)
+            VALUES (%s, %s)
+        """, (sales_id, data["vehicle_number"]))
 
         # ----------------------------
         # Update Product Stock
@@ -122,8 +141,6 @@ def add_sale():
         conn.close()
 
 
-from utils.unit_converter import ton_to_brass
-
 def get_sales():
 
     conn = get_connection()
@@ -138,39 +155,69 @@ def get_sales():
             pt.party_name,
             p.product_name,
             s.vehicle_number,
+            v.owner          AS vehicle_owner,
             s.quantity_tons,
             s.unit,
             s.site,
-            s.price
+            s.price,
+            s.loading_time,
+            s.unloading_time,
+            s.remarks
         FROM Sales s
         JOIN Product p
             ON s.product_id = p.product_id
         JOIN Party pt
             ON s.party_id = pt.party_id
-        ORDER BY s.sales_date DESC
+        LEFT JOIN Vehicle v
+            ON s.vehicle_number = v.vehicle_number
+        ORDER BY s.sales_date DESC, s.sales_id DESC
     """)
 
     sales = cursor.fetchall()
 
     for sale in sales:
+        # Format date
         if sale["sales_date"]:
             sale["sales_date"] = sale["sales_date"].strftime("%Y-%m-%d")
-        if sale["unit"].lower() == "brass":
 
-            sale["display_quantity"] = ton_to_brass(
-                sale["quantity_tons"]
-            )
-
+        # Format time fields as HH:MM strings
+        if sale["loading_time"] is not None:
+            total_seconds = int(sale["loading_time"].total_seconds())
+            hours, remainder = divmod(total_seconds, 3600)
+            minutes = remainder // 60
+            sale["loading_time"] = f"{hours:02d}:{minutes:02d}"
         else:
+            sale["loading_time"] = ""
 
-            sale["display_quantity"] = float(
-                sale["quantity_tons"]
-            )
+        if sale["unloading_time"] is not None:
+            total_seconds = int(sale["unloading_time"].total_seconds())
+            hours, remainder = divmod(total_seconds, 3600)
+            minutes = remainder // 60
+            sale["unloading_time"] = f"{hours:02d}:{minutes:02d}"
+        else:
+            sale["unloading_time"] = ""
+
+        qty_tons = float(sale["quantity_tons"])
+        qty_brass = ton_to_brass(qty_tons)
+
+        if sale["unit"].lower() == "brass":
+            # Entry was made in brass — display_quantity is in brass
+            sale["display_quantity"] = qty_brass
+            sale["converted_quantity"] = qty_tons
+            sale["converted_unit"] = "tons"
+        else:
+            # Entry was made in tons
+            sale["display_quantity"] = qty_tons
+            sale["converted_quantity"] = qty_brass
+            sale["converted_unit"] = "brass"
+
+        sale["quantity_tons"] = qty_tons
 
     cursor.close()
     conn.close()
 
     return jsonify(sales)
+
 
 def delete_sale(id):
 
@@ -208,6 +255,14 @@ def delete_sale(id):
         ))
 
         # ----------------------------
+        # Delete VehicleSale entry first
+        # ----------------------------
+        cursor.execute("""
+            DELETE FROM VehicleSale
+            WHERE sales_id=%s
+        """, (id,))
+
+        # ----------------------------
         # Delete Sale
         # ----------------------------
         cursor.execute("""
@@ -233,6 +288,7 @@ def delete_sale(id):
 
         cursor.close()
         conn.close()
+
 
 def update_sale(id):
     print(request.json)
@@ -333,7 +389,10 @@ def update_sale(id):
                 quantity_tons=%s,
                 unit=%s,
                 site=%s,
-                price=%s
+                price=%s,
+                loading_time=%s,
+                unloading_time=%s,
+                remarks=%s
             WHERE sales_id=%s
         """, (
             data["sales_date"],
@@ -344,8 +403,23 @@ def update_sale(id):
             data["unit"],
             data["site"],
             data["price"],
+            data.get("loading_time") or None,
+            data.get("unloading_time") or None,
+            data.get("remarks") or None,
             id
         ))
+
+        # ----------------------------
+        # Sync VehicleSale
+        # ----------------------------
+        cursor.execute("""
+            DELETE FROM VehicleSale WHERE sales_id=%s
+        """, (id,))
+
+        cursor.execute("""
+            INSERT INTO VehicleSale (sales_id, vehicle_number)
+            VALUES (%s, %s)
+        """, (id, data["vehicle_number"]))
 
         conn.commit()
 

@@ -132,10 +132,21 @@ function Products() {
         { value: "Inactive", label: "Inactive" },
     ];
 
+    // Custom renderer for dual-unit quantity display
+    const renderQuantity = (row) => (
+        <div style={{ lineHeight: "1.3" }}>
+            <span>{Number(row.quantity_tons).toFixed(2)} Tons</span>
+            <br />
+            <span style={{ fontSize: "0.75em", color: "var(--text-muted, #888)" }}>
+                ≈ {row.quantity_brass != null ? Number(row.quantity_brass).toFixed(2) : "—"} Brass
+            </span>
+        </div>
+    );
+
     const columns = [
         { key: "product_id", label: "ID" },
         { key: "product_name", label: "Product Name" },
-        { key: "quantity_tons", label: "Quantity" },
+        { key: "quantity_tons", label: "Quantity", render: renderQuantity },
         { key: "status", label: "Status" },
     ];
 

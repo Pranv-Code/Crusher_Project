@@ -14,6 +14,46 @@ import InputField from "../components/common/InputField";
 import SelectField from "../components/common/SelectField";
 import EditModal from "../components/modal/EditModal";
 
+// ─── Helper: format a quantity cell with dual-unit display ───────────────────
+const QtyCell = ({ displayQty, displayUnit, convertedQty, convertedUnit }) => (
+    <div style={{ lineHeight: "1.3" }}>
+        <span>{Number(displayQty).toFixed(2)} {displayUnit}</span>
+        <br />
+        <span style={{ fontSize: "0.75em", color: "var(--text-muted, #888)" }}>
+            ≈ {Number(convertedQty).toFixed(2)} {convertedUnit}
+        </span>
+    </div>
+);
+
+// ─── Helper: format vehicle cell with owner in small text ────────────────────
+const VehicleCell = ({ vehicleNumber, owner }) => (
+    <div style={{ lineHeight: "1.3" }}>
+        <span>{vehicleNumber}</span>
+        {owner && (
+            <>
+                <br />
+                <span style={{ fontSize: "0.75em", color: "var(--text-muted, #888)" }}>
+                    {owner}
+                </span>
+            </>
+        )}
+    </div>
+);
+
+const emptyNewSale = {
+    sales_date: "",
+    party_id: "",
+    product_id: "",
+    vehicle_number: "",
+    quantity: "",
+    unit: "tons",
+    site: "",
+    price: "",
+    loading_time: "",
+    unloading_time: "",
+    remarks: "",
+};
+
 const Sales = () => {
     // --- Context Hook ---
     const {
@@ -25,7 +65,7 @@ const Sales = () => {
         fetchParties,
         vehicles,
         fetchVehicles,
-        fetchProducts
+        fetchProducts,
     } = useInventory();
 
     const products = activeProducts;
@@ -35,17 +75,7 @@ const Sales = () => {
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
 
-    const [newSale, setNewSale] = useState({
-        sales_date: "",
-        party_id: "",
-        product_id: "",
-        vehicle_number: "",
-        quantity: "",
-        unit: "tons",
-        site: "",
-        price: "",
-    });
-
+    const [newSale, setNewSale] = useState(emptyNewSale);
     const [editData, setEditData] = useState({});
 
     // --- Lifecycle Hook ---
@@ -58,7 +88,9 @@ const Sales = () => {
 
     // --- Client Side Filtering ---
     const filteredSales = sales.filter((sale) =>
-        sale.party_name?.toLowerCase().includes(search.toLowerCase())
+        sale.party_name?.toLowerCase().includes(search.toLowerCase()) ||
+        sale.vehicle_number?.toLowerCase().includes(search.toLowerCase()) ||
+        sale.product_name?.toLowerCase().includes(search.toLowerCase())
     );
 
     // --- Action Handlers ---
@@ -69,16 +101,7 @@ const Sales = () => {
             await fetchProducts(true);
             await fetchActiveProducts(true);
             setShowAddForm(false);
-            setNewSale({
-                sales_date: "",
-                party_id: "",
-                product_id: "",
-                vehicle_number: "",
-                quantity: "",
-                unit: "tons",
-                site: "",
-                price: "",
-            });
+            setNewSale(emptyNewSale);
         } catch (err) {
             alert(err.response?.data?.message || "Failed to add sale.");
         }
@@ -95,6 +118,9 @@ const Sales = () => {
             unit: sale.unit,
             site: sale.site,
             price: sale.price,
+            loading_time: sale.loading_time || "",
+            unloading_time: sale.unloading_time || "",
+            remarks: sale.remarks || "",
         });
     };
 
@@ -107,6 +133,7 @@ const Sales = () => {
             setEditingId(null);
         } catch (err) {
             console.error(err);
+            alert(err.response?.data?.message || "Failed to update sale.");
         }
     };
 
@@ -142,29 +169,26 @@ const Sales = () => {
             {showAddForm && (
                 <div className="form-card">
                     <div className="form-grid">
+
+                        {/* Sale Date */}
                         <div className="form-group">
                             <label>Sale Date</label>
                             <input
                                 type="date"
                                 value={newSale.sales_date}
                                 onChange={(e) =>
-                                    setNewSale({
-                                        ...newSale,
-                                        sales_date: e.target.value,
-                                    })
+                                    setNewSale({ ...newSale, sales_date: e.target.value })
                                 }
                             />
                         </div>
 
+                        {/* Party */}
                         <div className="form-group">
                             <label>Party</label>
                             <select
                                 value={newSale.party_id}
                                 onChange={(e) =>
-                                    setNewSale({
-                                        ...newSale,
-                                        party_id: e.target.value,
-                                    })
+                                    setNewSale({ ...newSale, party_id: e.target.value })
                                 }
                             >
                                 <option value="">Select Party</option>
@@ -176,15 +200,13 @@ const Sales = () => {
                             </select>
                         </div>
 
+                        {/* Product */}
                         <div className="form-group">
                             <label>Product</label>
                             <select
                                 value={newSale.product_id}
                                 onChange={(e) =>
-                                    setNewSale({
-                                        ...newSale,
-                                        product_id: e.target.value,
-                                    })
+                                    setNewSale({ ...newSale, product_id: e.target.value })
                                 }
                             >
                                 <option value="">Select Product</option>
@@ -196,49 +218,31 @@ const Sales = () => {
                             </select>
                         </div>
 
+                        {/* Vehicle */}
                         <div className="form-group">
                             <label>Vehicle</label>
                             <select
                                 value={newSale.vehicle_number}
                                 onChange={(e) =>
-                                    setNewSale({
-                                        ...newSale,
-                                        vehicle_number: e.target.value,
-                                    })
+                                    setNewSale({ ...newSale, vehicle_number: e.target.value })
                                 }
                             >
                                 <option value="">Select Vehicle</option>
                                 {vehicles.map((vehicle) => (
                                     <option key={vehicle.vehicle_number} value={vehicle.vehicle_number}>
-                                        {vehicle.vehicle_number}
+                                        {vehicle.vehicle_number}{vehicle.owner ? ` — ${vehicle.owner}` : ""}
                                     </option>
                                 ))}
                             </select>
                         </div>
 
-                        <div className="form-group">
-                            <label>Quantity</label>
-                            <input
-                                type="number"
-                                value={newSale.quantity}
-                                onChange={(e) =>
-                                    setNewSale({
-                                        ...newSale,
-                                        quantity: e.target.value,
-                                    })
-                                }
-                            />
-                        </div>
-
+                        {/* Unit */}
                         <div className="form-group">
                             <label>Unit</label>
                             <select
                                 value={newSale.unit}
                                 onChange={(e) =>
-                                    setNewSale({
-                                        ...newSale,
-                                        unit: e.target.value,
-                                    })
+                                    setNewSale({ ...newSale, unit: e.target.value })
                                 }
                             >
                                 <option value="tons">Tons</option>
@@ -246,33 +250,79 @@ const Sales = () => {
                             </select>
                         </div>
 
+                        {/* Quantity */}
+                        <div className="form-group">
+                            <label>Quantity ({newSale.unit})</label>
+                            <input
+                                type="number"
+                                value={newSale.quantity}
+                                onChange={(e) =>
+                                    setNewSale({ ...newSale, quantity: e.target.value })
+                                }
+                            />
+                        </div>
+
+                        {/* Site */}
                         <div className="form-group">
                             <label>Site</label>
                             <input
                                 type="text"
                                 value={newSale.site}
                                 onChange={(e) =>
-                                    setNewSale({
-                                        ...newSale,
-                                        site: e.target.value,
-                                    })
+                                    setNewSale({ ...newSale, site: e.target.value })
                                 }
                             />
                         </div>
 
+                        {/* Price */}
                         <div className="form-group">
                             <label>Price</label>
                             <input
                                 type="number"
                                 value={newSale.price}
                                 onChange={(e) =>
-                                    setNewSale({
-                                        ...newSale,
-                                        price: e.target.value,
-                                    })
+                                    setNewSale({ ...newSale, price: e.target.value })
                                 }
                             />
                         </div>
+
+                        {/* Loading Time */}
+                        <div className="form-group">
+                            <label>Loading Time</label>
+                            <input
+                                type="time"
+                                value={newSale.loading_time}
+                                onChange={(e) =>
+                                    setNewSale({ ...newSale, loading_time: e.target.value })
+                                }
+                            />
+                        </div>
+
+                        {/* Unloading Time */}
+                        <div className="form-group">
+                            <label>Unloading Time</label>
+                            <input
+                                type="time"
+                                value={newSale.unloading_time}
+                                onChange={(e) =>
+                                    setNewSale({ ...newSale, unloading_time: e.target.value })
+                                }
+                            />
+                        </div>
+
+                        {/* Remarks */}
+                        <div className="form-group" style={{ gridColumn: "1 / -1" }}>
+                            <label>Remarks</label>
+                            <input
+                                type="text"
+                                value={newSale.remarks}
+                                placeholder="Optional notes..."
+                                onChange={(e) =>
+                                    setNewSale({ ...newSale, remarks: e.target.value })
+                                }
+                            />
+                        </div>
+
                     </div>
                     <button className="primary-btn" onClick={handleAddSale}>
                         Save Sale
@@ -283,7 +333,7 @@ const Sales = () => {
             <div className="table-container">
                 <input
                     className="search-box"
-                    placeholder="Search Party..."
+                    placeholder="Search Party, Vehicle, Product..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                 />
@@ -298,13 +348,16 @@ const Sales = () => {
                             <th>Quantity</th>
                             <th>Site</th>
                             <th>Price</th>
+                            <th>Loading</th>
+                            <th>Unloading</th>
+                            <th>Remarks</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredSales.length === 0 ? (
                             <tr>
-                                <td colSpan="8" style={{ textAlign: "center" }}>
+                                <td colSpan="11" style={{ textAlign: "center" }}>
                                     No Sales Found
                                 </td>
                             </tr>
@@ -314,12 +367,25 @@ const Sales = () => {
                                     <td>{sale.sales_date}</td>
                                     <td>{sale.party_name}</td>
                                     <td>{sale.product_name}</td>
-                                    <td>{sale.vehicle_number}</td>
                                     <td>
-                                        {`${sale.display_quantity || sale.quantity} ${sale.unit}`}
+                                        <VehicleCell
+                                            vehicleNumber={sale.vehicle_number}
+                                            owner={sale.vehicle_owner}
+                                        />
+                                    </td>
+                                    <td>
+                                        <QtyCell
+                                            displayQty={sale.display_quantity}
+                                            displayUnit={sale.unit}
+                                            convertedQty={sale.converted_quantity}
+                                            convertedUnit={sale.converted_unit}
+                                        />
                                     </td>
                                     <td>{sale.site}</td>
                                     <td>{sale.price}</td>
+                                    <td>{sale.loading_time || "—"}</td>
+                                    <td>{sale.unloading_time || "—"}</td>
+                                    <td>{sale.remarks || "—"}</td>
                                     <td>
                                         <>
                                             <button className="edit-btn" onClick={() => handleEdit(sale)}>
@@ -337,7 +403,7 @@ const Sales = () => {
                 </table>
             </div>
 
-            {/* Edit modal (replaces inline row editing) */}
+            {/* Edit modal */}
             <EditModal
                 isOpen={editingId !== null}
                 title="Edit Sale"
@@ -349,10 +415,7 @@ const Sales = () => {
                     type="date"
                     value={editData.sales_date || ""}
                     onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            sales_date: e.target.value,
-                        })
+                        setEditData({ ...editData, sales_date: e.target.value })
                     }
                 />
 
@@ -361,10 +424,7 @@ const Sales = () => {
                     name="party_id"
                     value={editData.party_id || ""}
                     onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            party_id: e.target.value,
-                        })
+                        setEditData({ ...editData, party_id: e.target.value })
                     }
                     options={parties.map((p) => ({
                         value: p.party_id,
@@ -377,10 +437,7 @@ const Sales = () => {
                     name="product_id"
                     value={editData.product_id || ""}
                     onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            product_id: e.target.value,
-                        })
+                        setEditData({ ...editData, product_id: e.target.value })
                     }
                     options={products.map((p) => ({
                         value: p.product_id,
@@ -393,27 +450,14 @@ const Sales = () => {
                     name="vehicle_number"
                     value={editData.vehicle_number || ""}
                     onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            vehicle_number: e.target.value,
-                        })
+                        setEditData({ ...editData, vehicle_number: e.target.value })
                     }
                     options={vehicles.map((v) => ({
                         value: v.vehicle_number,
-                        label: v.vehicle_number,
+                        label: v.owner
+                            ? `${v.vehicle_number} — ${v.owner}`
+                            : v.vehicle_number,
                     }))}
-                />
-
-                <InputField
-                    label="Quantity"
-                    type="number"
-                    value={editData.quantity || ""}
-                    onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            quantity: e.target.value,
-                        })
-                    }
                 />
 
                 <SelectField
@@ -421,10 +465,7 @@ const Sales = () => {
                     name="unit"
                     value={editData.unit || "tons"}
                     onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            unit: e.target.value,
-                        })
+                        setEditData({ ...editData, unit: e.target.value })
                     }
                     options={[
                         { value: "tons", label: "Tons" },
@@ -433,14 +474,20 @@ const Sales = () => {
                 />
 
                 <InputField
+                    label="Quantity"
+                    type="number"
+                    value={editData.quantity || ""}
+                    onChange={(e) =>
+                        setEditData({ ...editData, quantity: e.target.value })
+                    }
+                />
+
+                <InputField
                     label="Site"
                     type="text"
                     value={editData.site || ""}
                     onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            site: e.target.value,
-                        })
+                        setEditData({ ...editData, site: e.target.value })
                     }
                 />
 
@@ -449,10 +496,34 @@ const Sales = () => {
                     type="number"
                     value={editData.price || ""}
                     onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            price: e.target.value,
-                        })
+                        setEditData({ ...editData, price: e.target.value })
+                    }
+                />
+
+                <InputField
+                    label="Loading Time"
+                    type="time"
+                    value={editData.loading_time || ""}
+                    onChange={(e) =>
+                        setEditData({ ...editData, loading_time: e.target.value })
+                    }
+                />
+
+                <InputField
+                    label="Unloading Time"
+                    type="time"
+                    value={editData.unloading_time || ""}
+                    onChange={(e) =>
+                        setEditData({ ...editData, unloading_time: e.target.value })
+                    }
+                />
+
+                <InputField
+                    label="Remarks"
+                    type="text"
+                    value={editData.remarks || ""}
+                    onChange={(e) =>
+                        setEditData({ ...editData, remarks: e.target.value })
                     }
                 />
             </EditModal>

@@ -8,6 +8,7 @@ import Sales from "./pages/Sales";
 import Reports from "./pages/Reports";
 import Parties from "./pages/Parties";
 import RawMaterial from "./pages/RawMaterial";
+import VehicleSales from "./pages/VehicleSales";
 
 function AppRoutes() {
     return (
@@ -17,6 +18,7 @@ function AppRoutes() {
             <Route path="/production" element={<Production />} />
             <Route path="/vehicles" element={<Vehicles />} />
             <Route path="/sales" element={<Sales />} />
+            <Route path="/vehicle-sales" element={<VehicleSales />} />
             <Route path="/parties" element={<Parties />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/raw-material" element={<RawMaterial />} />

@@ -15,7 +15,9 @@ def get_connection():
             user=Config.DB_USER,
             password=Config.DB_PASSWORD,
             database=Config.DB_NAME,
-            port=Config.DB_PORT
+            port=Config.DB_PORT,
+            connection_timeout=10,       # fail fast if DB is unreachable
+            autocommit=False,            # explicit commit/rollback required
         )
 
         if connection.is_connected():

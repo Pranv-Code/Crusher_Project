@@ -5,6 +5,7 @@ import { getSales } from "../services/salesApi";
 import { getParties } from "../services/partyApi";
 import { getVehicles } from "../services/vehicleApi";
 import { getVehicleActivities } from "../services/vehicleActivityApi";
+import { getVehicleSales } from "../services/vehicleSaleApi";
 
 const InventoryContext = createContext();
 
@@ -20,6 +21,7 @@ export const InventoryProvider = ({ children }) => {
     const [parties, setParties] = useState([]);
     const [vehicles, setVehicles] = useState([]);
     const [vehicleActivities, setVehicleActivities] = useState([]);
+    const [vehicleSales, setVehicleSales] = useState([]);
 
     const [productsLoaded, setProductsLoaded] = useState(false);
     const [activeProductsLoaded, setActiveProductsLoaded] = useState(false);
@@ -28,6 +30,7 @@ export const InventoryProvider = ({ children }) => {
     const [partiesLoaded, setPartiesLoaded] = useState(false);
     const [vehiclesLoaded, setVehiclesLoaded] = useState(false);
     const [vehicleActivitiesLoaded, setVehicleActivitiesLoaded] = useState(false);
+    const [vehicleSalesLoaded, setVehicleSalesLoaded] = useState(false);
 
     const fetchProducts = async (force = false) => {
         if (productsLoaded && !force) return;
@@ -106,6 +109,17 @@ export const InventoryProvider = ({ children }) => {
         }
     };
 
+    const fetchVehicleSales = async (force = false) => {
+        if (vehicleSalesLoaded && !force) return;
+        try {
+            const res = await getVehicleSales();
+            setVehicleSales(res.data);
+            setVehicleSalesLoaded(true);
+        } catch (err) {
+            console.error("Error fetching vehicle sales:", err);
+        }
+    };
+
     return (
         <InventoryContext.Provider
             value={{
@@ -116,6 +130,7 @@ export const InventoryProvider = ({ children }) => {
                 parties,
                 vehicles,
                 vehicleActivities,
+                vehicleSales,
                 fetchProducts,
                 fetchActiveProducts,
                 fetchProduction,
@@ -123,6 +138,7 @@ export const InventoryProvider = ({ children }) => {
                 fetchParties,
                 fetchVehicles,
                 fetchVehicleActivities,
+                fetchVehicleSales,
             }}
         >
             {children}

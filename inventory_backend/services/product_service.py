@@ -1,6 +1,6 @@
 from flask import jsonify, request
 from db import get_connection
-from utils.unit_converter import unit_convertor
+from utils.unit_converter import unit_convertor, ton_to_brass
 
 
 def get_products():
@@ -13,6 +13,11 @@ def get_products():
 
     cursor.close()
     conn.close()
+
+    # Enrich each product with its brass-equivalent quantity
+    for product in products:
+        if product.get("quantity_tons") is not None:
+            product["quantity_brass"] = ton_to_brass(product["quantity_tons"])
 
     return jsonify(products)
 
