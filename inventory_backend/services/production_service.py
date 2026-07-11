@@ -119,7 +119,7 @@ def add_production():
         conn.close()
 
 def update_production(id):
-
+    import json
     data = request.json
     print("Update Request:", data)
     print("Production ID:", id)
@@ -141,6 +141,20 @@ def update_production(id):
             return jsonify({
                 "message": "Production not found"
             }), 404
+
+        user_role = request.user.get("role")
+        user_id   = request.user.get("user_id")
+
+        if user_role == "Clerk":
+            cursor.execute("""
+                INSERT INTO Approval_Requests (requester_id, request_type, reference_id, reference_data, status)
+                VALUES (%s, 'production_edit', %s, %s, 'pending')
+            """, (user_id, str(id), json.dumps(data)))
+            conn.commit()
+            return jsonify({
+                "message": "Edit request submitted for Manager approval",
+                "status": "pending_approval"
+            }), 202
 
         # Convert new quantity
         new_qty = unit_convertor(
@@ -229,6 +243,20 @@ def delete_production(id):
             return jsonify({
                 "message":"Production not found"
             }),404
+
+        user_role = request.user.get("role")
+        user_id   = request.user.get("user_id")
+
+        if user_role == "Clerk":
+            cursor.execute("""
+                INSERT INTO Approval_Requests (requester_id, request_type, reference_id, reference_data, status)
+                VALUES (%s, 'production_delete', %s, NULL, 'pending')
+            """, (user_id, str(id)))
+            conn.commit()
+            return jsonify({
+                "message": "Delete request submitted for Manager approval",
+                "status": "pending_approval"
+            }), 202
 
         # Reverse stock
         cursor.execute("""

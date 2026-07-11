@@ -1,54 +1,111 @@
-.sidebar{
-
-    width:250px;
-    background:#0f172a;
-    color:white;
-
-    display:flex;
-    flex-direction:column;
-
-    padding:30px 20px;
+.sidebar {
+    width: 250px;
+    background: #0f172a;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    padding: 30px 16px;
+    border-right: 1px solid rgba(255,255,255,0.05);
 }
 
-.logo{
-
-    margin-bottom:40px;
-
-    text-align:center;
-
-    color:#60a5fa;
-
+.logo {
+    margin-bottom: 40px;
+    text-align: center;
+    color: #60a5fa;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 1px;
 }
 
-.sidebar nav{
-
-    display:flex;
-    flex-direction:column;
-
-    gap:12px;
-
+.sidebar nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
-.nav-link{
-
-    padding:12px 18px;
-
-    border-radius:8px;
-
-    color:white;
-
-    transition:.3s;
-
+.nav-link {
+    padding: 11px 16px;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
 }
 
-.nav-link:hover{
-
-    background:#1e3a8a;
-
+.nav-link:hover {
+    background: rgba(255,255,255,0.06);
+    color: #e2e8f0;
+    border-left-color: rgba(96, 165, 250, 0.4);
 }
 
-.active{
+/* ── Active state: premium left border accent ── */
+.active {
+    background: rgba(37, 99, 235, 0.15);
+    color: #93c5fd;
+    border-left: 3px solid #2563eb;
+    font-weight: 600;
+}
 
-    background:#2563eb;
+.sidebar-user {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
 
+.user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.user-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e2e8f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-role {
+    font-size: 11px;
+    display: inline-block;
+    align-self: flex-start;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.user-role.manager {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.user-role.clerk {
+    background-color: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+}
+
+.logout-btn {
+    width: 100%;
+    padding: 8px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.logout-btn:hover {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
 }

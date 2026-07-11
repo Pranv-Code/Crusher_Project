@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from "react";
 import { getProducts, getActiveProducts } from "../services/productApi";
 import { getProduction } from "../services/productionApi";
-import { getSales } from "../services/salesApi";
+import { getSales, getPendingSales } from "../services/salesApi";
 import { getParties } from "../services/partyApi";
 import { getVehicles } from "../services/vehicleApi";
 import { getVehicleActivities } from "../services/vehicleActivityApi";
@@ -18,6 +18,7 @@ export const InventoryProvider = ({ children }) => {
     const [activeProducts, setActiveProducts] = useState([]);
     const [production, setProduction] = useState([]);
     const [sales, setSales] = useState([]);
+    const [pendingSales, setPendingSales] = useState([]);
     const [parties, setParties] = useState([]);
     const [vehicles, setVehicles] = useState([]);
     const [vehicleActivities, setVehicleActivities] = useState([]);
@@ -27,6 +28,7 @@ export const InventoryProvider = ({ children }) => {
     const [activeProductsLoaded, setActiveProductsLoaded] = useState(false);
     const [productionLoaded, setProductionLoaded] = useState(false);
     const [salesLoaded, setSalesLoaded] = useState(false);
+    const [pendingSalesLoaded, setPendingSalesLoaded] = useState(false);
     const [partiesLoaded, setPartiesLoaded] = useState(false);
     const [vehiclesLoaded, setVehiclesLoaded] = useState(false);
     const [vehicleActivitiesLoaded, setVehicleActivitiesLoaded] = useState(false);
@@ -69,10 +71,21 @@ export const InventoryProvider = ({ children }) => {
         if (salesLoaded && !force) return;
         try {
             const res = await getSales();
-            setSales(res.data);
+            setSales(res.data.sales || res.data);
             setSalesLoaded(true);
         } catch (err) {
             console.error("Error fetching sales:", err);
+        }
+    };
+
+    const fetchPendingSales = async (force = false) => {
+        if (pendingSalesLoaded && !force) return;
+        try {
+            const res = await getPendingSales();
+            setPendingSales(res.data.sales || res.data);
+            setPendingSalesLoaded(true);
+        } catch (err) {
+            console.error("Error fetching pending sales:", err);
         }
     };
 
@@ -127,6 +140,7 @@ export const InventoryProvider = ({ children }) => {
                 activeProducts,
                 production,
                 sales,
+                pendingSales,
                 parties,
                 vehicles,
                 vehicleActivities,
@@ -135,6 +149,7 @@ export const InventoryProvider = ({ children }) => {
                 fetchActiveProducts,
                 fetchProduction,
                 fetchSales,
+                fetchPendingSales,
                 fetchParties,
                 fetchVehicles,
                 fetchVehicleActivities,

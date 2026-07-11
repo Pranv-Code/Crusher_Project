@@ -13,12 +13,14 @@
 }
 
 .crud-table th {
-    background: #f8fafc;
-    color: #374151;
-    padding: 14px;
+    background: #f1f5f9;
+    color: #6b7280;
+    padding: 13px 14px;
     text-align: left;
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     border-bottom: 1px solid #e5e7eb;
 }
 
@@ -26,11 +28,15 @@
     padding: 14px;
     border-bottom: 1px solid #f1f5f9;
     font-size: 14px;
-    color: #4b5563;
+    color: #374151;
+}
+
+.crud-table tbody tr {
+    transition: background 0.15s ease;
 }
 
 .crud-table tbody tr:hover {
-    background: #f9fafb;
+    background: #f8fafc;
 }
 
 .actions-column {

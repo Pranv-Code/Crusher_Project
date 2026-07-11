@@ -17,7 +17,3 @@ product_bp.route("/api/products/active", methods=["GET"])(get_active_products)
 product_bp.route("/api/products", methods=["POST"])(add_product)
 product_bp.route("/api/products/<int:id>", methods=["PUT"])(update_product)
 product_bp.route("/api/products/<int:id>", methods=["DELETE"])(delete_product)
-
-product_bp.route("/api/products", methods=["POST"])(add_product)
-product_bp.route("/api/products/<int:id>", methods=["PUT"])(update_product)
-product_bp.route("/api/products/<int:id>", methods=["DELETE"])(delete_product)

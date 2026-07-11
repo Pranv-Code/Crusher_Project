@@ -94,13 +94,15 @@ function Production() {
 
     const handleSave = async () => {
         try {
-            await updateProduction(editingId, editData);
+            const res = await updateProduction(editingId, editData);
+            alert(res.data?.message || "Production Updated Successfully");
             await fetchProduction(true);
             await fetchProducts(true);
             await fetchActiveProducts(true);
             setEditingId(null);
         } catch (err) {
             console.error(err);
+            alert(err.response?.data?.error || err.response?.data?.message || "Failed to update production record.");
         }
     };
 
@@ -112,7 +114,8 @@ function Production() {
     const confirmDelete = async () => {
         setShowConfirm(false);
         try {
-            await deleteProduction(deleteTargetId);
+            const res = await deleteProduction(deleteTargetId);
+            alert(res.data?.message || "Production Deleted Successfully");
             await fetchProduction(true);
             await fetchProducts(true);
             await fetchActiveProducts(true);
@@ -169,8 +172,11 @@ function Production() {
 
             <div className="table-container">
                 {showAddForm && (
-                    <div className="add-form">
+                    <div className="form-card">
+                        <div className="form-grid">
                         <InputField
+                            label="Production Date"
+                            name="production_date"
                             type="date"
                             value={newProduction.production_date}
                             onChange={(e) =>
@@ -193,8 +199,10 @@ function Production() {
                             options={productOptions}
                         />
                         <InputField
+                            label="Quantity"
+                            name="quantity_tons"
                             type="number"
-                            placeholder="Quantity"
+                            placeholder="Enter quantity"
                             value={newProduction.quantity_tons}
                             onChange={(e) =>
                                 setNewProduction({
@@ -216,8 +224,10 @@ function Production() {
                             options={unitOptions}
                         />
                         <InputField
+                            label="Production Cost"
+                            name="production_cost"
                             type="number"
-                            placeholder="Production Cost"
+                            placeholder="Enter cost"
                             value={newProduction.production_cost}
                             onChange={(e) =>
                                 setNewProduction({
@@ -226,6 +236,7 @@ function Production() {
                                 })
                             }
                         />
+                        </div>
                         <Button variant="success" onClick={handleAddProduction}>
                             Save Production
                         </Button>

@@ -37,7 +37,13 @@ function CrudTable({
                                 <td key={column.key}>
                                     {column.render
                                         ? column.render(row)
-                                        : row[column.key]}
+                                        : column.key === "status"
+                                            ? (
+                                                <span className={`badge badge-${row[column.key]?.toLowerCase()}`}>
+                                                    {row[column.key]}
+                                                </span>
+                                            )
+                                            : row[column.key]}
                                 </td>
                             ))}
 

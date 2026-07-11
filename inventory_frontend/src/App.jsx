@@ -1,13 +1,16 @@
 import { BrowserRouter } from "react-router-dom";
 import AppRoutes from "./routes";
 import { InventoryProvider } from "./context/InventoryContext";
+import { AuthProvider } from "./context/AuthContext";
 
 function App() {
   return (
     <BrowserRouter>
-      <InventoryProvider>
-        <AppRoutes />
-      </InventoryProvider>
+      <AuthProvider>
+        <InventoryProvider>
+          <AppRoutes />
+        </InventoryProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

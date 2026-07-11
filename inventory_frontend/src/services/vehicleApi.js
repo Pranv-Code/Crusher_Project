@@ -3,6 +3,9 @@ import api from "./api";
 export const getVehicles = () =>
     api.get("/vehicles");
 
+export const getActiveVehicles = () =>
+    api.get("/vehicles/active");
+
 export const addVehicle = (data) =>
     api.post("/vehicles", data);
 

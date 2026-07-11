@@ -12,8 +12,8 @@ conn = mysql.connector.connect(
     port=int(os.getenv("DB_PORT", 3306))
 )
 
-cursor = conn.cursor()
-cursor.execute("DESCRIBE Vehicle_Activity;")
+cursor = conn.cursor(dictionary=True)
+cursor.execute("SELECT sales_id, sales_date, loading_time, unloading_date, unloading_time, unloading_status FROM Sales;")
 for row in cursor.fetchall():
     print(row)
 

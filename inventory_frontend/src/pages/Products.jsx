@@ -166,43 +166,49 @@ function Products() {
             />
 
             {showAddForm && (
-                <div className="add-form">
-                    <InputField
-                        type="text"
-                        placeholder="Product Name"
-                        value={newProduct.product_name}
-                        onChange={(e) =>
-                            setNewProduct({
-                                ...newProduct,
-                                product_name: e.target.value,
-                            })
-                        }
-                    />
+                <div className="form-card">
+                    <div className="form-grid">
+                        <InputField
+                            label="Product Name"
+                            name="product_name"
+                            type="text"
+                            placeholder="e.g. Gravel 20mm"
+                            value={newProduct.product_name}
+                            onChange={(e) =>
+                                setNewProduct({
+                                    ...newProduct,
+                                    product_name: e.target.value,
+                                })
+                            }
+                        />
 
-                    <InputField
-                        type="number"
-                        placeholder="Quantity"
-                        value={newProduct.quantity_tons}
-                        onChange={(e) =>
-                            setNewProduct({
-                                ...newProduct,
-                                quantity_tons: e.target.value,
-                            })
-                        }
-                    />
+                        <InputField
+                            label="Quantity"
+                            name="quantity_tons"
+                            type="number"
+                            placeholder="Enter quantity"
+                            value={newProduct.quantity_tons}
+                            onChange={(e) =>
+                                setNewProduct({
+                                    ...newProduct,
+                                    quantity_tons: e.target.value,
+                                })
+                            }
+                        />
 
-                    <SelectField
-                        label="Unit"
-                        name="unit"
-                        value={newProduct.unit}
-                        onChange={(e) =>
-                            setNewProduct({
-                                ...newProduct,
-                                unit: e.target.value,
-                            })
-                        }
-                        options={unitOptions}
-                    />
+                        <SelectField
+                            label="Unit"
+                            name="unit"
+                            value={newProduct.unit}
+                            onChange={(e) =>
+                                setNewProduct({
+                                    ...newProduct,
+                                    unit: e.target.value,
+                                })
+                            }
+                            options={unitOptions}
+                        />
+                    </div>
 
                     <Button variant="success" onClick={handleAddProduct}>
                         Save Product

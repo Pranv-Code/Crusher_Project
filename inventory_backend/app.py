@@ -9,6 +9,10 @@ from routes.vehicle_activity_routes import vehicle_activity_bp
 from routes.party_routes import party_bp
 from routes.sales_routes import sales_bp
 from routes.vehicle_sale_routes import vehicle_sale_bp
+from routes.reports_routes import reports_bp
+from routes.auth_routes import auth_bp
+from routes.user_routes import user_bp
+from routes.approval_routes import approval_bp
 
 import os
 
@@ -46,6 +50,10 @@ app.register_blueprint(vehicle_activity_bp)
 app.register_blueprint(party_bp)
 app.register_blueprint(sales_bp)
 app.register_blueprint(vehicle_sale_bp)
+app.register_blueprint(reports_bp)
+app.register_blueprint(auth_bp)
+app.register_blueprint(user_bp)
+app.register_blueprint(approval_bp)
 
 
 if __name__ == "__main__":

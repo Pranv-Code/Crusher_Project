@@ -11,6 +11,7 @@ import {
 // Component Imports
 import Button from "../components/common/Button";
 import InputField from "../components/common/InputField";
+import SelectField from "../components/common/SelectField";
 import PageHeader from "../components/common/PageHeader";
 import EmptyState from "../components/common/EmptyState";
 
@@ -21,7 +22,7 @@ import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
 
 function Vehicles() {
-    const { vehicles, fetchVehicles } = useInventory();
+    const { vehicles, fetchVehicles, fetchActiveVehicles } = useInventory();
     const [showAddForm, setShowAddForm] = useState(false);
 
     const [newVehicle, setNewVehicle] = useState({
@@ -34,6 +35,7 @@ function Vehicles() {
     const [editData, setEditData] = useState({
         vehicle_number: "",
         owner: "",
+        status: "Active",
     });
 
     // Confirmation modal states to replace window.confirm
@@ -71,6 +73,7 @@ function Vehicles() {
         setEditData({
             vehicle_number: vehicle.vehicle_number,
             owner: vehicle.owner,
+            status: vehicle.status || "Active",
         });
     };
 
@@ -81,6 +84,7 @@ function Vehicles() {
                 editData
             );
             await fetchVehicles(true);
+            await fetchActiveVehicles(true);
             setEditingVehicle(null);
         } catch (err) {
             console.error(err);
@@ -97,6 +101,7 @@ function Vehicles() {
         try {
             await deleteVehicle(deleteTargetNumber);
             await fetchVehicles(true);
+            await fetchActiveVehicles(true);
         } catch (err) {
             console.error(err);
         } finally {
@@ -111,7 +116,13 @@ function Vehicles() {
     // Table mapping configurations
     const columns = [
         { key: "vehicle_number", label: "Vehicle Number" },
-        { key: "owner", label: "Owner" }
+        { key: "owner", label: "Owner" },
+        { key: "status", label: "Status" },
+    ];
+
+    const statusOptions = [
+        { value: "Active", label: "Active" },
+        { value: "Inactive", label: "Inactive" },
     ];
 
     return (
@@ -131,30 +142,36 @@ function Vehicles() {
 
             <div className="table-container">
                 {showAddForm && (
-                    <div className="add-form">
-                        <InputField
-                            type="text"
-                            placeholder="Vehicle Number"
-                            value={newVehicle.vehicle_number}
-                            onChange={(e) =>
-                                setNewVehicle({
-                                    ...newVehicle,
-                                    vehicle_number: e.target.value.toUpperCase()
-                                })
-                            }
-                        />
+                    <div className="form-card">
+                        <div className="form-grid">
+                            <InputField
+                                label="Vehicle Number"
+                                name="vehicle_number"
+                                type="text"
+                                placeholder="e.g. MH09AB1234"
+                                value={newVehicle.vehicle_number}
+                                onChange={(e) =>
+                                    setNewVehicle({
+                                        ...newVehicle,
+                                        vehicle_number: e.target.value.toUpperCase()
+                                    })
+                                }
+                            />
 
-                        <InputField
-                            type="text"
-                            placeholder="Owner"
-                            value={newVehicle.owner}
-                            onChange={(e) =>
-                                setNewVehicle({
-                                    ...newVehicle,
-                                    owner: e.target.value
-                                })
-                            }
-                        />
+                            <InputField
+                                label="Owner"
+                                name="owner"
+                                type="text"
+                                placeholder="Owner name"
+                                value={newVehicle.owner}
+                                onChange={(e) =>
+                                    setNewVehicle({
+                                        ...newVehicle,
+                                        owner: e.target.value
+                                    })
+                                }
+                            />
+                        </div>
 
                         <Button variant="success" onClick={handleAddVehicle}>
                             Save Vehicle
@@ -212,6 +229,18 @@ function Vehicles() {
                             owner: e.target.value
                         })
                     }
+                />
+                <SelectField
+                    label="Status"
+                    name="status"
+                    value={editData.status}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            status: e.target.value
+                        })
+                    }
+                    options={statusOptions}
                 />
             </EditModal>
 

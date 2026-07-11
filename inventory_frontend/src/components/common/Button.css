@@ -10,7 +10,7 @@
     font-size: 14px;
     font-weight: 600;
 
-    transition: all .25s ease;
+    transition: all .2s ease;
 
     display: inline-flex;
     align-items: center;
@@ -21,6 +21,7 @@
 
 .btn:hover{
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .btn:disabled{
@@ -31,28 +32,34 @@
 .btn-primary{
     background:#2563eb;
     color:white;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
 }
 
 .btn-primary:hover{
     background:#1d4ed8;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45);
 }
 
 .btn-success{
     background:#16a34a;
     color:white;
+    box-shadow: 0 1px 3px rgba(22, 163, 74, 0.3);
 }
 
 .btn-success:hover{
     background:#15803d;
+    box-shadow: 0 4px 14px rgba(22, 163, 74, 0.4);
 }
 
 .btn-danger{
     background:#dc2626;
     color:white;
+    box-shadow: 0 1px 3px rgba(220, 38, 38, 0.3);
 }
 
 .btn-danger:hover{
     background:#b91c1c;
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
 }
 
 .btn-secondary{
