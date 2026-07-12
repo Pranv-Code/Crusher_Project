@@ -21,14 +21,13 @@ function Sidebar() {
                 { name: "Vehicle Sales", path: "/vehicle-sales" },
                 { name: "Parties", path: "/parties" },
                 { name: "Reports", path: "/reports" },
-                { name: "Pending Approvals", path: "/approvals" }
+                { name: "Users", path: "/users" }
             );
         } else if (isClerk) {
             menuItems.push(
                 { name: "Production", path: "/production" },
                 { name: "Sales", path: "/sales" },
-                { name: "Reports", path: "/reports" },
-                { name: "My Pending Work", path: "/my-pending" }
+                { name: "Reports", path: "/reports" }
             );
         }
     }

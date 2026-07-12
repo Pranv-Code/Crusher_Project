@@ -25,7 +25,7 @@ def get_connection():
 
     except Error as e:
         print(f"Database Connection Error: {e}")
-        return None
+        raise RuntimeError("Database connection failed. Please ensure the database server is running and accessible.") from e
 
 
 def get_cursor(dictionary=True):

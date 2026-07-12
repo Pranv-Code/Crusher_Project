@@ -64,3 +64,22 @@
     color: #38bdf8;             /* Changes to a soft electric blue on hover */
     transition: color 0.2s ease;
 }
+
+@keyframes badgePulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    70% {
+        transform: scale(1.15);
+        box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+.pulse-badge {
+    animation: badgePulse 2s infinite;
+}

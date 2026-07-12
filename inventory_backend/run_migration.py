@@ -3,7 +3,7 @@ import bcrypt
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(override=True)
 
 def run():
     print("Connecting to MySQL and running migration...")

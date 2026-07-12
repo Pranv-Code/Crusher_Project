@@ -1,12 +1,70 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { NavLink } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { getApprovals, getMyPendingApprovals } from "../services/approvalApi";
 import "../css/navbar.css";
 
 function Navbar() {
+    const { user, isManager, isClerk } = useAuth();
     const [showModal, setShowModal] = useState(false);
     const [tons, setTons] = useState("");
     const [brass, setBrass] = useState("");
+    const [pendingCount, setPendingCount] = useState(0);
 
     const today = new Date().toLocaleDateString();
+
+    const checkOldEntries = (entries) => {
+        if (!isManager || !user) return;
+        
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        
+        const hasOld = entries.some(entry => {
+            const entryDate = new Date(entry.created_at);
+            return entryDate < oneDayAgo;
+        });
+
+        if (hasOld) {
+            const storageKey = `alerted_old_approvals_${user.user_id}`;
+            const hasAlerted = sessionStorage.getItem(storageKey);
+            if (!hasAlerted) {
+                alert("⚠️ Warning: You have pending approval requests that are more than a day old!");
+                sessionStorage.setItem(storageKey, "true");
+            }
+        }
+    };
+
+    const updatePendingCount = async () => {
+        if (!user) return;
+        try {
+            if (isManager) {
+                const res = await getApprovals();
+                setPendingCount(res.data.length);
+                checkOldEntries(res.data);
+            } else if (isClerk) {
+                const res = await getMyPendingApprovals();
+                // Filter only 'pending' status requests for the clerk badge count
+                const pending = res.data.filter(req => req.status === "pending");
+                setPendingCount(pending.length);
+            }
+        } catch (err) {
+            console.error("Failed to fetch pending count for navbar:", err);
+        }
+    };
+
+    useEffect(() => {
+        if (user) {
+            updatePendingCount();
+
+            const interval = setInterval(() => {
+                updatePendingCount();
+            }, 5000);
+
+            return () => clearInterval(interval);
+        } else {
+            setPendingCount(0);
+        }
+    }, [user, isManager, isClerk]);
 
     const handleTonsChange = (e) => {
         const val = e.target.value;
@@ -38,6 +96,51 @@ function Navbar() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                {user && (isManager || isClerk) && (
+                    <NavLink
+                        to={isManager ? "/approvals" : "/my-pending"}
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            padding: "6px 12px",
+                            backgroundColor: pendingCount > 0 ? "#fee2e2" : "#f1f5f9",
+                            color: pendingCount > 0 ? "#b91c1c" : "#475569",
+                            border: pendingCount > 0 ? "1px solid #fca5a5" : "1px solid #cbd5e1",
+                            textDecoration: "none",
+                            borderRadius: "6px",
+                            fontWeight: 600,
+                            fontSize: "0.85rem",
+                            position: "relative",
+                            transition: "all 0.2s"
+                        }}
+                    >
+                        <span style={{ fontSize: "1.1rem" }}>💬</span>
+                        <span>{isManager ? "Pending Approvals" : "Pending Work"}</span>
+                        {pendingCount > 0 && (
+                            <span className="pulse-badge" style={{
+                                position: "absolute",
+                                top: "-8px",
+                                right: "-8px",
+                                backgroundColor: "#ef4444",
+                                color: "white",
+                                borderRadius: "50%",
+                                width: "18px",
+                                height: "18px",
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                fontSize: "0.75rem",
+                                fontWeight: "bold",
+                                border: "2px solid white",
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.15)"
+                            }}>
+                                {pendingCount}
+                            </span>
+                        )}
+                    </NavLink>
+                )}
+                
                 <button 
                     style={{ 
                         fontSize: "0.85rem", 

@@ -1,6 +1,7 @@
-from flask import Flask
+from flask import Flask, jsonify, json
 from flask_cors import CORS
 from db import get_connection
+from werkzeug.exceptions import HTTPException
 
 from routes.product_routes import product_bp
 from routes.production_routes import production_bp
@@ -19,6 +20,32 @@ import os
 app = Flask(__name__)
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# -------------------------
+# Global Error Handling
+# -------------------------
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Pass through HTTP exceptions (404, 405, etc.)
+    if isinstance(e, HTTPException):
+        response = e.get_response()
+        response.data = json.dumps({
+            "error": e.name,
+            "message": e.description
+        })
+        response.content_type = "application/json"
+        return response
+
+    # Handle all other uncaught python exceptions
+    print("Unhandled exception occurred:", str(e))
+    import traceback
+    traceback.print_exc()
+
+    return jsonify({
+        "error": "Internal Server Error",
+        "message": str(e)
+    }), 500
+
 # -------------------------
 # Test Database Connection
 # -------------------------

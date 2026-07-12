@@ -8,20 +8,26 @@ export default function Approvals() {
     const [rejectId, setRejectId] = useState(null);
     const [remark, setRemark] = useState("");
 
-    const fetchPendingApprovals = async () => {
-        setLoading(true);
+    const fetchPendingApprovals = async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const res = await getApprovals();
             setRequests(res.data);
         } catch (err) {
             console.error("Failed to load approvals:", err);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchPendingApprovals();
+        fetchPendingApprovals(false);
+
+        const interval = setInterval(() => {
+            fetchPendingApprovals(true);
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const handleApprove = async (id) => {

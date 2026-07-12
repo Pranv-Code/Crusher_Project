@@ -12,20 +12,26 @@ export default function ClerkPendingWork() {
     const [newVehicle, setNewVehicle] = useState({ vehicle_number: "", owner: "" });
     const [submitting, setSubmitting] = useState(false);
 
-    const fetchMyRequests = async () => {
-        setLoading(true);
+    const fetchMyRequests = async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const res = await getMyPendingApprovals();
             setRequests(res.data);
         } catch (err) {
             console.error("Failed to load requests:", err);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchMyRequests();
+        fetchMyRequests(false);
+
+        const interval = setInterval(() => {
+            fetchMyRequests(true);
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const handleRequestVehicle = async (e) => {
