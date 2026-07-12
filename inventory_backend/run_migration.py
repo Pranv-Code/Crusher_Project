@@ -66,9 +66,25 @@ def run():
     # Modify Approval_Requests request_type enum
     print("Modifying Approval_Requests.request_type ENUM...")
     try:
-        cursor.execute("ALTER TABLE Approval_Requests MODIFY COLUMN request_type ENUM('vehicle', 'sales_unloading', 'user_registration', 'sales_edit', 'sales_delete', 'production_edit', 'production_delete') NOT NULL;")
+        cursor.execute("ALTER TABLE Approval_Requests MODIFY COLUMN request_type ENUM('vehicle', 'sales_unloading', 'user_registration', 'sales_edit', 'sales_delete', 'production_edit', 'production_delete', 'party', 'report_print') NOT NULL;")
     except Exception as e:
         print(f"Approval_Requests modify warning: {e}")
+
+    # Safe alters for Party
+    print("Applying column extensions to Party...")
+    try:
+        cursor.execute("ALTER TABLE Party ADD COLUMN status ENUM('Active', 'Inactive', 'Pending') NOT NULL DEFAULT 'Pending';")
+        cursor.execute("UPDATE Party SET status = 'Active' WHERE status = 'Pending';")
+    except Exception as e:
+        if "Duplicate column name" not in str(e):
+            print(f"Party status alter warning: {e}")
+            
+    for col, dtype in [("requested_by", "INT NULL"), ("requested_at", "TIMESTAMP NULL"), ("approved_by", "INT NULL"), ("approved_at", "TIMESTAMP NULL")]:
+        try:
+            cursor.execute(f"ALTER TABLE Party ADD COLUMN {col} {dtype};")
+        except Exception as e:
+            if "Duplicate column name" not in str(e):
+                print(f"Party column {col} alter warning: {e}")
 
     conn.commit()
     print("Alters successfully applied.")

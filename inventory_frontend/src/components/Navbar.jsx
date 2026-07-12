@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { getApprovals, getMyPendingApprovals } from "../services/approvalApi";
 import "../css/navbar.css";
 
-function Navbar() {
+function Navbar({ onToggleSidebar, isSidebarCollapsed }) {
     const { user, isManager, isClerk } = useAuth();
     const [showModal, setShowModal] = useState(false);
     const [tons, setTons] = useState("");
@@ -90,9 +90,31 @@ function Navbar() {
 
     return (
         <header className="navbar">
-            <div className="nav-logo">
-                <h2>WHITE CLOUD</h2>
-                <p>GLOBAL SOLUTIONS</p>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                <button
+                    onClick={onToggleSidebar}
+                    style={{
+                        background: "#f1f5f9",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "0.85rem",
+                        cursor: "pointer",
+                        color: "#475569",
+                        padding: "6px 12px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "6px",
+                        fontWeight: "800",
+                        transition: "all 0.2s"
+                    }}
+                    title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                >
+                    {isSidebarCollapsed ? "▶" : "◀"}
+                </button>
+                <div className="nav-logo">
+                    <h2>WHITE CLOUD</h2>
+                    <p>GLOBAL SOLUTIONS</p>
+                </div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>

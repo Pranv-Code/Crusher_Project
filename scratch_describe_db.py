@@ -2,7 +2,7 @@ import mysql.connector
 from dotenv import load_dotenv
 import os
 
-load_dotenv(dotenv_path="inventory_backend/.env")
+load_dotenv(dotenv_path="inventory_backend/.env", override=True)
 
 conn = mysql.connector.connect(
     host=os.getenv("DB_HOST", "localhost"),

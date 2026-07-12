@@ -1,5 +1,6 @@
 from flask import jsonify, request
 from db import get_connection
+from datetime import datetime
 
 
 def get_parties():
@@ -31,6 +32,7 @@ def get_active_parties():
             party_id,
             party_name
         FROM Party
+        WHERE status = 'Active'
         ORDER BY party_name
     """)
 
@@ -72,6 +74,9 @@ def add_party():
     cursor = conn.cursor()
 
     try:
+        user = request.user
+        role = user.get("role", "Clerk")
+        status = "Active" if role == "Manager" else "Pending"
 
         cursor.execute("""
             INSERT INTO Party
@@ -79,20 +84,35 @@ def add_party():
                 party_name,
                 gst_no,
                 address,
-                pan_no
+                pan_no,
+                status,
+                requested_by,
+                requested_at
             )
-            VALUES (%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s)
         """, (
             data["party_name"],
             data["gst_no"],
             data["address"],
-            data["pan_no"]
+            data["pan_no"],
+            status,
+            user["user_id"] if role == "Clerk" else None,
+            datetime.utcnow() if role == "Clerk" else None
         ))
+
+        party_id = cursor.lastrowid
+
+        if role == "Clerk":
+            cursor.execute("""
+                INSERT INTO Approval_Requests (requester_id, request_type, reference_id, status)
+                VALUES (%s, 'party', %s, 'pending')
+            """, (user["user_id"], str(party_id)))
 
         conn.commit()
 
+        msg = "Party Added Successfully" if role == "Manager" else "Party Request Submitted (Pending Manager Approval)"
         return jsonify({
-            "message": "Party Added Successfully"
+            "message": msg
         }), 201
 
     except Exception as e:

@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { getPartyReport } from "../../services/reportsApi";
 import { useAuth } from "../../context/AuthContext";
 import { generatePartyReportPdf } from "../../utils/pdfGenerator";
+import { requestReportPrint } from "../../services/approvalApi";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777"];
 
@@ -36,7 +37,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function PartyReport({ parties, onSwitchToSales }) {
-    const { isManager } = useAuth();
+    const { isManager, isClerk } = useAuth();
 
     const [search, setSearch]             = useState("");
     const [selectedPartyId, setSelectedPartyId] = useState(null);
@@ -44,6 +45,25 @@ export default function PartyReport({ parties, onSwitchToSales }) {
     const [loading, setLoading]           = useState(false);
     const [error, setError]               = useState(null);
     const [pdfUnit, setPdfUnit]           = useState("tons");
+
+    const [showApprovalModal, setShowApprovalModal] = useState(false);
+    const [pendingRequest, setPendingRequest] = useState(null);
+    const [submittingRequest, setSubmittingRequest] = useState(false);
+
+    const handleRequestApproval = async () => {
+        if (!pendingRequest) return;
+        setSubmittingRequest(true);
+        try {
+            await requestReportPrint(pendingRequest);
+            alert("Request submitted successfully! Check status in 'My Pending Work'.");
+            setShowApprovalModal(false);
+            setPendingRequest(null);
+        } catch (err) {
+            alert(err.response?.data?.message || err.response?.data?.error || "Failed to submit request.");
+        } finally {
+            setSubmittingRequest(false);
+        }
+    };
 
     const filteredParties = useMemo(() =>
         parties.filter(p => p.party_name.toLowerCase().includes(search.toLowerCase())),
@@ -90,6 +110,21 @@ export default function PartyReport({ parties, onSwitchToSales }) {
 
     const handleExport = () => {
         if (!partyData?.sales) return;
+        const label = `Party Report (Excel) - Party: ${partyData.party.party_name}`;
+        const requestData = {
+            report_type: "party",
+            format: "excel",
+            filters: {
+                party_id: partyData.party.party_id,
+                party_name: partyData.party.party_name
+            },
+            label: label
+        };
+        if (isClerk) {
+            setPendingRequest(requestData);
+            setShowApprovalModal(true);
+            return;
+        }
         const rows = partyData.sales.map(s => ({
             "Date":           s.sales_date,
             "Product":        s.product_name,
@@ -106,6 +141,22 @@ export default function PartyReport({ parties, onSwitchToSales }) {
 
     const handlePdfExport = () => {
         if (!partyData) return;
+        const label = `Party Report (PDF) - Party: ${partyData.party.party_name} | Unit: ${pdfUnit}`;
+        const requestData = {
+            report_type: "party",
+            format: "pdf",
+            pdf_unit: pdfUnit,
+            filters: {
+                party_id: partyData.party.party_id,
+                party_name: partyData.party.party_name
+            },
+            label: label
+        };
+        if (isClerk) {
+            setPendingRequest(requestData);
+            setShowApprovalModal(true);
+            return;
+        }
         generatePartyReportPdf(partyData, pdfUnit);
     };
 
@@ -236,7 +287,7 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                                         🔗 View in Sales Report
                                     </button>
                                     <button className="export-btn" onClick={handleExport}>⬇ Export to Excel</button>
-                                    {isManager && (
+                                    {(isManager || isClerk) && (
                                         <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
                                             <select 
                                                 value={pdfUnit} 
@@ -304,6 +355,51 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                     </>
                 )}
             </div>
+            {showApprovalModal && (
+                <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
+                    justifyContent: "center", alignItems: "center", zIndex: 2000
+                }}>
+                    <div style={{
+                        background: "white", padding: "2rem", borderRadius: "12px",
+                        width: "100%", maxWidth: "450px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
+                    }}>
+                        <h3 style={{ margin: "0 0 1rem 0", color: "#1e1b4b" }}>Approval Required</h3>
+                        <p style={{ color: "#475569", fontSize: "0.95rem", marginBottom: "1rem" }}>
+                            You need manager approval to print or export reports. Would you like to request approval for this report?
+                        </p>
+                        <div style={{ 
+                            marginBottom: "1.5rem", padding: "0.75rem", 
+                            background: "#f1f5f9", borderRadius: "8px",
+                            fontSize: "0.9rem", color: "#334155", borderLeft: "4px solid #3b82f6"
+                        }}>
+                            <strong>Request Details:</strong>
+                            <div style={{ marginTop: "0.25rem" }}>{pendingRequest?.label}</div>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                            <button
+                                className="primary-btn"
+                                onClick={handleRequestApproval}
+                                disabled={submittingRequest}
+                            >
+                                {submittingRequest ? "Submitting..." : "Submit Request"}
+                            </button>
+                            <button
+                                className="primary-btn"
+                                style={{ backgroundColor: "#9ca3af", color: "white", border: "none" }}
+                                onClick={() => {
+                                    setShowApprovalModal(false);
+                                    setPendingRequest(null);
+                                }}
+                                disabled={submittingRequest}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

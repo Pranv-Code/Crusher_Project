@@ -40,6 +40,11 @@ def get_all_approvals():
                 vehicle = cursor.fetchone()
                 if vehicle:
                     req["details"] = f"Vehicle Number: {req['reference_id']}, Owner: {vehicle['owner']}"
+            elif req["request_type"] == "party":
+                cursor.execute("SELECT party_name, gst_no, pan_no, address FROM Party WHERE party_id = %s", (int(req["reference_id"]),))
+                party = cursor.fetchone()
+                if party:
+                    req["details"] = f"Party Name: {party['party_name']} | GST: {party['gst_no']} | PAN: {party['pan_no']} | Address: {party['address']}"
             elif req["request_type"] == "user_registration":
                 cursor.execute("SELECT name, username, email, role FROM Users WHERE user_id = %s", (int(req["reference_id"]),))
                 usr = cursor.fetchone()
@@ -154,6 +159,12 @@ def get_all_approvals():
                         f"Loaded: {sale['sales_date'].strftime('%Y-%m-%d')} {loading_str} | "
                         f"Proposed Unloading: {prop_date} {prop_time}"
                     )
+            elif req["request_type"] == "report_print":
+                ref_data = req["reference_data"] if isinstance(req["reference_data"], dict) else {}
+                fmt = ref_data.get("format", "").upper()
+                report_type = ref_data.get("report_type", "").capitalize()
+                label = ref_data.get("label", "")
+                req["details"] = f"Export {report_type} Report to {fmt} | Filters: {label}"
 
         return jsonify(requests_list), 200
 
@@ -212,6 +223,21 @@ def action_approval(request_id, manager_id):
                     SET status = 'Inactive' 
                     WHERE vehicle_number = %s
                 """, (v_num,))
+                
+        elif req["request_type"] == "party":
+            party_id = int(req["reference_id"])
+            if status == "approved":
+                cursor.execute("""
+                    UPDATE Party 
+                    SET status = 'Active', approved_by = %s, approved_at = %s 
+                    WHERE party_id = %s
+                """, (manager_id, datetime.utcnow(), party_id))
+            else:
+                cursor.execute("""
+                    UPDATE Party 
+                    SET status = 'Inactive' 
+                    WHERE party_id = %s
+                """, (party_id,))
                 
         elif req["request_type"] == "sales_unloading":
             sale_id = req["reference_id"]
@@ -324,6 +350,8 @@ def action_approval(request_id, manager_id):
                 if prod:
                     cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (prod["quantity_tons"], prod["product_id"]))
                     cursor.execute("DELETE FROM Production WHERE production_id=%s", (prod_id,))
+        elif req["request_type"] == "report_print":
+            pass
 
         conn.commit()
         return jsonify({"message": f"Request has been {status} successfully."}), 200
@@ -375,6 +403,40 @@ def get_my_pending_approvals(clerk_id):
                 
         return jsonify(requests_list), 200
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def request_report_print(clerk_id):
+    data = request.json
+    report_type = data.get("report_type")
+    fmt = data.get("format")
+    filters = data.get("filters", {})
+    pdf_unit = data.get("pdf_unit")
+    label = data.get("label", f"{report_type.capitalize()} Report ({fmt.upper()})")
+    
+    reference_data_dict = {
+        "report_type": report_type,
+        "format": fmt,
+        "filters": filters,
+        "pdf_unit": pdf_unit,
+        "label": label
+    }
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        ref_id = f"{report_type}_{fmt}"
+        cursor.execute("""
+            INSERT INTO Approval_Requests (requester_id, request_type, reference_id, reference_data, status)
+            VALUES (%s, 'report_print', %s, %s, 'pending')
+        """, (clerk_id, ref_id, json.dumps(reference_data_dict)))
+        conn.commit()
+        return jsonify({"message": "Report print request submitted for manager approval."}), 201
+    except Exception as e:
+        conn.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()

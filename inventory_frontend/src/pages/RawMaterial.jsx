@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
 import { useInventory } from "../context/InventoryContext";
+import { useAuth } from "../context/AuthContext";
 
 import {
     addVehicleActivity,
@@ -56,6 +57,7 @@ const calculateTurnaround = (arrival, unloading) => {
 };
 
 function RawMaterial() {
+    const { isManager } = useAuth();
     const {
         vehicleActivities,
         fetchVehicleActivities,
@@ -451,12 +453,12 @@ function RawMaterial() {
                         columns={columns}
                         data={filteredActivities}
                         keyField="activity_id"
-                        renderActions={(row) => (
+                        renderActions={isManager ? (row) => (
                             <ActionButtons
                                 onEdit={() => handleEdit(row)}
                                 onDelete={() => handleDeleteClick(row.activity_id)}
                             />
-                        )}
+                        ) : null}
                     />
                 )}
             </div>

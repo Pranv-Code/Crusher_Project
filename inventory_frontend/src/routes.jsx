@@ -95,7 +95,7 @@ function AppRoutes() {
             <Route
                 path="/raw-material"
                 element={
-                    <ProtectedRoute allowedRoles={["Manager"]}>
+                    <ProtectedRoute allowedRoles={["Manager", "Clerk"]}>
                         <RawMaterial />
                     </ProtectedRoute>
                 }

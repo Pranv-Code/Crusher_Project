@@ -123,7 +123,8 @@ function Parties() {
         { key: "party_name", label: "Party Name" },
         { key: "gst_no", label: "GST No" },
         { key: "pan_no", label: "PAN No" },
-        { key: "address", label: "Address" }
+        { key: "address", label: "Address" },
+        { key: "status", label: "Status" }
     ];
 
     return (

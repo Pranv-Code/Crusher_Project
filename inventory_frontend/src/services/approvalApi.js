@@ -8,3 +8,7 @@ export const actionApproval = (id, data) =>
 
 export const getMyPendingApprovals = () =>
     api.get("/approvals/my-pending");
+
+export const requestReportPrint = (data) =>
+    api.post("/approvals/request-report", data);
+
