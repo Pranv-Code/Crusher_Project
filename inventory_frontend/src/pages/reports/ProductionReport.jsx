@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import Pagination from "../../components/common/Pagination";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, LineChart, Line,
@@ -15,7 +16,7 @@ const fmtTons = (v) => Number(v).toFixed(2);
 const monthLabel = (dateStr) => {
     if (!dateStr) return "";
     const [y, m] = dateStr.split("-");
-    return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m)-1]} ${y}`;
+    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
 };
 
 function exportToExcel(rows, filename) {
@@ -28,8 +29,8 @@ function exportToExcel(rows, filename) {
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div style={{ background:"#1e293b", color:"#f8fafc", padding:"10px 14px", borderRadius:8, fontSize:12 }}>
-            <div style={{ fontWeight:700, marginBottom:4 }}>{label}</div>
+        <div style={{ background: "#1e293b", color: "#f8fafc", padding: "10px 14px", borderRadius: 8, fontSize: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
             {payload.map((p, i) => (
                 <div key={i}>{p.name}: <strong>{fmtTons(p.value)}</strong></div>
             ))}
@@ -40,12 +41,16 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function ProductionReport({ productions, products }) {
     const { isManager, isClerk } = useAuth();
 
-    const [dateFrom, setDateFrom]   = useState("");
-    const [dateTo, setDateTo]       = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
     const [monthFilter, setMonthFilter] = useState("");
     const [productFilter, setProductFilter] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [pdfUnit, setPdfUnit] = useState("tons");
+
+    // --- Pagination States ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     const [showApprovalModal, setShowApprovalModal] = useState(false);
     const [pendingRequest, setPendingRequest] = useState(null);
@@ -69,12 +74,12 @@ export default function ProductionReport({ productions, products }) {
     const filtered = useMemo(() => {
         return productions.filter((p) => {
             if (dateFrom && p.production_date < dateFrom) return false;
-            if (dateTo   && p.production_date > dateTo)   return false;
-            if (monthFilter && p.production_date?.slice(0,7) !== monthFilter) return false;
+            if (dateTo && p.production_date > dateTo) return false;
+            if (monthFilter && p.production_date?.slice(0, 7) !== monthFilter) return false;
             if (productFilter && String(p.product_id) !== productFilter) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                const match = 
+                const match =
                     p.product_name?.toLowerCase().includes(q) ||
                     p.unit?.toLowerCase().includes(q) ||
                     String(p.production_cost || "").includes(q);
@@ -84,9 +89,14 @@ export default function ProductionReport({ productions, products }) {
         });
     }, [productions, dateFrom, dateTo, monthFilter, productFilter, searchQuery]);
 
-    const totalTons   = filtered.reduce((s, r) => s + (parseFloat(r.quantity_tons) || 0), 0);
-    const totalCost   = filtered.reduce((s, r) => s + (parseFloat(r.production_cost) || 0), 0);
-    const avgCost     = filtered.length ? totalCost / filtered.length : 0;
+    // Reset pagination when data changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filtered.length]);
+
+    const totalTons = filtered.reduce((s, r) => s + (parseFloat(r.quantity_tons) || 0), 0);
+    const totalCost = filtered.reduce((s, r) => s + (parseFloat(r.production_cost) || 0), 0);
+    const avgCost = filtered.length ? totalCost / filtered.length : 0;
 
     const byMonth = useMemo(() => {
         const map = {};
@@ -104,7 +114,7 @@ export default function ProductionReport({ productions, products }) {
         });
         return Object.entries(map)
             .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
-            .sort((a,b) => b.value - a.value);
+            .sort((a, b) => b.value - a.value);
     }, [filtered]);
 
     const dailyTrend = useMemo(() => {
@@ -113,7 +123,7 @@ export default function ProductionReport({ productions, products }) {
             map[r.production_date] = (map[r.production_date] || 0) + parseFloat(r.quantity_tons || 0);
         });
         return Object.entries(map)
-            .sort(([a],[b]) => a.localeCompare(b))
+            .sort(([a], [b]) => a.localeCompare(b))
             .map(([date, tons]) => ({ date, tons: parseFloat(tons.toFixed(2)) }));
     }, [filtered]);
 
@@ -139,10 +149,10 @@ export default function ProductionReport({ productions, products }) {
         }
 
         const rows = filtered.map(r => ({
-            "Date":            r.production_date,
-            "Product":         r.product_name,
+            "Date": r.production_date,
+            "Product": r.product_name,
             "Quantity (Tons)": fmtTons(r.quantity_tons),
-            "Unit":            r.unit,
+            "Unit": r.unit,
             "Production Cost": r.production_cost,
         }));
         exportToExcel(rows, "production_report.xlsx");
@@ -237,9 +247,9 @@ export default function ProductionReport({ productions, products }) {
                     <div className="kpi-value">{filtered.length}</div>
                 </div>
                 <div className="kpi-card green">
-                    <div className="kpi-label">Total Produced (Tons)</div>
+                    <div className="kpi-label">Total Produced (MT)</div>
                     <div className="kpi-value">{fmtTons(totalTons)}</div>
-                    <div className="kpi-sub">≈ {(totalTons * 4.2).toFixed(2)} brass</div>
+                    <div className="kpi-sub">≈ {(totalTons * 4.2).toFixed(2)} Brass</div>
                 </div>
                 <div className="kpi-card orange">
                     <div className="kpi-label">Total Cost</div>
@@ -254,15 +264,15 @@ export default function ProductionReport({ productions, products }) {
             {/* Charts */}
             <div className="chart-grid">
                 <div className="chart-card">
-                    <h3>Production by Month (Tons)</h3>
+                    <h3>Production by Month (MT)</h3>
                     {byMonth.length === 0 ? <div className="report-empty">No data</div> : (
                         <ResponsiveContainer width="100%" height={220}>
-                            <BarChart data={byMonth} margin={{ top:5, right:10, left:0, bottom:40 }}>
+                            <BarChart data={byMonth} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                <XAxis dataKey="month" tick={{ fontSize:11 }} angle={-30} textAnchor="end" />
-                                <YAxis tick={{ fontSize:11 }} />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
+                                <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="tons" fill="#16a34a" radius={[4,4,0,0]} name="Tons" />
+                                <Bar dataKey="tons" fill="#16a34a" radius={[4, 4, 0, 0]} name="Tons" />
                             </BarChart>
                         </ResponsiveContainer>
                     )}
@@ -275,7 +285,7 @@ export default function ProductionReport({ productions, products }) {
                             <PieChart>
                                 <Pie data={byProduct} cx="50%" cy="50%" outerRadius={80}
                                     dataKey="value" nameKey="name"
-                                    label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}
+                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                                     labelLine={false} fontSize={10}>
                                     {byProduct.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                                 </Pie>
@@ -289,10 +299,10 @@ export default function ProductionReport({ productions, products }) {
                     <h3>Daily Production Trend</h3>
                     {dailyTrend.length === 0 ? <div className="report-empty">No data</div> : (
                         <ResponsiveContainer width="100%" height={220}>
-                            <LineChart data={dailyTrend} margin={{ top:5, right:10, left:0, bottom:40 }}>
+                            <LineChart data={dailyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                <XAxis dataKey="date" tick={{ fontSize:10 }} angle={-30} textAnchor="end" />
-                                <YAxis tick={{ fontSize:11 }} />
+                                <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
+                                <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip content={<CustomTooltip />} />
                                 <Line type="monotone" dataKey="tons" stroke="#2563eb" strokeWidth={2} dot={false} name="Tons" />
                             </LineChart>
@@ -304,7 +314,7 @@ export default function ProductionReport({ productions, products }) {
             {/* Table */}
             <div className="report-table-section">
                 <div className="report-table-header">
-                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <h3>Production Entries</h3>
                         <span className="report-count">{filtered.length} records</span>
                     </div>
@@ -312,8 +322,8 @@ export default function ProductionReport({ productions, products }) {
                         <button className="export-btn" onClick={handleExport}>⬇ Export to Excel</button>
                         {(isManager || isClerk) && (
                             <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-                                <select 
-                                    value={pdfUnit} 
+                                <select
+                                    value={pdfUnit}
                                     onChange={(e) => setPdfUnit(e.target.value)}
                                     style={{
                                         padding: "0.5rem",
@@ -326,7 +336,7 @@ export default function ProductionReport({ productions, products }) {
                                         boxSizing: "border-box"
                                     }}
                                 >
-                                    <option value="tons">Tons (T)</option>
+                                    <option value="tons"> Metric Ton  (T)</option>
                                     <option value="brass">Brass (B)</option>
                                 </select>
                                 <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
@@ -339,36 +349,52 @@ export default function ProductionReport({ productions, products }) {
                 {filtered.length === 0 ? (
                     <div className="report-empty">No production records match the selected filters.</div>
                 ) : (
-                    <div style={{ overflowX:"auto" }}>
+                    <div style={{ overflowX: "auto" }}>
                         <table className="report-table">
                             <thead>
                                 <tr>
                                     <th>#</th>
                                     <th>Date</th>
                                     <th>Product</th>
-                                    <th>Quantity (Tons)</th>
-                                    <th>Quantity (Brass)</th>
-                                    <th>Unit</th>
+                                    <th>Quantity</th>
                                     <th>Production Cost</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map((r, i) => {
-                                    const tons = parseFloat(r.quantity_tons || 0);
-                                    return (
-                                        <tr key={r.production_id}>
-                                            <td style={{ color:"#9ca3af", fontSize:12 }}>{i+1}</td>
-                                            <td>{r.production_date}</td>
-                                            <td><strong>{r.product_name}</strong></td>
-                                            <td>{fmtTons(tons)}</td>
-                                            <td style={{ color:"#6b7280" }}>{(tons * 4.2).toFixed(2)}</td>
-                                            <td>{r.unit}</td>
-                                            <td>₹{parseFloat(r.production_cost || 0).toLocaleString("en-IN")}</td>
-                                        </tr>
-                                    );
-                                })}
+                                {filtered
+                                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                    .map((r, i) => {
+                                        const tons = parseFloat(r.quantity_tons || 0);
+                                        return (
+                                            <tr key={r.production_id}>
+                                                <td style={{ color: "#9ca3af", fontSize: 12 }}>
+                                                    {(currentPage - 1) * pageSize + i + 1}
+                                                </td>
+                                                <td>{r.production_date}</td>
+                                                <td><strong>{r.product_name}</strong></td>
+                                                <td>
+                                                    <div style={{ lineHeight: 1.4 }}>
+                                                        <span style={{ fontWeight: 600 }}>{fmtTons(r.quantity_tons)} MT</span>
+                                                        <br />
+                                                        <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                                                            ≈ {(r.quantity_tons * 4.2).toFixed(2)} Brass
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td>₹{parseFloat(r.production_cost || 0).toLocaleString("en-IN")}</td>
+                                            </tr>
+                                        );
+                                    })}
                             </tbody>
                         </table>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filtered.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={setPageSize}
+                            pageSizeOptions={[5, 10, 20, 50]}
+                        />
                     </div>
                 )}
             </div>
@@ -386,8 +412,8 @@ export default function ProductionReport({ productions, products }) {
                         <p style={{ color: "#475569", fontSize: "0.95rem", marginBottom: "1rem" }}>
                             You need manager approval to print or export reports. Would you like to request approval for this report?
                         </p>
-                        <div style={{ 
-                            marginBottom: "1.5rem", padding: "0.75rem", 
+                        <div style={{
+                            marginBottom: "1.5rem", padding: "0.75rem",
                             background: "#f1f5f9", borderRadius: "8px",
                             fontSize: "0.9rem", color: "#334155", borderLeft: "4px solid #3b82f6"
                         }}>

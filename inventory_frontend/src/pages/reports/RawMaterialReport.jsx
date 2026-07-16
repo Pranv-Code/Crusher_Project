@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import Pagination from "../../components/common/Pagination";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, LineChart, Line,
@@ -15,21 +16,82 @@ const fmtNum = (v) => Number(v || 0).toFixed(2);
 const monthLabel = (dateStr) => {
     if (!dateStr) return "";
     const [y, m] = dateStr.split("-");
-    return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m)-1]} ${y}`;
+    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
 };
 
-function exportToExcel(rows, filename) {
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Raw Material Report");
-    XLSX.writeFile(wb, filename);
-}
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+
+export const exportToExcel = async (rows, fileName) => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Report");
+
+    // Add header
+    worksheet.columns = Object.keys(rows[0]).map((key) => ({
+        header: key,
+        key,
+        width: Math.max(key.length + 5, 18),
+    }));
+
+    // Add data
+    rows.forEach((row) => worksheet.addRow(row));
+
+    // Header formatting
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = {
+        bold: true,
+        color: { argb: "FFFFFFFF" },
+    };
+    headerRow.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+    };
+    headerRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" }, // Blue
+    };
+
+    // Format all cells
+    worksheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+            cell.border = {
+                top: { style: "thin" },
+                left: { style: "thin" },
+                bottom: { style: "thin" },
+                right: { style: "thin" },
+            };
+
+            cell.alignment = {
+                vertical: "middle",
+                horizontal: rowNumber === 1 ? "center" : "left",
+            };
+        });
+    });
+
+    // Auto filter
+    worksheet.autoFilter = {
+        from: "A1",
+        to: `${String.fromCharCode(64 + worksheet.columnCount)}1`,
+    };
+
+    // Freeze header
+    worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(
+        new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        fileName
+    );
+};
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div style={{ background:"#1e293b", color:"#f8fafc", padding:"10px 14px", borderRadius:8, fontSize:12 }}>
-            <div style={{ fontWeight:700, marginBottom:4 }}>{label}</div>
+        <div style={{ background: "#1e293b", color: "#f8fafc", padding: "10px 14px", borderRadius: 8, fontSize: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
             {payload.map((p, i) => <div key={i}>{p.name}: <strong>{fmtNum(p.value)}</strong></div>)}
         </div>
     );
@@ -38,12 +100,16 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function RawMaterialReport({ activities, vehicles }) {
     const { isManager, isClerk } = useAuth();
 
-    const [dateFrom, setDateFrom]   = useState("");
-    const [dateTo, setDateTo]       = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
     const [monthFilter, setMonthFilter] = useState("");
     const [vehicleFilter, setVehicleFilter] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [pdfUnit, setPdfUnit] = useState("tons");
+
+    // --- Pagination States ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     const [showApprovalModal, setShowApprovalModal] = useState(false);
     const [pendingRequest, setPendingRequest] = useState(null);
@@ -67,12 +133,12 @@ export default function RawMaterialReport({ activities, vehicles }) {
     const filtered = useMemo(() => {
         return activities.filter((a) => {
             if (dateFrom && a.activity_date < dateFrom) return false;
-            if (dateTo   && a.activity_date > dateTo)   return false;
-            if (monthFilter && a.activity_date?.slice(0,7) !== monthFilter) return false;
+            if (dateTo && a.activity_date > dateTo) return false;
+            if (monthFilter && a.activity_date?.slice(0, 7) !== monthFilter) return false;
             if (vehicleFilter && a.vehicle_number !== vehicleFilter) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                const match = 
+                const match =
                     a.vehicle_number?.toLowerCase().includes(q) ||
                     a.driver_name?.toLowerCase().includes(q) ||
                     a.remarks?.toLowerCase().includes(q) ||
@@ -83,9 +149,14 @@ export default function RawMaterialReport({ activities, vehicles }) {
         });
     }, [activities, dateFrom, dateTo, monthFilter, vehicleFilter, searchQuery]);
 
-    const totalNetWeight   = filtered.reduce((s, r) => s + parseFloat(r.net_weight || 0), 0);
+    // Reset pagination when data changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filtered.length]);
+
+    const totalNetWeight = filtered.reduce((s, r) => s + parseFloat(r.net_weight || 0), 0);
     const totalGrossWeight = filtered.reduce((s, r) => s + parseFloat(r.total_weight || 0), 0);
-    const avgNetWeight     = filtered.length ? totalNetWeight / filtered.length : 0;
+    const avgNetWeight = filtered.length ? totalNetWeight / filtered.length : 0;
 
     const byMonth = useMemo(() => {
         const map = {};
@@ -103,7 +174,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
         });
         return Object.entries(map)
             .map(([name, trips]) => ({ name, value: trips }))
-            .sort((a,b) => b.value - a.value)
+            .sort((a, b) => b.value - a.value)
             .slice(0, 8);
     }, [filtered]);
 
@@ -113,7 +184,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
             map[r.activity_date] = (map[r.activity_date] || 0) + parseFloat(r.net_weight || 0);
         });
         return Object.entries(map)
-            .sort(([a],[b]) => a.localeCompare(b))
+            .sort(([a], [b]) => a.localeCompare(b))
             .map(([date, tons]) => ({ date, tons: parseFloat(tons.toFixed(2)) }));
     }, [filtered]);
 
@@ -123,7 +194,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
             map[r.vehicle_number] = (map[r.vehicle_number] || 0) + parseFloat(r.net_weight || 0);
         });
         return Object.entries(map)
-            .sort(([,a],[,b]) => b - a)
+            .sort(([, a], [, b]) => b - a)
             .slice(0, 10)
             .map(([name, tons]) => ({ name, tons: parseFloat(tons.toFixed(2)) }));
     }, [filtered]);
@@ -149,18 +220,20 @@ export default function RawMaterialReport({ activities, vehicles }) {
         }
 
         const rows = filtered.map(r => ({
-            "Date":                r.activity_date,
-            "Vehicle":             r.vehicle_number,
-            "Site":                r.site || "",
-            "Arrival Time":        r.arrival_time || "",
-            "Loading Start":       r.loading_start_time || "",
-            "Unloading End":       r.unloading_end_time || "",
-            "Turnaround Time":     r.turnaround_time || "",
-            "Total Weight (T)":    fmtNum(r.total_weight),
-            "Vehicle Weight (T)":  fmtNum(r.vehicle_weight),
-            "Net Weight (T)":      fmtNum(r.net_weight),
+            "Date": r.activity_date,
+            "Vehicle": r.vehicle_number,
+            "Site": r.site || "",
+            "Arrival Time": r.arrival_time || "",
+            "Loading Start": r.loading_start_time || "",
+            "Unloading End": r.unloading_end_time || "",
+            "Turnaround Time": r.turnaround_time || "",
+            "Total Weight (MT)": fmtNum(r.total_weight),
+            "Vehicle Weight (MT)": fmtNum(r.vehicle_weight),
+            "Net Weight (MT)": fmtNum(r.net_weight),
         }));
         exportToExcel(rows, "raw_material_report.xlsx");
+
+
     };
 
     const handlePdfExport = () => {
@@ -253,15 +326,15 @@ export default function RawMaterialReport({ activities, vehicles }) {
                     <div className="kpi-value">{filtered.length}</div>
                 </div>
                 <div className="kpi-card green">
-                    <div className="kpi-label">Total Net Weight (T)</div>
+                    <div className="kpi-label">Total Net Weight (MT)</div>
                     <div className="kpi-value">{fmtNum(totalNetWeight)}</div>
                 </div>
                 <div className="kpi-card orange">
-                    <div className="kpi-label">Total Gross Weight (T)</div>
+                    <div className="kpi-label">Total Gross Weight (MT)</div>
                     <div className="kpi-value">{fmtNum(totalGrossWeight)}</div>
                 </div>
                 <div className="kpi-card purple">
-                    <div className="kpi-label">Avg Net / Trip (T)</div>
+                    <div className="kpi-label">Avg Net / Trip (MT)</div>
                     <div className="kpi-value">{fmtNum(avgNetWeight)}</div>
                 </div>
             </div>
@@ -269,15 +342,15 @@ export default function RawMaterialReport({ activities, vehicles }) {
             {/* Charts */}
             <div className="chart-grid">
                 <div className="chart-card">
-                    <h3>Net Weight by Month (Tons)</h3>
+                    <h3>Net Weight by Month (MT)</h3>
                     {byMonth.length === 0 ? <div className="report-empty">No data</div> : (
                         <ResponsiveContainer width="100%" height={220}>
-                            <BarChart data={byMonth} margin={{ top:5, right:10, left:0, bottom:40 }}>
+                            <BarChart data={byMonth} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                <XAxis dataKey="month" tick={{ fontSize:11 }} angle={-30} textAnchor="end" />
-                                <YAxis tick={{ fontSize:11 }} />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
+                                <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="tons" fill="#ea580c" radius={[4,4,0,0]} name="Net Weight (T)" />
+                                <Bar dataKey="tons" fill="#ea580c" radius={[4, 4, 0, 0]} name="Net Weight (MT)" />
                             </BarChart>
                         </ResponsiveContainer>
                     )}
@@ -290,7 +363,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
                             <PieChart>
                                 <Pie data={byVehicle} cx="50%" cy="50%" outerRadius={80}
                                     dataKey="value" nameKey="name"
-                                    label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}
+                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                                     labelLine={false} fontSize={10}>
                                     {byVehicle.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                                 </Pie>
@@ -304,12 +377,12 @@ export default function RawMaterialReport({ activities, vehicles }) {
                     <h3>Daily Net Weight Trend</h3>
                     {dailyTrend.length === 0 ? <div className="report-empty">No data</div> : (
                         <ResponsiveContainer width="100%" height={220}>
-                            <LineChart data={dailyTrend} margin={{ top:5, right:10, left:0, bottom:40 }}>
+                            <LineChart data={dailyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                <XAxis dataKey="date" tick={{ fontSize:10 }} angle={-30} textAnchor="end" />
-                                <YAxis tick={{ fontSize:11 }} />
+                                <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
+                                <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Line type="monotone" dataKey="tons" stroke="#ea580c" strokeWidth={2} dot={false} name="Net Weight (T)" />
+                                <Line type="monotone" dataKey="tons" stroke="#ea580c" strokeWidth={2} dot={false} name="Net Weight (MT)" />
                             </LineChart>
                         </ResponsiveContainer>
                     )}
@@ -319,12 +392,12 @@ export default function RawMaterialReport({ activities, vehicles }) {
                     <h3>Net Weight by Vehicle</h3>
                     {netWeightByVehicle.length === 0 ? <div className="report-empty">No data</div> : (
                         <ResponsiveContainer width="100%" height={220}>
-                            <BarChart data={netWeightByVehicle} layout="vertical" margin={{ top:5, right:20, left:40, bottom:5 }}>
+                            <BarChart data={netWeightByVehicle} layout="vertical" margin={{ top: 5, right: 20, left: 40, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                <XAxis type="number" tick={{ fontSize:11 }} />
-                                <YAxis dataKey="name" type="category" tick={{ fontSize:10 }} width={80} />
+                                <XAxis type="number" tick={{ fontSize: 11 }} />
+                                <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={80} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="tons" fill="#7c3aed" radius={[0,4,4,0]} name="Net Weight (T)" />
+                                <Bar dataKey="tons" fill="#7c3aed" radius={[0, 4, 4, 0]} name="Net Weight (MT)" />
                             </BarChart>
                         </ResponsiveContainer>
                     )}
@@ -334,7 +407,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
             {/* Table */}
             <div className="report-table-section">
                 <div className="report-table-header">
-                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <h3>Raw Material Entries</h3>
                         <span className="report-count">{filtered.length} records</span>
                     </div>
@@ -342,8 +415,8 @@ export default function RawMaterialReport({ activities, vehicles }) {
                         <button className="export-btn" onClick={handleExport}>⬇ Export to Excel</button>
                         {(isManager || isClerk) && (
                             <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-                                <select 
-                                    value={pdfUnit} 
+                                <select
+                                    value={pdfUnit}
                                     onChange={(e) => setPdfUnit(e.target.value)}
                                     style={{
                                         padding: "0.5rem",
@@ -356,7 +429,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
                                         boxSizing: "border-box"
                                     }}
                                 >
-                                    <option value="tons">Tons (T)</option>
+                                    <option value="tons">Metric Ton (MT)</option>
                                     <option value="brass">Brass (B)</option>
                                 </select>
                                 <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
@@ -369,7 +442,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
                 {filtered.length === 0 ? (
                     <div className="report-empty">No entries match the selected filters.</div>
                 ) : (
-                    <div style={{ overflowX:"auto" }}>
+                    <div style={{ overflowX: "auto" }}>
                         <table className="report-table">
                             <thead>
                                 <tr>
@@ -381,29 +454,41 @@ export default function RawMaterialReport({ activities, vehicles }) {
                                     <th>Loading Start</th>
                                     <th>Unloading End</th>
                                     <th>Turnaround</th>
-                                    <th>Gross Wt (T)</th>
-                                    <th>Vehicle Wt (T)</th>
-                                    <th>Net Wt (T)</th>
+                                    <th>Gross Wt (MT)</th>
+                                    <th>Vehicle Wt (MT)</th>
+                                    <th>Net Wt (MT)</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map((r, i) => (
-                                    <tr key={r.activity_id}>
-                                        <td style={{ color:"#9ca3af", fontSize:12 }}>{i+1}</td>
-                                        <td>{r.activity_date}</td>
-                                        <td><strong>{r.vehicle_number}</strong></td>
-                                        <td>{r.site || "—"}</td>
-                                        <td>{r.arrival_time}</td>
-                                        <td>{r.loading_start_time}</td>
-                                        <td>{r.unloading_end_time}</td>
-                                        <td>{r.turnaround_time}</td>
-                                        <td>{fmtNum(r.total_weight)}</td>
-                                        <td style={{ color:"#6b7280" }}>{fmtNum(r.vehicle_weight)}</td>
-                                        <td style={{ fontWeight:600, color:"#16a34a" }}>{fmtNum(r.net_weight)}</td>
-                                    </tr>
-                                ))}
+                                {filtered
+                                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                    .map((r, i) => (
+                                        <tr key={r.activity_id}>
+                                            <td style={{ color: "#9ca3af", fontSize: 12 }}>
+                                                {(currentPage - 1) * pageSize + i + 1}
+                                            </td>
+                                            <td>{r.activity_date}</td>
+                                            <td><strong>{r.vehicle_number}</strong></td>
+                                            <td>{r.site || "—"}</td>
+                                            <td>{r.arrival_time}</td>
+                                            <td>{r.loading_start_time}</td>
+                                            <td>{r.unloading_end_time}</td>
+                                            <td>{r.turnaround_time}</td>
+                                            <td>{fmtNum(r.total_weight)}</td>
+                                            <td style={{ color: "#6b7280" }}>{fmtNum(r.vehicle_weight)}</td>
+                                            <td style={{ fontWeight: 600, color: "#16a34a" }}>{fmtNum(r.net_weight)}</td>
+                                        </tr>
+                                    ))}
                             </tbody>
                         </table>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filtered.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={setPageSize}
+                            pageSizeOptions={[5, 10, 20, 50]}
+                        />
                     </div>
                 )}
             </div>
@@ -421,8 +506,8 @@ export default function RawMaterialReport({ activities, vehicles }) {
                         <p style={{ color: "#475569", fontSize: "0.95rem", marginBottom: "1rem" }}>
                             You need manager approval to print or export reports. Would you like to request approval for this report?
                         </p>
-                        <div style={{ 
-                            marginBottom: "1.5rem", padding: "0.75rem", 
+                        <div style={{
+                            marginBottom: "1.5rem", padding: "0.75rem",
                             background: "#f1f5f9", borderRadius: "8px",
                             fontSize: "0.9rem", color: "#334155", borderLeft: "4px solid #3b82f6"
                         }}>
@@ -448,9 +533,9 @@ export default function RawMaterialReport({ activities, vehicles }) {
                             >
                                 Cancel
                             </button>
+                        </div>
                     </div>
                 </div>
-            </div>
             )}
         </div>
     );

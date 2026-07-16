@@ -40,6 +40,15 @@ def add_production():
 
     data = request.json
 
+    try:
+        qty_val = float(data.get("quantity_tons", 0))
+        cost_val = float(data.get("production_cost", 0))
+    except (ValueError, TypeError):
+        return jsonify({"message": "Quantity and Production Cost must be valid numbers"}), 400
+
+    if qty_val <= 0 or cost_val <= 0:
+        return jsonify({"message": "Quantity and Production Cost must be greater than zero"}), 400
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -123,6 +132,16 @@ def update_production(id):
     data = request.json
     print("Update Request:", data)
     print("Production ID:", id)
+
+    try:
+        qty_val = float(data.get("quantity_tons", 0))
+        cost_val = float(data.get("production_cost", 0))
+    except (ValueError, TypeError):
+        return jsonify({"message": "Quantity and Production Cost must be valid numbers"}), 400
+
+    if qty_val <= 0 or cost_val <= 0:
+        return jsonify({"message": "Quantity and Production Cost must be greater than zero"}), 400
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 

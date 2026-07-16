@@ -1,12 +1,22 @@
 import React, { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
 import { getApprovals, actionApproval } from "../services/approvalApi";
+import Pagination from "../components/common/Pagination";
 
 export default function Approvals() {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [rejectId, setRejectId] = useState(null);
     const [remark, setRemark] = useState("");
+
+    // --- Pagination States ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    // Reset pagination when data changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [requests.length]);
 
     const fetchPendingApprovals = async (silent = false) => {
         if (!silent) setLoading(true);
@@ -91,63 +101,75 @@ export default function Approvals() {
                             </tr>
                         </thead>
                         <tbody>
-                            {requests.map((req) => (
-                                <tr key={req.request_id}>
-                                    <td>{req.request_id}</td>
-                                    <td>{req.requester_name}</td>
-                                    <td>
-                                        <span style={{
-                                            backgroundColor: req.request_type === "vehicle" 
-                                                ? "#dbeafe" 
-                                                : req.request_type === "user_registration" 
-                                                    ? "#f3e8ff" 
-                                                    : req.request_type.includes("edit") 
-                                                        ? "#fef3c7" 
-                                                        : req.request_type.includes("delete") 
-                                                            ? "#fee2e2" 
-                                                            : "#e0f2fe",
-                                            color: req.request_type === "vehicle" 
-                                                ? "#1e40af" 
-                                                : req.request_type === "user_registration" 
-                                                    ? "#6b21a8" 
-                                                    : req.request_type.includes("edit") 
-                                                        ? "#b45309" 
-                                                        : req.request_type.includes("delete") 
-                                                            ? "#b91c1c" 
-                                                            : "#0369a1",
-                                            padding: "0.25rem 0.5rem",
-                                            borderRadius: "4px",
-                                            fontSize: "0.85em",
-                                            fontWeight: "500",
-                                            textTransform: "capitalize"
-                                        }}>
-                                            {req.request_type.replace("_", " ")}
-                                        </span>
-                                    </td>
-                                    <td>{req.reference_id}</td>
-                                    <td style={{ maxWidth: "300px", wordBreak: "break-all" }}>{req.details}</td>
-                                    <td>{new Date(req.created_at).toLocaleString()}</td>
-                                    <td>
-                                        <div style={{ display: "flex", gap: "0.5rem" }}>
-                                            <button
-                                                className="edit-btn"
-                                                style={{ backgroundColor: "#10b981", color: "white" }}
-                                                onClick={() => handleApprove(req.request_id)}
-                                            >
-                                                Approve
-                                            </button>
-                                            <button
-                                                className="delete-btn"
-                                                onClick={() => handleRejectClick(req.request_id)}
-                                            >
-                                                Reject
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {requests
+                                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                .map((req) => (
+                                    <tr key={req.request_id}>
+                                        <td>{req.request_id}</td>
+                                        <td>{req.requester_name}</td>
+                                        <td>
+                                            <span style={{
+                                                backgroundColor: req.request_type === "vehicle" 
+                                                    ? "#dbeafe" 
+                                                    : req.request_type === "user_registration" 
+                                                        ? "#f3e8ff" 
+                                                        : req.request_type.includes("edit") 
+                                                            ? "#fef3c7" 
+                                                            : req.request_type.includes("delete") 
+                                                                ? "#fee2e2" 
+                                                                : "#e0f2fe",
+                                                color: req.request_type === "vehicle" 
+                                                    ? "#1e40af" 
+                                                    : req.request_type === "user_registration" 
+                                                        ? "#6b21a8" 
+                                                        : req.request_type.includes("edit") 
+                                                            ? "#b45309" 
+                                                            : req.request_type.includes("delete") 
+                                                                ? "#b91c1c" 
+                                                                : "#0369a1",
+                                                padding: "0.25rem 0.5rem",
+                                                borderRadius: "4px",
+                                                fontSize: "0.85em",
+                                                fontWeight: "500",
+                                                textTransform: "capitalize"
+                                            }}>
+                                                {req.request_type.replace("_", " ")}
+                                            </span>
+                                        </td>
+                                        <td>{req.reference_id}</td>
+                                        <td style={{ maxWidth: "300px", wordBreak: "break-all" }}>{req.details}</td>
+                                        <td>{new Date(req.created_at).toLocaleString()}</td>
+                                        <td>
+                                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                                                <button
+                                                    className="edit-btn"
+                                                    style={{ backgroundColor: "#10b981", color: "white" }}
+                                                    onClick={() => handleApprove(req.request_id)}
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    className="delete-btn"
+                                                    onClick={() => handleRejectClick(req.request_id)}
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
                         </tbody>
                     </table>
+                )}
+                {!loading && requests.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={requests.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={setPageSize}
+                        pageSizeOptions={[5, 10, 20, 50]}
+                    />
                 )}
             </div>
 

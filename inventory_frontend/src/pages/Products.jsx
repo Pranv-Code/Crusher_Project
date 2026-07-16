@@ -28,7 +28,7 @@ function Products() {
     const [newProduct, setNewProduct] = useState({
         product_name: "",
         quantity_tons: "",
-        unit: "Tons",
+        unit: "",
     });
 
     const [editingId, setEditingId] = useState(null);
@@ -51,9 +51,23 @@ function Products() {
     const handleAddProduct = async () => {
         if (
             newProduct.product_name.trim() === "" ||
-            newProduct.quantity_tons === ""
+            newProduct.quantity_tons === "" ||
+            !newProduct.unit
         ) {
-            alert("Please fill all fields.");
+            alert("Please fill all fields and select a unit.");
+            return;
+        }
+
+        if (parseFloat(newProduct.quantity_tons) <= 0) {
+            alert("Quantity must be greater than zero.");
+            return;
+        }
+
+        const isDuplicate = products.some(
+            (p) => p.product_name.trim().toLowerCase() === newProduct.product_name.trim().toLowerCase()
+        );
+        if (isDuplicate) {
+            alert(`A product with the name "${newProduct.product_name}" already exists.`);
             return;
         }
 
@@ -64,7 +78,7 @@ function Products() {
             setNewProduct({
                 product_name: "",
                 quantity_tons: "",
-                unit: "Tons",
+                unit: "",
             });
             setShowAddForm(false);
         } catch (err) {
@@ -91,6 +105,19 @@ function Products() {
     };
 
     const handleSave = async () => {
+        if (editData.product_name.trim() === "") {
+            alert("Product name cannot be empty.");
+            return;
+        }
+
+        const isDuplicate = products.some(
+            (p) => p.product_id !== editingId && p.product_name.trim().toLowerCase() === editData.product_name.trim().toLowerCase()
+        );
+        if (isDuplicate) {
+            alert(`A product with the name "${editData.product_name}" already exists.`);
+            return;
+        }
+
         try {
             await updateProduct(editingId, editData);
             await fetchProducts(true);
@@ -123,7 +150,7 @@ function Products() {
 
     // Configuration schemas for structural mapping
     const unitOptions = [
-        { value: "Tons", label: "Tons" },
+        { value: "Tons", label: "MT" },
         { value: "Brass", label: "Brass" },
     ];
 
@@ -135,7 +162,7 @@ function Products() {
     // Custom renderer for dual-unit quantity display
     const renderQuantity = (row) => (
         <div style={{ lineHeight: "1.3" }}>
-            <span>{Number(row.quantity_tons).toFixed(2)} Tons</span>
+            <span>{Number(row.quantity_tons).toFixed(2)} MT</span>
             <br />
             <span style={{ fontSize: "0.75em", color: "var(--text-muted, #888)" }}>
                 ≈ {row.quantity_brass != null ? Number(row.quantity_brass).toFixed(2) : "—"} Brass

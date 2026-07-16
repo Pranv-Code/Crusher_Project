@@ -57,6 +57,14 @@ const calculateTurnaround = (arrival, unloading) => {
 };
 
 function RawMaterial() {
+    const capitalizeWords = (str) => {
+        if (!str) return "";
+        return str
+            .split(/\s+/)
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+    };
+
     const { isManager } = useAuth();
     const {
         vehicleActivities,
@@ -136,6 +144,11 @@ function RawMaterial() {
             return;
         }
 
+        if (parseFloat(newActivity.total_weight) <= 0 || parseFloat(newActivity.vehicle_weight) <= 0) {
+            alert("Total Weight and Vehicle Weight must be greater than zero.");
+            return;
+        }
+
         const net_weight = parseFloat(newActivity.total_weight) - parseFloat(newActivity.vehicle_weight);
         if (net_weight < 0) {
             alert("Total Weight cannot be less than Vehicle Weight.");
@@ -146,6 +159,7 @@ function RawMaterial() {
 
         const payload = {
             ...newActivity,
+            site: capitalizeWords(newActivity.site),
             net_weight: net_weight.toFixed(2),
             turnaround_time,
         };
@@ -199,6 +213,11 @@ function RawMaterial() {
             return;
         }
 
+        if (parseFloat(editData.total_weight) <= 0 || parseFloat(editData.vehicle_weight) <= 0) {
+            alert("Total Weight and Vehicle Weight must be greater than zero.");
+            return;
+        }
+
         const net_weight = parseFloat(editData.total_weight) - parseFloat(editData.vehicle_weight);
         if (net_weight < 0) {
             alert("Total Weight cannot be less than Vehicle Weight.");
@@ -209,6 +228,7 @@ function RawMaterial() {
 
         const payload = {
             ...editData,
+            site: capitalizeWords(editData.site),
             net_weight: net_weight.toFixed(2),
             turnaround_time,
         };
@@ -270,17 +290,17 @@ function RawMaterial() {
         },
         {
             key: "total_weight",
-            label: "Total Wt (T)",
+            label: "Total Wt (MT)",
             render: (row) => Number(row.total_weight).toFixed(2),
         },
         {
             key: "vehicle_weight",
-            label: "Vehicle Wt (T)",
+            label: "Vehicle Wt (MT)",
             render: (row) => Number(row.vehicle_weight).toFixed(2),
         },
         {
             key: "net_weight",
-            label: "Net Wt (T)",
+            label: "Net Wt (MT)",
             render: (row) => Number(row.net_weight).toFixed(2),
         },
         { key: "site", label: "Site" },
@@ -327,10 +347,12 @@ function RawMaterial() {
                                     vehicle_number: e.target.value,
                                 })
                             }
-                            options={vehicles.map((v) => ({
-                                value: v.vehicle_number,
-                                label: v.vehicle_number,
-                            }))}
+                            options={vehicles
+                                .filter(v => v.status === "Active")
+                                .map((v) => ({
+                                    value: v.vehicle_number,
+                                    label: v.vehicle_number,
+                                }))}
                         />
 
                         <InputField
@@ -373,7 +395,7 @@ function RawMaterial() {
                         />
 
                         <InputField
-                            label="Total Weight (T)"
+                            label="Total Weight (MT)"
                             name="total_weight"
                             type="number"
                             step="0.01"
@@ -387,7 +409,7 @@ function RawMaterial() {
                         />
 
                         <InputField
-                            label="Vehicle Weight (T)"
+                            label="Vehicle Weight (MT)"
                             name="vehicle_weight"
                             type="number"
                             step="0.01"
@@ -410,6 +432,12 @@ function RawMaterial() {
                                 setNewActivity({
                                     ...newActivity,
                                     site: e.target.value,
+                                })
+                            }
+                            onBlur={(e) =>
+                                setNewActivity({
+                                    ...newActivity,
+                                    site: capitalizeWords(e.target.value),
                                 })
                             }
                         />
@@ -492,10 +520,12 @@ function RawMaterial() {
                             vehicle_number: e.target.value,
                         })
                     }
-                    options={vehicles.map((v) => ({
-                        value: v.vehicle_number,
-                        label: v.vehicle_number,
-                    }))}
+                    options={vehicles
+                        .filter(v => v.status === "Active")
+                        .map((v) => ({
+                            value: v.vehicle_number,
+                            label: v.vehicle_number,
+                        }))}
                 />
 
                 <InputField
@@ -574,6 +604,12 @@ function RawMaterial() {
                         setEditData({
                             ...editData,
                             site: e.target.value,
+                        })
+                    }
+                    onBlur={(e) =>
+                        setEditData({
+                            ...editData,
+                            site: capitalizeWords(e.target.value),
                         })
                     }
                 />

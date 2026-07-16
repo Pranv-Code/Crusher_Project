@@ -47,13 +47,31 @@ def add_product():
 
     data = request.json
 
+    try:
+        qty_val = float(data.get("quantity_tons", 0))
+    except (ValueError, TypeError):
+        return jsonify({"message": "Invalid quantity value"}), 400
+
+    if qty_val <= 0:
+        return jsonify({"message": "Quantity must be greater than zero"}), 400
+
     qty = unit_convertor(
         data["unit"],
         data["quantity_tons"]
     )
 
+    product_name = data.get("product_name", "").strip()
+    if not product_name:
+        return jsonify({"message": "Product name is required"}), 400
+
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(buffered=True)
+
+    cursor.execute("SELECT product_id FROM Product WHERE LOWER(product_name) = LOWER(%s)", (product_name,))
+    if cursor.fetchone():
+        cursor.close()
+        conn.close()
+        return jsonify({"message": f"Product with name '{product_name}' already exists"}), 400
 
     cursor.execute("""
         INSERT INTO Product
@@ -77,9 +95,18 @@ def add_product():
 def update_product(id):
 
     data = request.json
+    product_name = data.get("product_name", "").strip()
+    if not product_name:
+        return jsonify({"message": "Product name is required"}), 400
 
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(buffered=True)
+
+    cursor.execute("SELECT product_id FROM Product WHERE LOWER(product_name) = LOWER(%s) AND product_id != %s", (product_name, id))
+    if cursor.fetchone():
+        cursor.close()
+        conn.close()
+        return jsonify({"message": f"Product with name '{product_name}' already exists"}), 400
 
     cursor.execute("""
         UPDATE Product
@@ -87,7 +114,7 @@ def update_product(id):
             product_name=%s
         WHERE product_id=%s
     """, (
-        data["status"],data["product_name"],
+        data["status"], product_name,
         id
     ))
 

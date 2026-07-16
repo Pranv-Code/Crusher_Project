@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import Pagination from "../../components/common/Pagination";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -51,6 +52,10 @@ export default function SalesReport({ sales, parties, vehicles }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [pdfUnit, setPdfUnit] = useState("tons");
 
+    // --- Pagination States ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
     const [showApprovalModal, setShowApprovalModal] = useState(false);
     const [pendingRequest, setPendingRequest] = useState(null);
     const [submittingRequest, setSubmittingRequest] = useState(false);
@@ -70,7 +75,6 @@ export default function SalesReport({ sales, parties, vehicles }) {
         }
     };
 
-    // ── Filter logic ─────────────────────────────────────────────────────────
     const filtered = useMemo(() => {
         return sales.filter((s) => {
             if (dateFrom && s.sales_date < dateFrom) return false;
@@ -94,6 +98,11 @@ export default function SalesReport({ sales, parties, vehicles }) {
             return true;
         });
     }, [sales, dateFrom, dateTo, monthFilter, partyFilter, vehicleFilter, searchQuery]);
+
+    // Reset pagination when report data changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filtered.length]);
 
     // ── KPIs ─────────────────────────────────────────────────────────────────
     const totalTons     = filtered.reduce((s, r) => s + (r.quantity_tons || 0), 0);
@@ -173,7 +182,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
             "Product":        s.product_name,
             "Vehicle":        s.vehicle_number || "",
             "Vehicle Owner":  s.vehicle_owner || "",
-            "Quantity (Tons)":fmtTons(s.quantity_tons),
+            "Quantity (MT)":fmtTons(s.quantity_tons),
             "Unit":           s.unit,
             "Site":           s.site || "",
             "Price":          s.price || "",
@@ -286,7 +295,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                 <div className="kpi-card green">
                     <div className="kpi-label">Total Tons Sold</div>
                     <div className="kpi-value">{fmtTons(totalTons)}</div>
-                    <div className="kpi-sub">≈ {(totalTons * 4.2).toFixed(2)} brass</div>
+                    <div className="kpi-sub">≈ {(totalTons * 4.2).toFixed(2)} Brass</div>
                 </div>
                 <div className="kpi-card purple">
                     <div className="kpi-label">Unique Parties</div>
@@ -302,7 +311,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
             <div className="chart-grid">
                 {/* Monthly Bar Chart */}
                 <div className="chart-card">
-                    <h3>Sales by Month (Tons)</h3>
+                    <h3>Sales by Month (MT)</h3>
                     {byMonth.length === 0 ? <div className="report-empty">No data</div> : (
                         <ResponsiveContainer width="100%" height={220}>
                             <BarChart data={byMonth} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
@@ -310,7 +319,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                 <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
                                 <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="tons" fill="#2563eb" radius={[4,4,0,0]} name="Tons" />
+                                <Bar dataKey="tons" fill="#2563eb" radius={[4,4,0,0]} name="Metric Ton" />
                             </BarChart>
                         </ResponsiveContainer>
                     )}
@@ -343,7 +352,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                 <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
                                 <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Line type="monotone" dataKey="tons" stroke="#16a34a" strokeWidth={2} dot={false} name="Tons" />
+                                <Line type="monotone" dataKey="tons" stroke="#16a34a" strokeWidth={2} dot={false} name="Metric Tons" />
                             </LineChart>
                         </ResponsiveContainer>
                     )}
@@ -351,7 +360,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
 
                 {/* Vehicle Bar Chart */}
                 <div className="chart-card">
-                    <h3>Top Vehicles by Tons</h3>
+                    <h3>Top Vehicles by Metric Tons</h3>
                     {byVehicle.length === 0 ? <div className="report-empty">No data</div> : (
                         <ResponsiveContainer width="100%" height={220}>
                             <BarChart data={byVehicle} layout="vertical" margin={{ top: 5, right: 20, left: 40, bottom: 5 }}>
@@ -359,7 +368,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                 <XAxis type="number" tick={{ fontSize: 11 }} />
                                 <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={80} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="tons" fill="#7c3aed" radius={[0,4,4,0]} name="Tons" />
+                                <Bar dataKey="tons" fill="#7c3aed" radius={[0,4,4,0]} name="Metric Ton" />
                             </BarChart>
                         </ResponsiveContainer>
                     )}
@@ -393,7 +402,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                         boxSizing: "border-box"
                                     }}
                                 >
-                                    <option value="tons">Tons (T)</option>
+                                    <option value="tons">Metric Tons (MT)</option>
                                     <option value="brass">Brass (B)</option>
                                 </select>
                                 <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
@@ -423,31 +432,43 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map((s, i) => (
-                                    <tr key={s.sales_id}>
-                                        <td style={{ color:"#9ca3af", fontSize:12 }}>{i+1}</td>
-                                        <td>{s.sales_date}</td>
-                                        <td><strong>{s.party_name}</strong></td>
-                                        <td>{s.product_name}</td>
-                                        <td>{s.vehicle_number || "—"}</td>
-                                        <td style={{ color:"#6b7280" }}>{s.vehicle_owner || "—"}</td>
-                                        <td>
-                                            <div style={{ lineHeight:1.4 }}>
-                                                <span style={{ fontWeight:600 }}>{fmtTons(s.quantity_tons)} tons</span>
-                                                <br/>
-                                                <span style={{ fontSize:11, color:"#9ca3af" }}>
-                                                    ≈ {(s.quantity_tons * 4.2).toFixed(2)} brass
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td>{s.site || "—"}</td>
-                                        <td>{s.price || "—"}</td>
-                                        <td style={{ maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
-                                            title={s.remarks}>{s.remarks || "—"}</td>
-                                    </tr>
-                                ))}
+                                {filtered
+                                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                    .map((s, i) => (
+                                        <tr key={s.sales_id}>
+                                            <td style={{ color:"#9ca3af", fontSize:12 }}>
+                                                {(currentPage - 1) * pageSize + i + 1}
+                                            </td>
+                                            <td>{s.sales_date}</td>
+                                            <td><strong>{s.party_name}</strong></td>
+                                            <td>{s.product_name}</td>
+                                            <td>{s.vehicle_number || "—"}</td>
+                                            <td style={{ color:"#6b7280" }}>{s.vehicle_owner || "—"}</td>
+                                            <td>
+                                                <div style={{ lineHeight:1.4 }}>
+                                                    <span style={{ fontWeight:600 }}>{fmtTons(s.quantity_tons)} MT</span>
+                                                    <br/>
+                                                    <span style={{ fontSize:11, color:"#9ca3af" }}>
+                                                        ≈ {(s.quantity_tons * 4.2).toFixed(2)} Brass
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>{s.site || "—"}</td>
+                                            <td>{s.price || "—"}</td>
+                                            <td style={{ maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                                                title={s.remarks}>{s.remarks || "—"}</td>
+                                        </tr>
+                                    ))}
                             </tbody>
                         </table>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filtered.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={setPageSize}
+                            pageSizeOptions={[5, 10, 20, 50]}
+                        />
                     </div>
                 )}
             </div>

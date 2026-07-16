@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
 import { getMyPendingApprovals } from "../services/approvalApi";
+import Pagination from "../components/common/Pagination";
 import { addVehicle } from "../services/vehicleApi";
 import { addParty } from "../services/partyApi";
 import * as XLSX from "xlsx";
@@ -18,9 +19,26 @@ import {
 } from "../utils/pdfGenerator";
 
 export default function ClerkPendingWork() {
+    const capitalizeWords = (str) => {
+        if (!str) return "";
+        return str
+            .split(/\s+/)
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+    };
+
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [downloadingId, setDownloadingId] = useState(null);
+    
+    // --- Pagination States ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    // Reset pagination when data changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [requests.length]);
     
     // Vehicle request states
     const [showRequestModal, setShowRequestModal] = useState(false);
@@ -235,9 +253,20 @@ export default function ClerkPendingWork() {
             alert("Vehicle Number and Owner are required.");
             return;
         }
+
+        const cleanedNumber = newVehicle.vehicle_number.replace(/[\s-]/g, "").toUpperCase();
+        const vehicleRegex = /^[A-Z]{1,2}\d{2}[A-Z]{1,2}\d{4}$/;
+        if (!vehicleRegex.test(cleanedNumber)) {
+            alert("Invalid vehicle number format. Expected format: 2 letters, 2 digits, 2 letters, 4 digits (e.g. MH12AB1234 or JR09B9987).");
+            return;
+        }
+
         setSubmitting(true);
         try {
-            await addVehicle(newVehicle);
+            await addVehicle({
+                ...newVehicle,
+                vehicle_number: cleanedNumber
+            });
             alert("Vehicle request submitted successfully!");
             setShowRequestModal(false);
             setNewVehicle({ vehicle_number: "", owner: "" });
@@ -257,7 +286,10 @@ export default function ClerkPendingWork() {
         }
         setSubmittingParty(true);
         try {
-            await addParty(newParty);
+            await addParty({
+                ...newParty,
+                party_name: capitalizeWords(newParty.party_name)
+            });
             alert("Party request submitted successfully!");
             setShowPartyModal(false);
             setNewParty({ party_name: "", gst_no: "", address: "", pan_no: "" });
@@ -322,72 +354,84 @@ export default function ClerkPendingWork() {
                             </tr>
                         </thead>
                         <tbody>
-                            {requests.map((req) => (
-                                <tr key={req.request_id}>
-                                    <td>{req.request_id}</td>
-                                    <td>
-                                        <span style={{
-                                            backgroundColor: req.request_type === "vehicle" ? "#dbeafe" : req.request_type === "party" ? "#f3e8ff" : "#e0f2fe",
-                                            color: req.request_type === "vehicle" ? "#1e40af" : req.request_type === "party" ? "#6b21a8" : "#0369a1",
-                                            padding: "0.25rem 0.5rem",
-                                            borderRadius: "4px",
-                                            fontSize: "0.85em",
-                                            fontWeight: "500",
-                                            textTransform: "capitalize"
+                            {requests
+                                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                .map((req) => (
+                                    <tr key={req.request_id}>
+                                        <td>{req.request_id}</td>
+                                        <td>
+                                            <span style={{
+                                                backgroundColor: req.request_type === "vehicle" ? "#dbeafe" : req.request_type === "party" ? "#f3e8ff" : "#e0f2fe",
+                                                color: req.request_type === "vehicle" ? "#1e40af" : req.request_type === "party" ? "#6b21a8" : "#0369a1",
+                                                padding: "0.25rem 0.5rem",
+                                                borderRadius: "4px",
+                                                fontSize: "0.85em",
+                                                fontWeight: "500",
+                                                textTransform: "capitalize"
+                                            }}>
+                                                {req.request_type.replace("_", " ")}
+                                            </span>
+                                        </td>
+                                        <td style={{ maxWidth: "300px", wordBreak: "break-word" }}>
+                                            {req.request_type === "report_print" ? (
+                                                req.reference_data?.label || req.reference_id
+                                            ) : (
+                                                <strong>{req.reference_id}</strong>
+                                            )}
+                                        </td>
+                                        <td>{req.created_at}</td>
+                                        <td>{req.reviewed_at || "—"}</td>
+                                        <td>
+                                            <span style={{
+                                                ...getStatusStyle(req.status),
+                                                padding: "0.25rem 0.5rem",
+                                                borderRadius: "4px",
+                                                fontSize: "0.85em",
+                                                fontWeight: "500",
+                                                textTransform: "capitalize"
+                                            }}>
+                                                {req.status}
+                                            </span>
+                                        </td>
+                                        <td>{req.manager_name || "—"}</td>
+                                        <td style={{
+                                            color: req.status === "rejected" ? "#dc2626" : "inherit",
+                                            fontWeight: req.status === "rejected" ? "500" : "normal",
+                                            maxWidth: "250px",
+                                            wordBreak: "break-word"
                                         }}>
-                                            {req.request_type.replace("_", " ")}
-                                        </span>
-                                    </td>
-                                    <td style={{ maxWidth: "300px", wordBreak: "break-word" }}>
-                                        {req.request_type === "report_print" ? (
-                                            req.reference_data?.label || req.reference_id
-                                        ) : (
-                                            <strong>{req.reference_id}</strong>
-                                        )}
-                                    </td>
-                                    <td>{req.created_at}</td>
-                                    <td>{req.reviewed_at || "—"}</td>
-                                    <td>
-                                        <span style={{
-                                            ...getStatusStyle(req.status),
-                                            padding: "0.25rem 0.5rem",
-                                            borderRadius: "4px",
-                                            fontSize: "0.85em",
-                                            fontWeight: "500",
-                                            textTransform: "capitalize"
-                                        }}>
-                                            {req.status}
-                                        </span>
-                                    </td>
-                                    <td>{req.manager_name || "—"}</td>
-                                    <td style={{
-                                        color: req.status === "rejected" ? "#dc2626" : "inherit",
-                                        fontWeight: req.status === "rejected" ? "500" : "normal",
-                                        maxWidth: "250px",
-                                        wordBreak: "break-word"
-                                    }}>
-                                        {req.remark || "—"}
-                                    </td>
-                                    <td>
-                                        {req.request_type === "report_print" && req.status === "approved" && (
-                                            <button
-                                                className="primary-btn"
-                                                style={{
-                                                    padding: "0.25rem 0.5rem",
-                                                    fontSize: "0.8rem",
-                                                    backgroundColor: downloadingId === req.request_id ? "#9ca3af" : "#10b981"
-                                                }}
-                                                onClick={() => handleDownloadReport(req)}
-                                                disabled={downloadingId === req.request_id}
-                                            >
-                                                {downloadingId === req.request_id ? "Generating..." : "⬇ Download"}
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
+                                            {req.remark || "—"}
+                                        </td>
+                                        <td>
+                                            {req.request_type === "report_print" && req.status === "approved" && (
+                                                <button
+                                                    className="primary-btn"
+                                                    style={{
+                                                        padding: "0.25rem 0.5rem",
+                                                        fontSize: "0.8rem",
+                                                        backgroundColor: downloadingId === req.request_id ? "#9ca3af" : "#10b981"
+                                                    }}
+                                                    onClick={() => handleDownloadReport(req)}
+                                                    disabled={downloadingId === req.request_id}
+                                                >
+                                                    {downloadingId === req.request_id ? "Generating..." : "⬇ Download"}
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
                         </tbody>
                     </table>
+                )}
+                {!loading && requests.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={requests.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={setPageSize}
+                        pageSizeOptions={[5, 10, 20, 50]}
+                    />
                 )}
             </div>
 
@@ -482,6 +526,7 @@ export default function ClerkPendingWork() {
                                 placeholder="e.g. ABC Enterprises"
                                 value={newParty.party_name}
                                 onChange={(e) => setNewParty({ ...newParty, party_name: e.target.value })}
+                                onBlur={(e) => setNewParty({ ...newParty, party_name: capitalizeWords(e.target.value) })}
                                 required
                             />
                         </div>

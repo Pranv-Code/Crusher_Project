@@ -22,6 +22,14 @@ import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
 
 function Parties() {
+    const capitalizeWords = (str) => {
+        if (!str) return "";
+        return str
+            .split(/\s+/)
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+    };
+
     const { parties, fetchParties } = useInventory();
     const [search, setSearch] = useState("");
     const [showAddForm, setShowAddForm] = useState(false);
@@ -59,7 +67,10 @@ function Parties() {
             return;
         }
         try {
-            await addParty(newParty);
+            await addParty({
+                ...newParty,
+                party_name: capitalizeWords(newParty.party_name)
+            });
             await fetchParties(true);
             setNewParty({
                 party_name: "",
@@ -85,7 +96,10 @@ function Parties() {
 
     const handleSave = async () => {
         try {
-            await updateParty(editingId, editData);
+            await updateParty(editingId, {
+                ...editData,
+                party_name: capitalizeWords(editData.party_name)
+            });
             await fetchParties(true);
             setEditingId(null);
         } catch (err) {
@@ -152,6 +166,9 @@ function Parties() {
                             value={newParty.party_name}
                             onChange={(e) =>
                                 setNewParty({ ...newParty, party_name: e.target.value })
+                            }
+                            onBlur={(e) =>
+                                setNewParty({ ...newParty, party_name: capitalizeWords(e.target.value) })
                             }
                         />
                         <InputField
@@ -229,6 +246,9 @@ function Parties() {
                     value={editData.party_name}
                     onChange={(e) =>
                         setEditData({ ...editData, party_name: e.target.value })
+                    }
+                    onBlur={(e) =>
+                        setEditData({ ...editData, party_name: capitalizeWords(e.target.value) })
                     }
                 />
                 <InputField

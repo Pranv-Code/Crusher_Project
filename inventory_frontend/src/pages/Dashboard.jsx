@@ -120,35 +120,33 @@ const totalProductionTons = production.reduce(
     return (
         <Layout>
             <div className="dashboard-container">
-                {/* Welcome Card Banner */}
-                <div className="welcome-card">
+
                     <div style={{ fontSize: "1.2rem", fontWeight: "700", backgroundColor: "rgba(48, 155, 232, 0.1)", padding: "10px 20px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)" }}>
                         🕒 {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                     </div>
-                </div>
 
                 {/* Key Metrics Stats Grid */}
                 <div className="stats-grid">
                     <div className="stat-card">
                         <span className="stat-card-title">Montly Sales</span>
-                        <span className="stat-card-value">{monthlySalesTons.toFixed(2)} T</span>
+                        <span className="stat-card-value">{monthlySalesTons.toFixed(2)} MT</span>
                         {/* <span className="stat-card-subtitle">Revenue: ₹{totalSalesRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span> */}
                         <span className="stat-card-subtitle">Monthly (as of Today)</span>
                     </div>
                     <div className="stat-card">
                         <span className="stat-card-title">Total Sales</span>
-                        <span className="stat-card-value">{totalSalesTons.toFixed(2)} T</span>
+                        <span className="stat-card-value">{totalSalesTons.toFixed(2)} MT</span>
                         {/* <span className="stat-card-subtitle">Revenue: ₹{totalSalesRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span> */}
                         <span className="stat-card-subtitle">Cumulative till today</span>
                     </div>
                     <div className="stat-card">
                         <span className="stat-card-title">Active Production</span>
-                        <span className="stat-card-value">{monthlyProductionTons.toFixed(2)} T</span>
+                        <span className="stat-card-value">{monthlyProductionTons.toFixed(2)} MT</span>
                         <span className="stat-card-subtitle">Monthly (as of today)</span>
                     </div>
                     <div className="stat-card">
                         <span className="stat-card-title">Total Production</span>
-                        <span className="stat-card-value">{totalProductionTons.toFixed(2)} T</span>
+                        <span className="stat-card-value">{totalProductionTons.toFixed(2)} MT</span>
                         <span className="stat-card-subtitle">Cumulative till date</span>
                     </div>
                     <div className="stat-card">
@@ -187,7 +185,7 @@ const totalProductionTons = production.reduce(
                                             <div className="stock-item" key={prod.product_id}>
                                                 <div className="stock-item-info">
                                                     <span>{prod.product_name}</span>
-                                                    <span>{qty.toFixed(2)} Tons</span>
+                                                    <span>{qty.toFixed(2)} Metric Ton</span>
                                                 </div>
                                                 <div className="stock-progress-bg">
                                                     <div
@@ -259,7 +257,7 @@ const totalProductionTons = production.reduce(
                                                 <td>{item.product_name || `ID: ${item.product_id}`}</td>
                                                 <td>
                                                     <span className="db-badge db-badge-tons">
-                                                        {parseFloat(item.quantity_tons).toFixed(2)} {item.unit}
+                                                        {parseFloat(item.quantity_tons).toFixed(2)} MT
                                                     </span>
                                                 </td>
                                             </tr>
@@ -295,7 +293,7 @@ const totalProductionTons = production.reduce(
                                                 <td>{item.product_name || `ID: ${item.product_id}`}</td>
                                                 <td>
                                                     <span className="db-badge db-badge-brass">
-                                                        {parseFloat(item.quantity_tons).toFixed(2)} {item.unit}
+                                                        {parseFloat(item.quantity_tons).toFixed(2)} MT 
                                                     </span>
                                                 </td>
                                                 <td>₹{parseFloat(item.production_cost).toFixed(2)}</td>

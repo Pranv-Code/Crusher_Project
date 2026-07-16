@@ -6,6 +6,12 @@ from datetime import datetime, timedelta
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
+def capitalize_words(s):
+    if not s:
+        return ""
+    return " ".join(word.capitalize() for word in s.strip().split())
+
+
 def _format_time(td):
     """Convert a timedelta (MySQL TIME) to HH:MM string."""
     if td is None:
@@ -311,6 +317,18 @@ def complete_unloading(id):
 
 def add_sale():
     data = request.json
+
+    try:
+        qty_val = float(data.get("quantity", 0))
+        price_val = float(data.get("price", 0.0) or 0.0)
+    except (ValueError, TypeError):
+        return jsonify({"message": "Quantity and Price must be valid numbers"}), 400
+
+    if qty_val <= 0:
+        return jsonify({"message": "Quantity must be greater than zero"}), 400
+    if price_val < 0:
+        return jsonify({"message": "Price cannot be negative"}), 400
+
     conn   = get_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -355,7 +373,7 @@ def add_sale():
             data["vehicle_number"],
             qty,
             data["unit"],
-            data.get("site", ""),
+            capitalize_words(data.get("site", "")),
             float(data.get("price", 0.0) or 0.0),
             data.get("loading_time") or None,
             data.get("remarks")    or None,
@@ -395,13 +413,69 @@ def add_sales_bulk():
     if not rows:
         return jsonify({"message": "No rows provided"}), 400
 
+    party_id = common.get("party_id")
+    sales_date = common.get("sales_date")
+    site = capitalize_words(common.get("site", ""))
+
+    if not party_id or not sales_date:
+        return jsonify({"message": "Party and Sales Date are required in the common section"}), 400
+
     conn   = get_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(buffered=True, dictionary=True)
 
     errors  = []
     created = 0
 
     try:
+        # 1. Verify Party once upfront
+        cursor.execute("SELECT party_name FROM Party WHERE party_id=%s", (party_id,))
+        party = cursor.fetchone()
+        if not party:
+            return jsonify({"message": "Party not found"}), 404
+
+        # 2. Gather unique product IDs and vehicle numbers
+        product_ids = []
+        vehicle_numbers = []
+        for r in rows:
+            pid = r.get("product_id")
+            vnum = r.get("vehicle_number")
+            if pid:
+                try:
+                    product_ids.append(int(pid))
+                except (ValueError, TypeError):
+                    product_ids.append(pid)
+            if vnum:
+                vehicle_numbers.append(vnum)
+
+        product_ids = list(set(product_ids))
+        vehicle_numbers = list(set(vehicle_numbers))
+
+        # 3. Bulk fetch Products
+        products_map = {}
+        if product_ids:
+            format_strings = ','.join(['%s'] * len(product_ids))
+            cursor.execute(
+                f"SELECT product_id, quantity_tons, status FROM Product WHERE product_id IN ({format_strings})",
+                tuple(product_ids)
+            )
+            for p in cursor.fetchall():
+                products_map[p["product_id"]] = p
+
+        # 4. Bulk fetch Vehicles
+        vehicles_set = set()
+        if vehicle_numbers:
+            format_strings = ','.join(['%s'] * len(vehicle_numbers))
+            cursor.execute(
+                f"SELECT vehicle_number FROM Vehicle WHERE vehicle_number IN ({format_strings})",
+                tuple(vehicle_numbers)
+            )
+            for v in cursor.fetchall():
+                vehicles_set.add(v["vehicle_number"])
+
+        # 5. Local stock tracking to handle multiple rows of same product
+        local_stock = {pid: float(p["quantity_tons"]) for pid, p in products_map.items()}
+
+        # 6. Loop and Insert
         for idx, row in enumerate(rows):
             row_label = f"Row {idx + 1}"
 
@@ -410,35 +484,55 @@ def add_sales_bulk():
             quantity       = row.get("quantity")
             unit           = row.get("unit", "tons")
             loading_time   = row.get("loading_time") or None
+            price          = row.get("price")
 
             if not all([product_id, vehicle_number, quantity]):
                 errors.append(f"{row_label}: Missing required fields")
                 continue
 
-            # Check product
-            cursor.execute("SELECT product_id, quantity_tons, status FROM Product WHERE product_id=%s", (product_id,))
-            product = cursor.fetchone()
-            if not product:
-                errors.append(f"{row_label}: Product not found"); continue
-            if product["status"].lower() != "active":
-                errors.append(f"{row_label}: Product is Inactive"); continue
+            try:
+                qty_val = float(quantity)
+                price_val = float(price or 0.0)
+            except (ValueError, TypeError):
+                errors.append(f"{row_label}: Quantity and Price must be valid numbers")
+                continue
 
-            # Check vehicle
-            cursor.execute("SELECT vehicle_number FROM Vehicle WHERE vehicle_number=%s", (vehicle_number,))
-            if not cursor.fetchone():
-                errors.append(f"{row_label}: Vehicle not found"); continue
+            if qty_val <= 0:
+                errors.append(f"{row_label}: Quantity must be greater than zero")
+                continue
+            if price_val < 0:
+                errors.append(f"{row_label}: Price cannot be negative")
+                continue
+
+            price = price_val
+
+            try:
+                p_id = int(product_id)
+            except (ValueError, TypeError):
+                p_id = product_id
+
+            # Validate Product
+            product = products_map.get(p_id)
+            if not product:
+                errors.append(f"{row_label}: Product not found")
+                continue
+            if product["status"].lower() != "active":
+                errors.append(f"{row_label}: Product is Inactive")
+                continue
+
+            # Validate Vehicle
+            if vehicle_number not in vehicles_set:
+                errors.append(f"{row_label}: Vehicle not found")
+                continue
 
             qty = unit_convertor(unit, quantity)
-            price = float(row.get("price", 0.0) or 0.0)
 
-            if float(product["quantity_tons"]) < float(qty):
-                errors.append(f"{row_label}: Insufficient Stock for product"); continue
+            # Validate Stock
+            if local_stock.get(p_id, 0.0) < float(qty):
+                errors.append(f"{row_label}: Insufficient Stock for product")
+                continue
 
-            # Check party
-            cursor.execute("SELECT party_name FROM Party WHERE party_id=%s", (common.get("party_id"),))
-            if not cursor.fetchone():
-                errors.append(f"{row_label}: Party not found"); continue
-
+            # Perform Insertions & Updates
             cursor.execute("""
                 INSERT INTO Sales (
                     sales_date, party_id, product_id, vehicle_number,
@@ -448,21 +542,23 @@ def add_sales_bulk():
                 )
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,NULL,'pending',NULL)
             """, (
-                common.get("sales_date"),
-                common.get("party_id"),
-                product_id,
+                sales_date,
+                party_id,
+                p_id,
                 vehicle_number,
                 qty,
                 unit,
-                common.get("site", ""),
+                site,
                 price,
                 loading_time,
             ))
 
             sales_id = cursor.lastrowid
             cursor.execute("INSERT INTO VehicleSale (sales_id, vehicle_number) VALUES (%s, %s)", (sales_id, vehicle_number))
-            cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (qty, product_id))
+            cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (qty, p_id))
 
+            # Update local stock
+            local_stock[p_id] -= float(qty)
             created += 1
 
         conn.commit()
@@ -530,6 +626,18 @@ def delete_sale(id):
 def update_sale(id):
     import json
     data = request.json
+
+    try:
+        qty_val = float(data.get("quantity", 0))
+        price_val = float(data.get("price", 0.0) or 0.0)
+    except (ValueError, TypeError):
+        return jsonify({"message": "Quantity and Price must be valid numbers"}), 400
+
+    if qty_val <= 0:
+        return jsonify({"message": "Quantity must be greater than zero"}), 400
+    if price_val < 0:
+        return jsonify({"message": "Price cannot be negative"}), 400
+
     conn   = get_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -577,7 +685,7 @@ def update_sale(id):
             WHERE sales_id=%s
         """, (
             data["sales_date"], data["party_id"], data["product_id"], data["vehicle_number"],
-            new_qty, data["unit"], data["site"], float(data.get("price", 0.0) or 0.0),
+            new_qty, data["unit"], capitalize_words(data["site"]), float(data.get("price", 0.0) or 0.0),
             data.get("loading_time") or None,
             data.get("unloading_time") or None,
             data.get("remarks") or None,

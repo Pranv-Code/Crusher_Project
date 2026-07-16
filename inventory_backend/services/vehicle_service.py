@@ -1,9 +1,21 @@
 from flask import jsonify, request
 from db import get_connection
 from datetime import datetime
+import re
+
+def validate_vehicle_number(v_num):
+    # Pattern: 1-2 letters, 2 digits, 1-2 letters, 4 digits
+    pattern = r"^[A-Z]{1,2}\d{2}[A-Z]{1,2}\d{4}$"
+    return bool(re.match(pattern, v_num))
 
 def add_vehicle():
     data = request.json
+    v_num = data.get("vehicle_number", "").replace(" ", "").replace("-", "").upper()
+    if not validate_vehicle_number(v_num):
+        return jsonify({
+            "message": "Invalid vehicle number format. Expected format: 2 letters, 2 digits, 2 letters, 4 digits (e.g., MH12AB1234 or JR09B9987)"
+        }), 400
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -17,7 +29,7 @@ def add_vehicle():
             INSERT INTO Vehicle (vehicle_number, owner, status, requested_by, requested_at)
             VALUES (%s, %s, %s, %s, %s)
         """, (
-            data["vehicle_number"],
+            v_num,
             data["owner"],
             status,
             user["user_id"] if role == "Clerk" else None,
@@ -28,7 +40,7 @@ def add_vehicle():
             cursor.execute("""
                 INSERT INTO Approval_Requests (requester_id, request_type, reference_id, status)
                 VALUES (%s, 'vehicle', %s, 'pending')
-            """, (user["user_id"], data["vehicle_number"]))
+            """, (user["user_id"], v_num))
 
         conn.commit()
 
@@ -66,6 +78,11 @@ def get_vehicles():
 def update_vehicle(vehicle_number):
 
     data = request.json
+    new_v_num = data.get("vehicle_number", "").replace(" ", "").replace("-", "").upper()
+    if not validate_vehicle_number(new_v_num):
+        return jsonify({
+            "message": "Invalid vehicle number format. Expected format: 2 letters, 2 digits, 2 letters, 4 digits (e.g., MH12AB1234 or JR09B9987)"
+        }), 400
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -80,7 +97,7 @@ def update_vehicle(vehicle_number):
                 status=%s
             WHERE vehicle_number=%s
         """, (
-            data["vehicle_number"],
+            new_v_num,
             data["owner"],
             data.get("status", "Active"),
             vehicle_number

@@ -29,6 +29,7 @@ function InputField({
                 min={min}
                 max={max}
                 step={step}
+                onWheel={type === "number" ? (e) => e.target.blur() : undefined}
             />
         </div>
     );

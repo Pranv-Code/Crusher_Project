@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
 import { getVehicleSales } from "../services/vehicleSaleApi";
+import Pagination from "../components/common/Pagination";
 
 // ─── Dual-unit quantity cell ──────────────────────────────────────────────────
 const QtyCell = ({ displayQty, displayUnit, convertedQty, convertedUnit }) => (
@@ -21,11 +22,30 @@ function VehicleSales() {
     const [search, setSearch] = useState("");
     const [filterVehicle, setFilterVehicle] = useState("");
 
+    // --- Pagination States ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    // Reset pagination when data or search or filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [data.length, search, filterVehicle]);
+
     useEffect(() => {
         getVehicleSales()
             .then((res) => setData(res.data))
             .catch((err) => console.error("Error loading vehicle sales:", err))
             .finally(() => setLoading(false));
+
+        const interval = setInterval(() => {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+            getVehicleSales()
+                .then((res) => setData(res.data))
+                .catch((err) => console.error("Error refreshing vehicle sales in background:", err));
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, []);
 
     // Unique vehicle numbers for filter dropdown
@@ -138,41 +158,43 @@ function VehicleSales() {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map((row, idx) => (
-                                    <tr key={row.vehicle_sale_id}>
-                                        <td style={{ color: "var(--text-muted,#888)", fontSize: "0.85em" }}>
-                                            {idx + 1}
-                                        </td>
-                                        <td>{row.sales_date}</td>
-                                        <td><strong>{row.vehicle_number}</strong></td>
-                                        <td>{row.vehicle_owner || "—"}</td>
-                                        <td>{row.party_name}</td>
-                                        <td>{row.product_name}</td>
-                                        <td>
-                                            <QtyCell
-                                                displayQty={row.display_quantity}
-                                                displayUnit={row.unit}
-                                                convertedQty={row.converted_quantity}
-                                                convertedUnit={row.converted_unit}
-                                            />
-                                        </td>
-                                        <td>{row.site || "—"}</td>
-                                        <td>{row.price}</td>
-                                        <td>{row.loading_time || "—"}</td>
-                                        <td>{row.unloading_time || "—"}</td>
-                                        <td
-                                            style={{
-                                                maxWidth: "180px",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                            title={row.remarks || ""}
-                                        >
-                                            {row.remarks || "—"}
-                                        </td>
-                                    </tr>
-                                ))
+                                filtered
+                                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                    .map((row, idx) => (
+                                        <tr key={row.vehicle_sale_id}>
+                                            <td style={{ color: "var(--text-muted,#888)", fontSize: "0.85em" }}>
+                                                {(currentPage - 1) * pageSize + idx + 1}
+                                            </td>
+                                            <td>{row.sales_date}</td>
+                                            <td><strong>{row.vehicle_number}</strong></td>
+                                            <td>{row.vehicle_owner || "—"}</td>
+                                            <td>{row.party_name}</td>
+                                            <td>{row.product_name}</td>
+                                            <td>
+                                                <QtyCell
+                                                    displayQty={row.display_quantity}
+                                                    displayUnit={row.unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                    convertedQty={row.converted_quantity}
+                                                    convertedUnit={row.converted_unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                />
+                                            </td>
+                                            <td>{row.site || "—"}</td>
+                                            <td>{row.price}</td>
+                                            <td>{row.loading_time || "—"}</td>
+                                            <td>{row.unloading_time || "—"}</td>
+                                            <td
+                                                style={{
+                                                    maxWidth: "180px",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                                title={row.remarks || ""}
+                                            >
+                                                {row.remarks || "—"}
+                                            </td>
+                                        </tr>
+                                    ))
                             )}
                         </tbody>
 
@@ -197,6 +219,16 @@ function VehicleSales() {
                             </tfoot>
                         )}
                     </table>
+                )}
+                {!loading && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filtered.length}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={setPageSize}
+                        pageSizeOptions={[5, 10, 20, 50]}
+                    />
                 )}
             </div>
         </Layout>

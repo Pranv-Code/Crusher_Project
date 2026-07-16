@@ -55,8 +55,18 @@ function Vehicles() {
             return;
         }
 
+        const cleanedNumber = newVehicle.vehicle_number.replace(/[\s-]/g, "").toUpperCase();
+        const vehicleRegex = /^[A-Z]{1,2}\d{2}[A-Z]{1,2}\d{4}$/;
+        if (!vehicleRegex.test(cleanedNumber)) {
+            alert("Invalid vehicle number format. Expected format: 2 letters, 2 digits, 2 letters, 4 digits (e.g. MH12AB1234 or JR09B9987).");
+            return;
+        }
+
         try {
-            await addVehicle(newVehicle);
+            await addVehicle({
+                ...newVehicle,
+                vehicle_number: cleanedNumber
+            });
             await fetchVehicles(true);
             setNewVehicle({
                 vehicle_number: "",
@@ -78,10 +88,20 @@ function Vehicles() {
     };
 
     const handleSave = async () => {
+        const cleanedNumber = editData.vehicle_number.replace(/[\s-]/g, "").toUpperCase();
+        const vehicleRegex = /^[A-Z]{1,2}\d{2}[A-Z]{1,2}\d{4}$/;
+        if (!vehicleRegex.test(cleanedNumber)) {
+            alert("Invalid vehicle number format. Expected format: 2 letters, 2 digits, 2 letters, 4 digits (e.g. MH12AB1234 or JR09B9987).");
+            return;
+        }
+
         try {
             await updateVehicle(
                 editingVehicle,
-                editData
+                {
+                    ...editData,
+                    vehicle_number: cleanedNumber
+                }
             );
             await fetchVehicles(true);
             await fetchActiveVehicles(true);

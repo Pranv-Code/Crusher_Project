@@ -39,6 +39,16 @@ export default function Users() {
 
     useEffect(() => {
         fetchUsers();
+
+        const interval = setInterval(() => {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+            getUsers()
+                .then((res) => setUsers(res.data))
+                .catch((err) => console.error("Failed to refresh users in background:", err));
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, []);
 
     // Status Change handler

@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import Pagination from "../../components/common/Pagination";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell,
@@ -45,6 +46,15 @@ export default function PartyReport({ parties, onSwitchToSales }) {
     const [loading, setLoading]           = useState(false);
     const [error, setError]               = useState(null);
     const [pdfUnit, setPdfUnit]           = useState("tons");
+
+    // --- Pagination States ---
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    // Reset pagination when report changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [partyData]);
 
     const [showApprovalModal, setShowApprovalModal] = useState(false);
     const [pendingRequest, setPendingRequest] = useState(null);
@@ -303,7 +313,7 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                                                     boxSizing: "border-box"
                                                 }}
                                             >
-                                                <option value="tons">Tons (T)</option>
+                                                <option value="tons">Tons (MT)</option>
                                                 <option value="brass">Brass (B)</option>
                                             </select>
                                             <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
@@ -325,7 +335,7 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                                                 <th>Date</th>
                                                 <th>Product</th>
                                                 <th>Vehicle</th>
-                                                <th>Quantity (T)</th>
+                                                <th>Quantity (MT)</th>
                                                 <th>Unit</th>
                                                 <th>Site</th>
                                                 <th>Price</th>
@@ -333,22 +343,42 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {partyData.sales.map((s, i) => (
-                                                <tr key={s.sales_id}>
-                                                    <td style={{ color:"#9ca3af", fontSize:12 }}>{i+1}</td>
-                                                    <td>{s.sales_date}</td>
-                                                    <td><strong>{s.product_name}</strong></td>
-                                                    <td>{s.vehicle_number || "—"}</td>
-                                                    <td style={{ fontWeight:600 }}>{fmtTons(s.quantity_tons)}</td>
-                                                    <td>{s.unit}</td>
-                                                    <td>{s.site || "—"}</td>
-                                                    <td>{s.price || "—"}</td>
-                                                    <td style={{ maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
-                                                        title={s.remarks}>{s.remarks || "—"}</td>
-                                                </tr>
-                                            ))}
+                                            {partyData.sales
+                                                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                                .map((s, i) => (
+                                                    <tr key={s.sales_id}>
+                                                        <td style={{ color:"#9ca3af", fontSize:12 }}>
+                                                            {(currentPage - 1) * pageSize + i + 1}
+                                                        </td>
+                                                        <td>{s.sales_date}</td>
+                                                        <td><strong>{s.product_name}</strong></td>
+                                                        <td>{s.vehicle_number || "—"}</td>
+                                                        <td style={{ fontWeight:600 }}>{fmtTons(s.quantity_tons)}</td>
+                                                        <td>
+                                                <div style={{ lineHeight:1.4 }}>
+                                                    <span style={{ fontWeight:600 }}>{fmtTons(s.quantity_tons)} MT</span>
+                                                    <br/>
+                                                    <span style={{ fontSize:11, color:"#9ca3af" }}>
+                                                        ≈ {(s.quantity_tons * 4.2).toFixed(2)} Brass
+                                                    </span>
+                                                </div>
+                                            </td>
+                                                        <td>{s.site || "—"}</td>
+                                                        <td>{s.price || "—"}</td>
+                                                        <td style={{ maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                                                            title={s.remarks}>{s.remarks || "—"}</td>
+                                                    </tr>
+                                                ))}
                                         </tbody>
                                     </table>
+                                    <Pagination
+                                        currentPage={currentPage}
+                                        totalItems={partyData.sales.length}
+                                        pageSize={pageSize}
+                                        onPageChange={setCurrentPage}
+                                        onPageSizeChange={setPageSize}
+                                        pageSizeOptions={[5, 10, 20, 50]}
+                                    />
                                 </div>
                             )}
                         </div>

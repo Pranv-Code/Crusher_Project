@@ -139,6 +139,29 @@ export default function Reports() {
         };
     }, [activeTab]);
 
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+
+            if (activeTab === "sales") {
+                getSales().then(res => setSales(res.data?.sales || res.data || [])).catch(e => {});
+                getParties().then(res => setParties(res.data || [])).catch(e => {});
+                getVehicles().then(res => setVehicles(res.data || [])).catch(e => {});
+            } else if (activeTab === "production") {
+                getProduction().then(res => setProductions(res.data || [])).catch(e => {});
+                getProducts().then(res => setProducts(res.data || [])).catch(e => {});
+            } else if (activeTab === "party") {
+                getParties().then(res => setParties(res.data || [])).catch(e => {});
+            } else if (activeTab === "raw") {
+                getVehicleActivities().then(res => setActivities(res.data || [])).catch(e => {});
+                getVehicles().then(res => setVehicles(res.data || [])).catch(e => {});
+            }
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [activeTab]);
+
     const handleSwitchToSales = () => setActiveTab("sales");
 
     return (

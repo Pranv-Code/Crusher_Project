@@ -219,8 +219,7 @@ def action_approval(request_id, manager_id):
                 """, (manager_id, datetime.utcnow(), v_num))
             else:
                 cursor.execute("""
-                    UPDATE Vehicle 
-                    SET status = 'Inactive' 
+                    DELETE FROM Vehicle 
                     WHERE vehicle_number = %s
                 """, (v_num,))
                 
@@ -234,8 +233,7 @@ def action_approval(request_id, manager_id):
                 """, (manager_id, datetime.utcnow(), party_id))
             else:
                 cursor.execute("""
-                    UPDATE Party 
-                    SET status = 'Inactive' 
+                    DELETE FROM Party 
                     WHERE party_id = %s
                 """, (party_id,))
                 

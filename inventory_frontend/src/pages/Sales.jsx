@@ -15,6 +15,7 @@ import Button from "../components/common/Button";
 import InputField from "../components/common/InputField";
 import SelectField from "../components/common/SelectField";
 import EditModal from "../components/modal/EditModal";
+import Pagination from "../components/common/Pagination";
 
 // ─── Helper: format a quantity cell with dual-unit display ───────────────────
 const QtyCell = ({ displayQty, displayUnit, convertedQty, convertedUnit }) => (
@@ -80,7 +81,7 @@ const emptyNewSale = {
     product_id: "",
     vehicle_number: "",
     quantity: "",
-    unit: "tons",
+    unit: "",
     site: "",
     price: "",
     loading_time: "",
@@ -89,6 +90,14 @@ const emptyNewSale = {
 };
 
 const Sales = () => {
+    const capitalizeWords = (str) => {
+        if (!str) return "";
+        return str
+            .split(/\s+/)
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
+    };
+
     // --- Context Hook ---
     const {
         sales,
@@ -112,6 +121,21 @@ const Sales = () => {
     const [editingId, setEditingId] = useState(null);
     const [entryMode, setEntryMode] = useState("single"); // "single" or "bulk"
 
+    // --- Pagination States ---
+    const [pendingPage, setPendingPage] = useState(1);
+    const [pendingPageSize, setPendingPageSize] = useState(5);
+    const [completedPage, setCompletedPage] = useState(1);
+    const [completedPageSize, setCompletedPageSize] = useState(10);
+
+    // Reset pagination when data or search changes
+    useEffect(() => {
+        setPendingPage(1);
+    }, [pendingSales.length, search]);
+
+    useEffect(() => {
+        setCompletedPage(1);
+    }, [sales.length, search]);
+
     // --- Single Sale Entry State ---
     const [newSale, setNewSale] = useState(emptyNewSale);
     const [editData, setEditData] = useState({});
@@ -123,7 +147,7 @@ const Sales = () => {
         site: "",
     });
     const [bulkRows, setBulkRows] = useState([
-        { product_id: "", vehicle_number: "", quantity: "", unit: "tons", loading_time: "", price: "" }
+        { product_id: "", vehicle_number: "", quantity: "", unit: "", loading_time: "", price: "" }
     ]);
 
     // --- Unloading Modal State ---
@@ -155,8 +179,23 @@ const Sales = () => {
 
     // --- Action Handlers ---
     const handleAddSale = async () => {
+        if (!newSale.unit) {
+            alert("Please select a unit.");
+            return;
+        }
+        if (parseFloat(newSale.quantity) <= 0) {
+            alert("Quantity must be greater than zero.");
+            return;
+        }
+        if (newSale.price && parseFloat(newSale.price) < 0) {
+            alert("Price cannot be negative.");
+            return;
+        }
         try {
-            await addSale(newSale);
+            await addSale({
+                ...newSale,
+                site: capitalizeWords(newSale.site)
+            });
             await fetchSales(true);
             await fetchPendingSales(true);
             await fetchProducts(true);
@@ -176,7 +215,7 @@ const Sales = () => {
     const handleAddBulkRow = () => {
         setBulkRows([
             ...bulkRows,
-            { product_id: "", vehicle_number: "", quantity: "", unit: "tons", loading_time: "", price: "" }
+            { product_id: "", vehicle_number: "", quantity: "", unit: "", loading_time: "", price: "" }
         ]);
     };
 
@@ -205,14 +244,25 @@ const Sales = () => {
             // Basic validation
             for (let i = 0; i < bulkRows.length; i++) {
                 const r = bulkRows[i];
-                if (!r.product_id || !r.vehicle_number || !r.quantity) {
-                    alert(`Row ${i + 1} is missing required fields (Product, Vehicle, or Quantity).`);
+                if (!r.product_id || !r.vehicle_number || !r.quantity || !r.unit) {
+                    alert(`Row ${i + 1} is missing required fields (Product, Vehicle, Quantity, or Unit).`);
+                    return;
+                }
+                if (parseFloat(r.quantity) <= 0) {
+                    alert(`Row ${i + 1} quantity must be greater than zero.`);
+                    return;
+                }
+                if (r.price && parseFloat(r.price) < 0) {
+                    alert(`Row ${i + 1} price cannot be negative.`);
                     return;
                 }
             }
 
             const payload = {
-                common: bulkCommon,
+                common: {
+                    ...bulkCommon,
+                    site: capitalizeWords(bulkCommon.site)
+                },
                 rows: bulkRows.map(r => ({
                     ...r,
                     quantity: parseFloat(r.quantity),
@@ -235,7 +285,7 @@ const Sales = () => {
             await fetchActiveProducts(true);
             setShowAddForm(false);
             setBulkCommon({ sales_date: "", party_id: "", site: "" });
-            setBulkRows([{ product_id: "", vehicle_number: "", quantity: "", unit: "tons", loading_time: "", price: "" }]);
+            setBulkRows([{ product_id: "", vehicle_number: "", quantity: "", unit: "", loading_time: "", price: "" }]);
         } catch (err) {
             const msg = err.response?.data?.message
                 || err.response?.data?.error
@@ -265,7 +315,10 @@ const Sales = () => {
 
     const handleSave = async (id) => {
         try {
-            const res = await updateSale(id, editData);
+            const res = await updateSale(id, {
+                ...editData,
+                site: capitalizeWords(editData.site)
+            });
             alert(res.data?.message || "Sale Updated Successfully");
             await fetchSales(true);
             await fetchPendingSales(true);
@@ -414,11 +467,14 @@ const Sales = () => {
                                         }
                                     >
                                         <option value="">Select Party</option>
-                                        {parties.map((party) => (
-                                            <option key={party.party_id} value={party.party_id}>
-                                                {party.party_name}
-                                            </option>
-                                        ))}
+                                        {parties
+                                            .filter(p => p.status === "Active")
+                                            .map((party) => (
+                                                <option key={party.party_id} value={party.party_id}>
+                                                    {party.party_name}
+                                                </option>
+                                            ))
+                                        }
                                     </select>
                                 </div>
 
@@ -450,11 +506,14 @@ const Sales = () => {
                                         }
                                     >
                                         <option value="">Select Vehicle</option>
-                                        {vehicles.map((vehicle) => (
-                                            <option key={vehicle.vehicle_number} value={vehicle.vehicle_number}>
-                                                {vehicle.vehicle_number}{vehicle.owner ? ` — ${vehicle.owner}` : ""}
-                                            </option>
-                                        ))}
+                                        {vehicles
+                                            .filter(v => v.status === "Active")
+                                            .map((vehicle) => (
+                                                <option key={vehicle.vehicle_number} value={vehicle.vehicle_number}>
+                                                    {vehicle.vehicle_number}{vehicle.owner ? ` — ${vehicle.owner}` : ""}
+                                                </option>
+                                            ))
+                                        }
                                     </select>
                                 </div>
 
@@ -467,7 +526,8 @@ const Sales = () => {
                                             setNewSale({ ...newSale, unit: e.target.value })
                                         }
                                     >
-                                        <option value="tons">Tons</option>
+                                        <option value="">Select Unit</option>
+                                        <option value="tons">MT</option>
                                         <option value="brass">Brass</option>
                                     </select>
                                 </div>
@@ -492,6 +552,9 @@ const Sales = () => {
                                         value={newSale.site}
                                         onChange={(e) =>
                                             setNewSale({ ...newSale, site: e.target.value })
+                                        }
+                                        onBlur={(e) =>
+                                            setNewSale({ ...newSale, site: capitalizeWords(e.target.value) })
                                         }
                                     />
                                 </div>
@@ -546,7 +609,13 @@ const Sales = () => {
                                     />
                                 </div>
                             </div>
-                            <button className="primary-btn" onClick={handleAddSale} style={{ marginTop: "1rem" }}>
+                            <button className="primary-btn" onClick={() => {
+                                if(!newSale.sales_date || !newSale.party_id || !newSale.product_id || !newSale.vehicle_number || !newSale.unit || !newSale.quantity) {
+                                    alert("Please fill all required fields.");
+                                    return;
+                                }
+                                handleAddSale();
+                            }} style={{ marginTop: "1rem" }}>
                                 Save Sale
                             </button>
                         </>
@@ -574,11 +643,14 @@ const Sales = () => {
                                         }
                                     >
                                         <option value="">Select Party</option>
-                                        {parties.map((party) => (
-                                            <option key={party.party_id} value={party.party_id}>
-                                                {party.party_name}
-                                            </option>
-                                        ))}
+                                        {parties
+                                            .filter(p => p.status === "Active")
+                                            .map((party) => (
+                                                <option key={party.party_id} value={party.party_id}>
+                                                    {party.party_name}
+                                                </option>
+                                            ))
+                                        }
                                     </select>
                                 </div>
 
@@ -589,6 +661,9 @@ const Sales = () => {
                                         value={bulkCommon.site}
                                         onChange={(e) =>
                                             setBulkCommon({ ...bulkCommon, site: e.target.value })
+                                        }
+                                        onBlur={(e) =>
+                                            setBulkCommon({ ...bulkCommon, site: capitalizeWords(e.target.value) })
                                         }
                                     />
                                 </div>
@@ -632,11 +707,14 @@ const Sales = () => {
                                                         onChange={(e) => handleBulkRowChange(index, "vehicle_number", e.target.value)}
                                                     >
                                                         <option value="">Select Vehicle</option>
-                                                        {vehicles.map((v) => (
-                                                            <option key={v.vehicle_number} value={v.vehicle_number}>
-                                                                {v.vehicle_number}
-                                                            </option>
-                                                        ))}
+                                                        {vehicles
+                                                            .filter(v => v.status === "Active")
+                                                            .map((v) => (
+                                                                <option key={v.vehicle_number} value={v.vehicle_number}>
+                                                                    {v.vehicle_number}
+                                                                </option>
+                                                            ))
+                                                        }
                                                     </select>
                                                 </td>
                                                 <td style={{ padding: "0.5rem" }}>
@@ -654,7 +732,8 @@ const Sales = () => {
                                                         value={row.unit}
                                                         onChange={(e) => handleBulkRowChange(index, "unit", e.target.value)}
                                                     >
-                                                        <option value="tons">Tons</option>
+                                                        <option value="">Select Unit</option>
+                                                        <option value="tons">MT</option>
                                                         <option value="brass">Brass</option>
                                                     </select>
                                                 </td>
@@ -750,64 +829,74 @@ const Sales = () => {
                                 </td>
                             </tr>
                         ) : (
-                            filteredPendingSales.map((sale) => (
-                                <tr key={sale.sales_id}>
-                                    <td>{sale.sales_id}</td>
-                                    <td>{sale.sales_date}</td>
-                                    <td>{sale.party_name}</td>
-                                    <td>{sale.site || "—"}</td>
-                                    <td>
-                                        <VehicleCell
-                                            vehicleNumber={sale.vehicle_number}
-                                            owner={sale.vehicle_owner}
-                                        />
-                                    </td>
-                                    <td>{sale.product_name}</td>
-                                    <td>
-                                        <QtyCell
-                                            displayQty={sale.display_quantity}
-                                            displayUnit={sale.unit}
-                                            convertedQty={sale.converted_quantity}
-                                            convertedUnit={sale.converted_unit}
-                                        />
-                                    </td>
-                                    <td>{sale.loading_time || "—"}</td>
-                                    <td>{getPendingSince(sale.sales_date, sale.loading_time)}</td>
-                                    <td>
-                                        <span style={{
-                                            backgroundColor: sale.unloading_status === "pending_approval" ? "#fee2e2" : "#fef3c7",
-                                            color: sale.unloading_status === "pending_approval" ? "#dc2626" : "#d97706",
-                                            padding: "0.25rem 0.5rem",
-                                            borderRadius: "4px",
-                                            fontSize: "0.85em",
-                                            fontWeight: "500",
-                                            display: "inline-block"
-                                        }}>
-                                            {sale.unloading_status === "pending_approval" ? "Pending Approval" : "Pending Unloading"}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
-                                            <button
-                                                className="edit-btn"
-                                                style={{ backgroundColor: "#3b82f6", color: "white" }}
-                                                onClick={() => handleUnloadClick(sale)}
-                                            >
-                                                Complete
-                                            </button>
-                                            <button className="edit-btn" onClick={() => handleEdit(sale)}>
-                                                Edit
-                                            </button>
-                                            <button className="delete-btn" onClick={() => handleDelete(sale.sales_id)}>
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
+                            filteredPendingSales
+                                .slice((pendingPage - 1) * pendingPageSize, pendingPage * pendingPageSize)
+                                .map((sale) => (
+                                    <tr key={sale.sales_id}>
+                                        <td>{sale.sales_id}</td>
+                                        <td>{sale.sales_date}</td>
+                                        <td>{sale.party_name}</td>
+                                        <td>{sale.site || "—"}</td>
+                                        <td>
+                                            <VehicleCell
+                                                vehicleNumber={sale.vehicle_number}
+                                                owner={sale.vehicle_owner}
+                                            />
+                                        </td>
+                                        <td>{sale.product_name}</td>
+                                        <td>
+                                            <QtyCell
+                                                displayQty={sale.display_quantity}
+                                                displayUnit={sale.unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                convertedQty={sale.converted_quantity}
+                                                convertedUnit={sale.converted_unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                            />
+                                        </td>
+                                        <td>{sale.loading_time || "—"}</td>
+                                        <td>{getPendingSince(sale.sales_date, sale.loading_time)}</td>
+                                        <td>
+                                            <span style={{
+                                                backgroundColor: sale.unloading_status === "pending_approval" ? "#fee2e2" : "#fef3c7",
+                                                color: sale.unloading_status === "pending_approval" ? "#dc2626" : "#d97706",
+                                                padding: "0.25rem 0.5rem",
+                                                borderRadius: "4px",
+                                                fontSize: "0.85em",
+                                                fontWeight: "500",
+                                                display: "inline-block"
+                                            }}>
+                                                {sale.unloading_status === "pending_approval" ? "Pending Approval" : "Pending Unloading"}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
+                                                <button
+                                                    className="edit-btn"
+                                                    style={{ backgroundColor: "#3b82f6", color: "white" }}
+                                                    onClick={() => handleUnloadClick(sale)}
+                                                >
+                                                    Complete
+                                                </button>
+                                                <button className="edit-btn" onClick={() => handleEdit(sale)}>
+                                                    Edit
+                                                </button>
+                                                <button className="delete-btn" onClick={() => handleDelete(sale.sales_id)}>
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
                         )}
                     </tbody>
                 </table>
+                <Pagination
+                    currentPage={pendingPage}
+                    totalItems={filteredPendingSales.length}
+                    pageSize={pendingPageSize}
+                    onPageChange={setPendingPage}
+                    onPageSizeChange={setPendingPageSize}
+                    pageSizeOptions={[5, 10, 15, 20]}
+                />
             </div>
 
             {/* ─── Sales History (Completed) Table ─── */}
@@ -837,45 +926,55 @@ const Sales = () => {
                                 </td>
                             </tr>
                         ) : (
-                            filteredSales.map((sale) => (
-                                <tr key={sale.sales_id}>
-                                    <td>{sale.sales_date}</td>
-                                    <td>{sale.party_name}</td>
-                                    <td>{sale.product_name}</td>
-                                    <td>
-                                        <VehicleCell
-                                            vehicleNumber={sale.vehicle_number}
-                                            owner={sale.vehicle_owner}
-                                        />
-                                    </td>
-                                    <td>
-                                        <QtyCell
-                                            displayQty={sale.display_quantity}
-                                            displayUnit={sale.unit}
-                                            convertedQty={sale.converted_quantity}
-                                            convertedUnit={sale.converted_unit}
-                                        />
-                                    </td>
-                                    <td>{sale.site || "—"}</td>
-                                    <td>{sale.price}</td>
-                                    <td>{sale.loading_time || "—"}</td>
-                                    <td>{sale.unloading_time || "—"}</td>
-                                    <td>{sale.remarks || "—"}</td>
-                                    <td>
-                                        <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
-                                            <button className="edit-btn" onClick={() => handleEdit(sale)}>
-                                                Edit
-                                            </button>
-                                            <button className="delete-btn" onClick={() => handleDelete(sale.sales_id)}>
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
+                            filteredSales
+                                .slice((completedPage - 1) * completedPageSize, completedPage * completedPageSize)
+                                .map((sale) => (
+                                    <tr key={sale.sales_id}>
+                                        <td>{sale.sales_date}</td>
+                                        <td>{sale.party_name}</td>
+                                        <td>{sale.product_name}</td>
+                                        <td>
+                                            <VehicleCell
+                                                vehicleNumber={sale.vehicle_number}
+                                                owner={sale.vehicle_owner}
+                                            />
+                                        </td>
+                                        <td>
+                                            <QtyCell
+                                                displayQty={sale.display_quantity}
+                                                displayUnit={sale.unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                convertedQty={sale.converted_quantity}
+                                                convertedUnit={sale.converted_unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                            />
+                                        </td>
+                                        <td>{sale.site || "—"}</td>
+                                        <td>{sale.price}</td>
+                                        <td>{sale.loading_time || "—"}</td>
+                                        <td>{sale.unloading_time || "—"}</td>
+                                        <td>{sale.remarks || "—"}</td>
+                                        <td>
+                                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
+                                                <button className="edit-btn" onClick={() => handleEdit(sale)}>
+                                                    Edit
+                                                </button>
+                                                <button className="delete-btn" onClick={() => handleDelete(sale.sales_id)}>
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
                         )}
                     </tbody>
                 </table>
+                <Pagination
+                    currentPage={completedPage}
+                    totalItems={filteredSales.length}
+                    pageSize={completedPageSize}
+                    onPageChange={setCompletedPage}
+                    onPageSizeChange={setCompletedPageSize}
+                    pageSizeOptions={[5, 10, 20, 50]}
+                />
             </div>
 
             {/* Edit modal */}
@@ -901,10 +1000,12 @@ const Sales = () => {
                     onChange={(e) =>
                         setEditData({ ...editData, party_id: e.target.value })
                     }
-                    options={parties.map((p) => ({
-                        value: p.party_id,
-                        label: p.party_name,
-                    }))}
+                    options={parties
+                        .filter(p => p.status === "Active")
+                        .map((p) => ({
+                            value: p.party_id,
+                            label: p.party_name,
+                        }))}
                 />
 
                 <SelectField
@@ -927,12 +1028,14 @@ const Sales = () => {
                     onChange={(e) =>
                         setEditData({ ...editData, vehicle_number: e.target.value })
                     }
-                    options={vehicles.map((v) => ({
-                        value: v.vehicle_number,
-                        label: v.owner
-                            ? `${v.vehicle_number} — ${v.owner}`
-                            : v.vehicle_number,
-                    }))}
+                    options={vehicles
+                        .filter(v => v.status === "Active")
+                        .map((v) => ({
+                            value: v.vehicle_number,
+                            label: v.owner
+                                ? `${v.vehicle_number} — ${v.owner}`
+                                : v.vehicle_number,
+                        }))}
                 />
 
                 <SelectField
@@ -943,7 +1046,7 @@ const Sales = () => {
                         setEditData({ ...editData, unit: e.target.value })
                     }
                     options={[
-                        { value: "tons", label: "Tons" },
+                        { value: "tons", label: "MT" },
                         { value: "brass", label: "Brass" },
                     ]}
                 />
@@ -963,6 +1066,9 @@ const Sales = () => {
                     value={editData.site || ""}
                     onChange={(e) =>
                         setEditData({ ...editData, site: e.target.value })
+                    }
+                    onBlur={(e) =>
+                        setEditData({ ...editData, site: capitalizeWords(e.target.value) })
                     }
                 />
 

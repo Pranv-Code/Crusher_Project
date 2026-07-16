@@ -66,6 +66,12 @@ def get_party(id):
     return jsonify({"message": "Party not found"}), 404
 
 
+def capitalize_words(s):
+    if not s:
+        return ""
+    return " ".join(word.capitalize() for word in s.strip().split())
+
+
 def add_party():
 
     data = request.json
@@ -91,7 +97,7 @@ def add_party():
             )
             VALUES (%s,%s,%s,%s,%s,%s,%s)
         """, (
-            data["party_name"],
+            capitalize_words(data["party_name"]),
             data["gst_no"],
             data["address"],
             data["pan_no"],
@@ -147,7 +153,7 @@ def update_party(id):
                 pan_no=%s
             WHERE party_id=%s
         """, (
-            data["party_name"],
+            capitalize_words(data["party_name"]),
             data["gst_no"],
             data["address"],
             data["pan_no"],

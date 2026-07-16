@@ -58,9 +58,15 @@ function Production() {
         if (
             !newProduction.product_id ||
             newProduction.quantity_tons === "" ||
-            newProduction.production_cost === ""
+            newProduction.production_cost === "" ||
+            !newProduction.unit
         ) {
-            alert("Please fill all fields.");
+            alert("Please fill all fields and select a unit.");
+            return;
+        }
+
+        if (parseFloat(newProduction.quantity_tons) <= 0 || parseFloat(newProduction.production_cost) <= 0) {
+            alert("Quantity and Production Cost must be greater than zero.");
             return;
         }
         console.log("Sending to backend:", newProduction);
@@ -72,7 +78,7 @@ function Production() {
             setNewProduction({
                 product_id: "",
                 quantity_tons: "",
-                unit: "Tons",
+                unit: "",
                 production_cost: "",
             });
             setShowAddForm(false);
@@ -143,7 +149,7 @@ function Production() {
     }));
 
     const unitOptions = [
-        { value: "tons", label: "Tons" },
+        { value: "tons", label: "MT" },
         { value: "brass", label: "Brass" },
     ];
 
@@ -151,7 +157,10 @@ function Production() {
         { key: "production_date", label: "Production Date" },
         { key: "product_name", label: "Product Name" },
         { key: "quantity_tons", label: "Quantity" },
-        { key: "unit", label: "Units" },
+        { key: "unit",
+        label: "Units",
+        render: (row) =>
+            row.unit?.toLowerCase() === "tons" ? "MT" : "Brass"},
         { key: "production_cost", label: "Production Cost" },
     ];
 

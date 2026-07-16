@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { getProducts, getActiveProducts } from "../services/productApi";
 import { getProduction } from "../services/productionApi";
 import { getSales, getPendingSales } from "../services/salesApi";
@@ -132,6 +132,25 @@ export const InventoryProvider = ({ children }) => {
             console.error("Error fetching vehicle sales:", err);
         }
     };
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+
+            fetchProducts(true);
+            fetchActiveProducts(true);
+            fetchProduction(true);
+            fetchSales(true);
+            fetchPendingSales(true);
+            fetchParties(true);
+            fetchVehicles(true);
+            fetchVehicleActivities(true);
+            fetchVehicleSales(true);
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     return (
         <InventoryContext.Provider

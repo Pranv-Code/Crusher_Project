@@ -1,8 +1,27 @@
 from flask import jsonify, request
 from db import get_connection
 
+def capitalize_words(s):
+    if not s:
+        return ""
+    return " ".join(word.capitalize() for word in s.strip().split())
+
+
 def add_vehicle_activity():
     data = request.json
+
+    try:
+        total_w = float(data.get("total_weight", 0))
+        vehicle_w = float(data.get("vehicle_weight", 0))
+    except (ValueError, TypeError):
+        return jsonify({"message": "Weights must be valid numbers"}), 400
+
+    if total_w <= 0 or vehicle_w <= 0:
+        return jsonify({"message": "Total Weight and Vehicle Weight must be greater than zero"}), 400
+
+    if total_w < vehicle_w:
+        return jsonify({"message": "Total Weight cannot be less than Vehicle Weight"}), 400
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -45,7 +64,7 @@ def add_vehicle_activity():
             data["total_weight"],
             data["vehicle_weight"],
             data["net_weight"],
-            data["site"]
+            capitalize_words(data.get("site", ""))
         ))
 
         conn.commit()
@@ -97,6 +116,19 @@ def get_vehicle_activity():
 
 def update_vehicle_activity(id):
     data = request.json
+
+    try:
+        total_w = float(data.get("total_weight", 0))
+        vehicle_w = float(data.get("vehicle_weight", 0))
+    except (ValueError, TypeError):
+        return jsonify({"message": "Weights must be valid numbers"}), 400
+
+    if total_w <= 0 or vehicle_w <= 0:
+        return jsonify({"message": "Total Weight and Vehicle Weight must be greater than zero"}), 400
+
+    if total_w < vehicle_w:
+        return jsonify({"message": "Total Weight cannot be less than Vehicle Weight"}), 400
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -138,7 +170,7 @@ def update_vehicle_activity(id):
             data["total_weight"],
             data["vehicle_weight"],
             data["net_weight"],
-            data["site"],
+            capitalize_words(data.get("site", "")),
             id
         ))
 
