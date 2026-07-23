@@ -22,6 +22,7 @@ import ActionButtons from "../components/table/ActionButtons";
 
 import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
+import { formatDate, formatTime } from "../utils/formatUtils";
 
 // Helper utilities for date & weight calculation
 const formatTimeToHM = (timeStr) => {
@@ -266,22 +267,22 @@ function RawMaterial() {
     };
 
     const columns = [
-        { key: "activity_date", label: "Date" },
+        { key: "activity_date", label: "Date", render: (row) => formatDate(row.activity_date) },
         { key: "vehicle_number", label: "Vehicle Number" },
         {
             key: "arrival_time",
             label: "Arrival",
-            render: (row) => formatTimeToHM(row.arrival_time),
+            render: (row) => formatTime(row.arrival_time),
         },
         {
             key: "loading_start_time",
             label: "Loading Start",
-            render: (row) => formatTimeToHM(row.loading_start_time),
+            render: (row) => formatTime(row.loading_start_time),
         },
         {
             key: "unloading_end_time",
             label: "Unloading End",
-            render: (row) => formatTimeToHM(row.unloading_end_time),
+            render: (row) => formatTime(row.unloading_end_time),
         },
         {
             key: "turnaround_time",

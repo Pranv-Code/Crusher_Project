@@ -5,10 +5,12 @@ import {
     PieChart, Pie, Cell,
 } from "recharts";
 import * as XLSX from "xlsx";
+import { exportToFormattedExcel } from "../../utils/excelGenerator";
 import { getPartyReport } from "../../services/reportsApi";
 import { useAuth } from "../../context/AuthContext";
 import { generatePartyReportPdf } from "../../utils/pdfGenerator";
 import { requestReportPrint } from "../../services/approvalApi";
+import { formatDate, formatInr } from "../../utils/formatUtils";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777"];
 
@@ -17,7 +19,7 @@ const fmtTons = (v) => Number(v || 0).toFixed(2);
 const monthLabel = (dateStr) => {
     if (!dateStr) return "";
     const [y, m] = dateStr.split("-");
-    return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m)-1]} ${y}`;
+    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
 };
 
 function exportToExcel(rows, filename) {
@@ -30,8 +32,8 @@ function exportToExcel(rows, filename) {
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div style={{ background:"#1e293b", color:"#f8fafc", padding:"10px 14px", borderRadius:8, fontSize:12 }}>
-            <div style={{ fontWeight:700, marginBottom:4 }}>{label}</div>
+        <div style={{ background: "#1e293b", color: "#f8fafc", padding: "10px 14px", borderRadius: 8, fontSize: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
             {payload.map((p, i) => <div key={i}>{p.name}: <strong>{fmtTons(p.value)} tons</strong></div>)}
         </div>
     );
@@ -40,12 +42,12 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function PartyReport({ parties, onSwitchToSales }) {
     const { isManager, isClerk } = useAuth();
 
-    const [search, setSearch]             = useState("");
+    const [search, setSearch] = useState("");
     const [selectedPartyId, setSelectedPartyId] = useState(null);
-    const [partyData, setPartyData]       = useState(null);
-    const [loading, setLoading]           = useState(false);
-    const [error, setError]               = useState(null);
-    const [pdfUnit, setPdfUnit]           = useState("tons");
+    const [partyData, setPartyData] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [pdfUnit, setPdfUnit] = useState("tons");
 
     // --- Pagination States ---
     const [currentPage, setCurrentPage] = useState(1);
@@ -77,7 +79,7 @@ export default function PartyReport({ parties, onSwitchToSales }) {
 
     const filteredParties = useMemo(() =>
         parties.filter(p => p.party_name.toLowerCase().includes(search.toLowerCase())),
-    [parties, search]);
+        [parties, search]);
 
     const handleSelectParty = async (partyId) => {
         setSelectedPartyId(partyId);
@@ -113,17 +115,18 @@ export default function PartyReport({ parties, onSwitchToSales }) {
         });
         return Object.entries(map)
             .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
-            .sort((a,b) => b.value - a.value);
+            .sort((a, b) => b.value - a.value);
     }, [partyData]);
 
     const topProduct = byProduct[0]?.name || "—";
 
     const handleExport = () => {
         if (!partyData?.sales) return;
-        const label = `Party Report (Excel) - Party: ${partyData.party.party_name}`;
+        const label = `Party Report (Excel) - Party: ${partyData.party.party_name} | Unit: ${pdfUnit}`;
         const requestData = {
             report_type: "party",
             format: "excel",
+            pdf_unit: pdfUnit,
             filters: {
                 party_id: partyData.party.party_id,
                 party_name: partyData.party.party_name
@@ -135,18 +138,32 @@ export default function PartyReport({ parties, onSwitchToSales }) {
             setShowApprovalModal(true);
             return;
         }
+        const partyName = partyData.party.party_name;
+        const multiplier = pdfUnit === "brass" ? 4.2 : 1.0;
+        const qtyHeader = pdfUnit === "brass" ? "Quantity (Brass)" : "Quantity (Tons)";
+        const unitLabel = pdfUnit === "brass" ? "brass" : "Tons";
+
+        const subtitle = `Unit: ${pdfUnit.toUpperCase()} | Party Statement: ${partyName}${partyData.party.gst_no ? ` | GSTIN: ${partyData.party.gst_no}` : ""}`;
+
         const rows = partyData.sales.map(s => ({
-            "Date":           s.sales_date,
-            "Product":        s.product_name,
-            "Vehicle":        s.vehicle_number || "",
-            "Vehicle Owner":  s.vehicle_owner || "",
-            "Quantity (Tons)":fmtTons(s.quantity_tons),
-            "Unit":           s.unit,
-            "Site":           s.site || "",
-            "Price":          s.price || "",
-            "Remarks":        s.remarks || "",
+            "Date": formatDate(s.sales_date),
+            "Product": s.product_name,
+            "Vehicle": s.vehicle_number || "",
+            "Vehicle Owner": s.vehicle_owner || "",
+            [qtyHeader]: Number((Number(s.quantity_tons || 0) * multiplier).toFixed(2)),
+            "Unit": unitLabel,
+            "Site": s.site || "",
+            "Price (₹)": Number(s.price || 0),
+            "Remarks": s.remarks || "",
         }));
-        exportToExcel(rows, `party_${partyData.party.party_name.replace(/\s/g,"_")}_report.xlsx`);
+
+        exportToFormattedExcel({
+            title: `PARTY STATEMENT - ${partyName} (${pdfUnit.toUpperCase()})`,
+            subtitle,
+            sheetName: "Party Statement",
+            rows,
+            fileName: `party_${partyName.replace(/\s/g, "_")}_report.xlsx`
+        });
     };
 
     const handlePdfExport = () => {
@@ -191,7 +208,7 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                     </div>
                 ))}
                 {filteredParties.length === 0 && (
-                    <div style={{ fontSize:13, color:"#9ca3af", padding:"8px 0" }}>No parties found.</div>
+                    <div style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>No parties found.</div>
                 )}
             </div>
 
@@ -199,13 +216,13 @@ export default function PartyReport({ parties, onSwitchToSales }) {
             <div className="party-detail-panel">
                 {!selectedPartyId && (
                     <div className="party-placeholder">
-                        <div style={{ fontSize:40 }}>👥</div>
+                        <div style={{ fontSize: 40 }}>👥</div>
                         <p>Select a party from the left to view their report</p>
                     </div>
                 )}
 
                 {loading && <div className="report-loading">Loading party data...</div>}
-                {error   && <div className="report-empty" style={{ color:"#dc2626" }}>{error}</div>}
+                {error && <div className="report-empty" style={{ color: "#dc2626" }}>{error}</div>}
 
                 {partyData && !loading && (
                     <>
@@ -242,7 +259,7 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                             </div>
                             <div className="kpi-card purple">
                                 <div className="kpi-label">Top Product</div>
-                                <div className="kpi-value" style={{ fontSize:"1rem" }}>{topProduct}</div>
+                                <div className="kpi-value" style={{ fontSize: "1rem" }}>{topProduct}</div>
                             </div>
                         </div>
 
@@ -252,12 +269,12 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                                 <h3>Monthly Purchases (Tons)</h3>
                                 {byMonth.length === 0 ? <div className="report-empty">No data</div> : (
                                     <ResponsiveContainer width="100%" height={220}>
-                                        <BarChart data={byMonth} margin={{ top:5, right:10, left:0, bottom:40 }}>
+                                        <BarChart data={byMonth} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                            <XAxis dataKey="month" tick={{ fontSize:11 }} angle={-30} textAnchor="end" />
-                                            <YAxis tick={{ fontSize:11 }} />
+                                            <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
+                                            <YAxis tick={{ fontSize: 11 }} />
                                             <Tooltip content={<CustomTooltip />} />
-                                            <Bar dataKey="tons" fill="#2563eb" radius={[4,4,0,0]} name="Tons" />
+                                            <Bar dataKey="tons" fill="#2563eb" radius={[4, 4, 0, 0]} name="Tons" />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 )}
@@ -270,7 +287,7 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                                         <PieChart>
                                             <Pie data={byProduct} cx="50%" cy="50%" outerRadius={80}
                                                 dataKey="value" nameKey="name"
-                                                label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}
+                                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                                                 labelLine={false} fontSize={10}>
                                                 {byProduct.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                                             </Pie>
@@ -284,42 +301,44 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                         {/* Table + Actions */}
                         <div className="report-table-section">
                             <div className="report-table-header">
-                                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                     <h3>Sales History</h3>
                                     <span className="report-count">{partyData.sales.length} records</span>
                                 </div>
-                                <div style={{ display:"flex", gap:8 }}>
+                                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                                     <button
                                         className="filter-reset-btn"
                                         onClick={() => onSwitchToSales(partyData.party.party_id)}
-                                        style={{ borderColor:"#2563eb", color:"#2563eb" }}
+                                        style={{ borderColor: "#2563eb", color: "#2563eb" }}
                                     >
                                         🔗 View in Sales Report
                                     </button>
+                                    <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+                                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>Unit:</span>
+                                        <select
+                                            value={pdfUnit}
+                                            onChange={(e) => setPdfUnit(e.target.value)}
+                                            style={{
+                                                padding: "0.4rem 0.6rem",
+                                                borderRadius: "6px",
+                                                border: "1px solid #cbd5e1",
+                                                fontSize: "0.85rem",
+                                                backgroundColor: "white",
+                                                cursor: "pointer",
+                                                height: "36px",
+                                                fontWeight: 600,
+                                                boxSizing: "border-box"
+                                            }}
+                                        >
+                                            <option value="tons">Tons (MT)</option>
+                                            <option value="brass">Brass (B)</option>
+                                        </select>
+                                    </div>
                                     <button className="export-btn" onClick={handleExport}>⬇ Export to Excel</button>
                                     {(isManager || isClerk) && (
-                                        <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-                                            <select 
-                                                value={pdfUnit} 
-                                                onChange={(e) => setPdfUnit(e.target.value)}
-                                                style={{
-                                                    padding: "0.5rem",
-                                                    borderRadius: "6px",
-                                                    border: "1px solid #cbd5e1",
-                                                    fontSize: "0.85rem",
-                                                    backgroundColor: "white",
-                                                    cursor: "pointer",
-                                                    height: "36px",
-                                                    boxSizing: "border-box"
-                                                }}
-                                            >
-                                                <option value="tons">Tons (MT)</option>
-                                                <option value="brass">Brass (B)</option>
-                                            </select>
-                                            <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
-                                                PDF Generate
-                                            </button>
-                                        </div>
+                                        <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
+                                            PDF Generate
+                                        </button>
                                     )}
                                 </div>
                             </div>
@@ -327,7 +346,7 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                             {partyData.sales.length === 0 ? (
                                 <div className="report-empty">No sales recorded for this party.</div>
                             ) : (
-                                <div style={{ overflowX:"auto" }}>
+                                <div style={{ overflowX: "auto" }}>
                                     <table className="report-table">
                                         <thead>
                                             <tr>
@@ -338,7 +357,7 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                                                 <th>Quantity (MT)</th>
                                                 <th>Unit</th>
                                                 <th>Site</th>
-                                                <th>Price</th>
+                                                <th>Price (₹)</th>
                                                 <th>Remarks</th>
                                             </tr>
                                         </thead>
@@ -347,25 +366,25 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                                                 .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                                                 .map((s, i) => (
                                                     <tr key={s.sales_id}>
-                                                        <td style={{ color:"#9ca3af", fontSize:12 }}>
+                                                        <td style={{ color: "#9ca3af", fontSize: 12 }}>
                                                             {(currentPage - 1) * pageSize + i + 1}
                                                         </td>
-                                                        <td>{s.sales_date}</td>
+                                                        <td>{formatDate(s.sales_date)}</td>
                                                         <td><strong>{s.product_name}</strong></td>
                                                         <td>{s.vehicle_number || "—"}</td>
-                                                        <td style={{ fontWeight:600 }}>{fmtTons(s.quantity_tons)}</td>
+                                                        <td style={{ fontWeight: 600 }}>{fmtTons(s.quantity_tons)}</td>
                                                         <td>
-                                                <div style={{ lineHeight:1.4 }}>
-                                                    <span style={{ fontWeight:600 }}>{fmtTons(s.quantity_tons)} MT</span>
-                                                    <br/>
-                                                    <span style={{ fontSize:11, color:"#9ca3af" }}>
-                                                        ≈ {(s.quantity_tons * 4.2).toFixed(2)} Brass
-                                                    </span>
-                                                </div>
-                                            </td>
+                                                            <div style={{ lineHeight: 1.4 }}>
+                                                                <span style={{ fontWeight: 600 }}>{fmtTons(s.quantity_tons)} MT</span>
+                                                                <br />
+                                                                <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                                                                    ≈ {(s.quantity_tons * 4.2).toFixed(2)} Brass
+                                                                </span>
+                                                            </div>
+                                                        </td>
                                                         <td>{s.site || "—"}</td>
-                                                        <td>{s.price || "—"}</td>
-                                                        <td style={{ maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                                                        <td>{s.price ? `₹${formatInr(s.price)}` : "—"}</td>
+                                                        <td style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                                                             title={s.remarks}>{s.remarks || "—"}</td>
                                                     </tr>
                                                 ))}
@@ -399,8 +418,8 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                         <p style={{ color: "#475569", fontSize: "0.95rem", marginBottom: "1rem" }}>
                             You need manager approval to print or export reports. Would you like to request approval for this report?
                         </p>
-                        <div style={{ 
-                            marginBottom: "1.5rem", padding: "0.75rem", 
+                        <div style={{
+                            marginBottom: "1.5rem", padding: "0.75rem",
                             background: "#f1f5f9", borderRadius: "8px",
                             fontSize: "0.9rem", color: "#334155", borderLeft: "4px solid #3b82f6"
                         }}>

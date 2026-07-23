@@ -53,13 +53,30 @@ def add_production():
     cursor = conn.cursor(dictionary=True)
 
     try:
+        from db import get_system_setting, set_system_setting
+        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+
+        product_id = data.get("product_id")
+        if inv_mode == "COMMON_POOL":
+            # If in COMMON_POOL, find or create the "Common Pool" product in Product table
+            cursor.execute("SELECT product_id, status FROM Product WHERE LOWER(product_name) = 'common pool'")
+            pool_product = cursor.fetchone()
+            if pool_product:
+                product_id = pool_product["product_id"]
+                if pool_product["status"].lower() != "active":
+                    cursor.execute("UPDATE Product SET status = 'Active' WHERE product_id = %s", (product_id,))
+            else:
+                cursor.execute("INSERT INTO Product (product_name, quantity_tons, status) VALUES ('Common Pool', 0.0, 'Active')")
+                product_id = cursor.lastrowid
+        elif not product_id:
+            return jsonify({"message": "Product selection is required"}), 400
 
         # Check Product
         cursor.execute("""
             SELECT product_id, quantity_tons, status
             FROM Product
             WHERE product_id=%s
-        """, (data["product_id"],))
+        """, (product_id,))
 
         product = cursor.fetchone()
 
@@ -92,21 +109,30 @@ def add_production():
             VALUES(%s,%s,%s,%s,%s)
         """, (
             data["production_date"],
-            data["product_id"],
+            product_id,
             data["unit"],
             qty,
             data["production_cost"]
         ))
 
-        # Update Product Quantity
-        cursor.execute("""
-            UPDATE Product
-            SET quantity_tons = quantity_tons + %s
-            WHERE product_id=%s
-        """, (
-            qty,
-            data["product_id"]
-        ))
+        # Check Inventory Mode
+        from db import get_system_setting, set_system_setting
+        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+
+        if inv_mode == "COMMON_POOL":
+            user_id = request.user.get("user_id") if hasattr(request, "user") and request.user else None
+            pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
+            set_system_setting("common_pool_stock", str(pool_stock + qty), user_id=user_id, cursor=cursor)
+        else:
+            # Update Product Quantity
+            cursor.execute("""
+                UPDATE Product
+                SET quantity_tons = quantity_tons + %s
+                WHERE product_id=%s
+            """, (
+                qty,
+                data["product_id"]
+            ))
 
         conn.commit()
 
@@ -182,25 +208,46 @@ def update_production(id):
         )
         print("Converted Quantity:", new_qty)
 
-        # Remove old quantity from old product
-        cursor.execute("""
-            UPDATE Product
-            SET quantity_tons = quantity_tons - %s
-            WHERE product_id=%s
-        """, (
-            old["quantity_tons"],
-            old["product_id"]
-        ))
+        from db import get_system_setting, set_system_setting
+        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
 
-        # Add new quantity to selected product
-        cursor.execute("""
-            UPDATE Product
-            SET quantity_tons = quantity_tons + %s
-            WHERE product_id=%s
-        """, (
-            new_qty,
-            data["product_id"]
-        ))
+        product_id = data.get("product_id")
+        if inv_mode == "COMMON_POOL":
+            cursor.execute("SELECT product_id, status FROM Product WHERE LOWER(product_name) = 'common pool'")
+            pool_product = cursor.fetchone()
+            if pool_product:
+                product_id = pool_product["product_id"]
+                if pool_product["status"].lower() != "active":
+                    cursor.execute("UPDATE Product SET status = 'Active' WHERE product_id = %s", (product_id,))
+            else:
+                cursor.execute("INSERT INTO Product (product_name, quantity_tons, status) VALUES ('Common Pool', 0.0, 'Active')")
+                product_id = cursor.lastrowid
+        elif not product_id:
+            return jsonify({"message": "Product selection is required"}), 400
+
+        if inv_mode == "COMMON_POOL":
+            pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
+            set_system_setting("common_pool_stock", str(pool_stock - old["quantity_tons"] + new_qty), user_id=user_id, cursor=cursor)
+        else:
+            # Remove old quantity from old product
+            cursor.execute("""
+                UPDATE Product
+                SET quantity_tons = quantity_tons - %s
+                WHERE product_id=%s
+            """, (
+                old["quantity_tons"],
+                old["product_id"]
+            ))
+
+            # Add new quantity to selected product
+            cursor.execute("""
+                UPDATE Product
+                SET quantity_tons = quantity_tons + %s
+                WHERE product_id=%s
+            """, (
+                new_qty,
+                product_id
+            ))
 
         # Update production
         cursor.execute("""
@@ -214,7 +261,7 @@ def update_production(id):
             WHERE production_id=%s
         """, (
             data["production_date"],
-            data["product_id"],
+            product_id,
             data["unit"],
             new_qty,
             data["production_cost"],
@@ -277,15 +324,22 @@ def delete_production(id):
                 "status": "pending_approval"
             }), 202
 
-        # Reverse stock
-        cursor.execute("""
-            UPDATE Product
-            SET quantity_tons = quantity_tons - %s
-            WHERE product_id=%s
-        """,(
-            production["quantity_tons"],
-            production["product_id"]
-        ))
+        from db import get_system_setting, set_system_setting
+        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+
+        if inv_mode == "COMMON_POOL":
+            pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
+            set_system_setting("common_pool_stock", str(pool_stock - production["quantity_tons"]), user_id=user_id, cursor=cursor)
+        else:
+            # Reverse stock
+            cursor.execute("""
+                UPDATE Product
+                SET quantity_tons = quantity_tons - %s
+                WHERE product_id=%s
+            """,(
+                production["quantity_tons"],
+                production["product_id"]
+            ))
 
         # Delete record
         cursor.execute("""

@@ -349,8 +349,16 @@ def add_sale():
         qty = unit_convertor(data["unit"], data["quantity"])
 
         # Check Stock
-        if float(product["quantity_tons"]) < float(qty):
-            return jsonify({"message": "Insufficient Stock"}), 400
+        from db import get_system_setting, set_system_setting
+        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+        
+        if inv_mode == "COMMON_POOL":
+            pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
+            if pool_stock < float(qty):
+                return jsonify({"message": "Insufficient Stock in Common Pool"}), 400
+        else:
+            if float(product["quantity_tons"]) < float(qty):
+                return jsonify({"message": "Insufficient Stock"}), 400
 
         # Check Party
         cursor.execute("SELECT party_name FROM Party WHERE party_id=%s", (data["party_id"],))
@@ -385,7 +393,10 @@ def add_sale():
         cursor.execute("INSERT INTO VehicleSale (sales_id, vehicle_number) VALUES (%s, %s)", (sales_id, data["vehicle_number"]))
 
         # Deduct stock
-        cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (qty, data["product_id"]))
+        if inv_mode == "COMMON_POOL":
+            set_system_setting("common_pool_stock", str(pool_stock - float(qty)), user_id=request.user.get("user_id"), cursor=cursor)
+        else:
+            cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (qty, data["product_id"]))
 
         conn.commit()
         return jsonify({"message": "Sale Added Successfully", "sales_id": sales_id}), 201
@@ -472,8 +483,14 @@ def add_sales_bulk():
             for v in cursor.fetchall():
                 vehicles_set.add(v["vehicle_number"])
 
-        # 5. Local stock tracking to handle multiple rows of same product
-        local_stock = {pid: float(p["quantity_tons"]) for pid, p in products_map.items()}
+        # 5. Local stock tracking
+        from db import get_system_setting, set_system_setting
+        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+        if inv_mode == "COMMON_POOL":
+            pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
+            local_pool_stock = pool_stock
+        else:
+            local_stock = {pid: float(p["quantity_tons"]) for pid, p in products_map.items()}
 
         # 6. Loop and Insert
         for idx, row in enumerate(rows):
@@ -528,9 +545,14 @@ def add_sales_bulk():
             qty = unit_convertor(unit, quantity)
 
             # Validate Stock
-            if local_stock.get(p_id, 0.0) < float(qty):
-                errors.append(f"{row_label}: Insufficient Stock for product")
-                continue
+            if inv_mode == "COMMON_POOL":
+                if local_pool_stock < float(qty):
+                    errors.append(f"{row_label}: Insufficient Stock in Common Pool")
+                    continue
+            else:
+                if local_stock.get(p_id, 0.0) < float(qty):
+                    errors.append(f"{row_label}: Insufficient Stock for product")
+                    continue
 
             # Perform Insertions & Updates
             cursor.execute("""
@@ -555,10 +577,12 @@ def add_sales_bulk():
 
             sales_id = cursor.lastrowid
             cursor.execute("INSERT INTO VehicleSale (sales_id, vehicle_number) VALUES (%s, %s)", (sales_id, vehicle_number))
-            cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (qty, p_id))
-
-            # Update local stock
-            local_stock[p_id] -= float(qty)
+            if inv_mode == "COMMON_POOL":
+                local_pool_stock -= float(qty)
+                set_system_setting("common_pool_stock", str(local_pool_stock), user_id=request.user.get("user_id"), cursor=cursor)
+            else:
+                cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (qty, p_id))
+                local_stock[p_id] -= float(qty)
             created += 1
 
         conn.commit()
@@ -607,7 +631,13 @@ def delete_sale(id):
                 "status": "pending_approval"
             }), 202
 
-        cursor.execute("UPDATE Product SET quantity_tons = quantity_tons + %s WHERE product_id=%s", (sale["quantity_tons"], sale["product_id"]))
+        from db import get_system_setting, set_system_setting
+        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+        if inv_mode == "COMMON_POOL":
+            pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
+            set_system_setting("common_pool_stock", str(pool_stock + float(sale["quantity_tons"])), user_id=user_id, cursor=cursor)
+        else:
+            cursor.execute("UPDATE Product SET quantity_tons = quantity_tons + %s WHERE product_id=%s", (sale["quantity_tons"], sale["product_id"]))
         cursor.execute("DELETE FROM VehicleSale WHERE sales_id=%s", (id,))
         cursor.execute("DELETE FROM Sales WHERE sales_id=%s", (id,))
         conn.commit()
@@ -662,7 +692,14 @@ def update_sale(id):
             }), 202
 
         # Return old stock
-        cursor.execute("UPDATE Product SET quantity_tons = quantity_tons + %s WHERE product_id=%s", (old_sale["quantity_tons"], old_sale["product_id"]))
+        from db import get_system_setting, set_system_setting
+        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+        if inv_mode == "COMMON_POOL":
+            pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
+            pool_stock += float(old_sale["quantity_tons"])
+            set_system_setting("common_pool_stock", str(pool_stock), user_id=user_id, cursor=cursor)
+        else:
+            cursor.execute("UPDATE Product SET quantity_tons = quantity_tons + %s WHERE product_id=%s", (old_sale["quantity_tons"], old_sale["product_id"]))
 
         new_qty = unit_convertor(data["unit"], data["quantity"])
 
@@ -672,10 +709,14 @@ def update_sale(id):
             conn.rollback(); return jsonify({"message": "Product not found"}), 404
         if product["status"].lower() != "active":
             conn.rollback(); return jsonify({"message": "Product is Inactive"}), 400
-        if float(product["quantity_tons"]) < float(new_qty):
-            conn.rollback(); return jsonify({"message": "Insufficient Stock"}), 400
-
-        cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (new_qty, data["product_id"]))
+        if inv_mode == "COMMON_POOL":
+            if pool_stock < float(new_qty):
+                conn.rollback(); return jsonify({"message": "Insufficient Stock in Common Pool"}), 400
+            set_system_setting("common_pool_stock", str(pool_stock - float(new_qty)), user_id=user_id, cursor=cursor)
+        else:
+            if float(product["quantity_tons"]) < float(new_qty):
+                conn.rollback(); return jsonify({"message": "Insufficient Stock"}), 400
+            cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (new_qty, data["product_id"]))
 
         cursor.execute("""
             UPDATE Sales SET

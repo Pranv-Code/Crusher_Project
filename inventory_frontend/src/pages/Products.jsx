@@ -7,6 +7,7 @@ import {
     updateProduct,
     deleteProduct,
 } from "../services/productApi";
+import { getSettings } from "../services/settingsApi";
 
 // Component Imports
 import Button from "../components/common/Button";
@@ -42,8 +43,13 @@ function Products() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
 
+    const [settings, setSettings] = useState({ inventory_mode: "PRODUCT_WISE", common_pool_stock: 0 });
+
     useEffect(() => {
         fetchProducts();
+        getSettings()
+            .then((res) => setSettings(res.data))
+            .catch((err) => console.error("Failed to load settings in Products page:", err));
     }, []);
 
     // ---------------- Add Product ----------------
@@ -58,8 +64,8 @@ function Products() {
             return;
         }
 
-        if (parseFloat(newProduct.quantity_tons) <= 0) {
-            alert("Quantity must be greater than zero.");
+        if (parseFloat(newProduct.quantity_tons) < 0) {
+            alert("Quantity cannot be negative.");
             return;
         }
 
@@ -191,6 +197,34 @@ function Products() {
                     </Button>
                 }
             />
+
+            {settings.inventory_mode === "COMMON_POOL" && (
+                <div style={{
+                    backgroundColor: "rgba(48, 155, 232, 0.05)",
+                    border: "1px solid rgba(48, 155, 232, 0.2)",
+                    borderRadius: "8px",
+                    padding: "1rem",
+                    marginBottom: "1.5rem",
+                    color: "var(--text-primary, #1e293b)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                }}>
+                    <div>
+                        <span style={{ fontSize: "1.1rem" }}>ℹ️</span> <strong>Common Pool Mode Active:</strong> Individual product stocks are static and suspended. Transactions affect only the consolidated pool.
+                    </div>
+                    <div style={{
+                        backgroundColor: "#309be8",
+                        color: "#fff",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "6px",
+                        fontWeight: "bold",
+                        fontSize: "0.95rem"
+                    }}>
+                        Consolidated Pool: {Number(settings.common_pool_stock).toFixed(2)} MT
+                    </div>
+                </div>
+            )}
 
             {showAddForm && (
                 <div className="form-card">

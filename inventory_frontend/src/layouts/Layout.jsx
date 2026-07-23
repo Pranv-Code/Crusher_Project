@@ -17,8 +17,8 @@ function Layout({ children }) {
 
     return (
         <div className="layout">
-            <Sidebar isCollapsed={isCollapsed} />
-            <div className="main-content">
+            <Sidebar isCollapsed={isCollapsed} onToggleSidebar={toggleSidebar} />
+            <div className={`main-content ${isCollapsed ? "sidebar-collapsed" : ""}`}>
                 <Navbar onToggleSidebar={toggleSidebar} isSidebarCollapsed={isCollapsed} />
                 <div className="page-content">
                     {children}

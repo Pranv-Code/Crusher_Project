@@ -3,14 +3,14 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "../css/sidebar.css";
 
-function Sidebar({ isCollapsed }) {
+function Sidebar({ isCollapsed, onToggleSidebar }) {
     const { user, logoutUser, isManager, isClerk } = useAuth();
     const navigate = useNavigate();
 
     const menuItems = [];
     if (user) {
         menuItems.push({ name: "Dashboard", path: "/", icon: "📊" });
-        
+
         if (isManager) {
             menuItems.push(
                 { name: "Products", path: "/products", icon: "📦" },
@@ -21,7 +21,8 @@ function Sidebar({ isCollapsed }) {
                 { name: "Vehicle Sales", path: "/vehicle-sales", icon: "🔑" },
                 { name: "Parties", path: "/parties", icon: "👥" },
                 { name: "Reports", path: "/reports", icon: "📈" },
-                { name: "Users", path: "/users", icon: "🛡️" }
+                { name: "Users", path: "/users", icon: "🛡️" },
+                { name: "Settings", path: "/settings", icon: "⚙️" }
             );
         } else if (isClerk) {
             menuItems.push(
@@ -38,9 +39,8 @@ function Sidebar({ isCollapsed }) {
         navigate("/login");
     };
 
-    // Get initials for collapsed user profile placeholder
     const getInitials = (name) => {
-        if (!name) return "U";
+        if (!name) return "E";
         const parts = name.split(" ");
         if (parts.length >= 2) {
             return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -50,15 +50,58 @@ function Sidebar({ isCollapsed }) {
 
     return (
         <aside className={`sidebar ${isCollapsed ? "collapsed" : ""}`}>
-            {isCollapsed ? (
-                <div className="logo-collapsed" title="Crusher IMS">🏭</div>
-            ) : (
-                <h2 className="logo">
-                    Crusher IMS
-                </h2>
-            )}
+            {/* Top Sidebar Header with Employee Name & Toggle Arrow */}
+            <div className="sidebar-top-header">
+                {isCollapsed ? (
+                    <div 
+                        className="sidebar-employee-avatar-collapsed" 
+                        onClick={onToggleSidebar}
+                        title={`Expand Sidebar — ${user?.name || "Employee"} (${user?.role || ""})`}
+                    >
+                        {getInitials(user?.name)}
+                    </div>
+                ) : (
+                    <div className="sidebar-employee-info">
+                        <div className="sidebar-employee-avatar">
+                            {getInitials(user?.name)}
+                        </div>
+                        <div className="sidebar-employee-text">
+                            <span className="sidebar-employee-name" title={user?.name || "Employee Name"}>
+                                {user?.name || "Employee Name"}
+                            </span>
+                            {/* <span className={`sidebar-employee-role ${user?.role?.toLowerCase() || ""}`}>
+                                {user?.role || "User"}
+                            </span> */}
+                        </div>
+                    </div>
+                )}
+                <button 
+                    className="sidebar-toggle-btn" 
+                    onClick={onToggleSidebar}
+                    title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                    aria-label="Toggle Sidebar"
+                >
+                    <svg 
+                        width="18" 
+                        height="18" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2.5" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                        style={{ 
+                            transform: isCollapsed ? "rotate(180deg)" : "rotate(0deg)", 
+                            transition: "transform 0.3s ease" 
+                        }}
+                    >
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+            </div>
 
-            <nav>
+            {/* Navigation Links */}
+            <nav className="sidebar-nav">
                 {menuItems.map((item) => (
                     <NavLink
                         key={item.path}
@@ -75,20 +118,12 @@ function Sidebar({ isCollapsed }) {
                 ))}
             </nav>
 
+            {/* Footer Section with Logout */}
             {user && (
-                <div className="sidebar-user">
-                    {isCollapsed ? (
-                        <div className="user-avatar-collapsed" title={`${user.name} (${user.role})`}>
-                            {getInitials(user.name)}
-                        </div>
-                    ) : (
-                        <div className="user-info">
-                            <div className="user-name">{user.name}</div>
-                            <div className={`user-role ${user.role.toLowerCase()}`}>{user.role}</div>
-                        </div>
-                    )}
+                <div className="sidebar-footer">
                     <button className="logout-btn" onClick={handleLogout} title="Logout">
-                        <span>Logout</span> 🚪
+                        <span className="logout-icon">🚪</span>
+                        <span className="logout-text">Logout</span>
                     </button>
                 </div>
             )}

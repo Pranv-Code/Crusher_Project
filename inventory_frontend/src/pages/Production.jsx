@@ -7,6 +7,8 @@ import {
     updateProduction,
     deleteProduction
 } from "../services/productionApi";
+import { getSettings } from "../services/settingsApi";
+import { formatDate, formatInr } from "../utils/formatUtils";
 
 // Reusable Component Imports
 import Button from "../components/common/Button";
@@ -54,9 +56,12 @@ function Production() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
 
+    const [settings, setSettings] = useState({ inventory_mode: "PRODUCT_WISE" });
+
     const handleAddProduction = async () => {
+        const isCommonPool = settings.inventory_mode === "COMMON_POOL";
         if (
-            !newProduction.product_id ||
+            (!isCommonPool && !newProduction.product_id) ||
             newProduction.quantity_tons === "" ||
             newProduction.production_cost === "" ||
             !newProduction.unit
@@ -140,6 +145,9 @@ function Production() {
     useEffect(() => {
         fetchProduction();
         fetchActiveProducts();
+        getSettings()
+            .then((res) => setSettings(res.data))
+            .catch((err) => console.error("Failed to load settings in Production page:", err));
     }, []);
 
     // Configuration formatting structures
@@ -154,14 +162,14 @@ function Production() {
     ];
 
     const columns = [
-        { key: "production_date", label: "Production Date" },
+        { key: "production_date", label: "Production Date", render: (row) => formatDate(row.production_date) },
         { key: "product_name", label: "Product Name" },
         { key: "quantity_tons", label: "Quantity" },
         { key: "unit",
         label: "Units",
         render: (row) =>
             row.unit?.toLowerCase() === "tons" ? "MT" : "Brass"},
-        { key: "production_cost", label: "Production Cost" },
+        { key: "production_cost", label: "Production Cost (₹)", render: (row) => row.production_cost ? `₹${formatInr(row.production_cost)}` : "—" },
     ];
 
     return (
@@ -195,18 +203,20 @@ function Production() {
                                 })
                             }
                         />
-                        <SelectField
-                            label="Select Product"
-                            name="product_id"
-                            value={newProduction.product_id}
-                            onChange={(e) =>
-                                setNewProduction({
-                                    ...newProduction,
-                                    product_id: e.target.value,
-                                })
-                            }
-                            options={productOptions}
-                        />
+                        {settings.inventory_mode !== "COMMON_POOL" && (
+                            <SelectField
+                                label="Select Product"
+                                name="product_id"
+                                value={newProduction.product_id}
+                                onChange={(e) =>
+                                    setNewProduction({
+                                        ...newProduction,
+                                        product_id: e.target.value,
+                                    })
+                                }
+                                options={productOptions}
+                            />
+                        )}
                         <InputField
                             label="Quantity"
                             name="quantity_tons"
@@ -233,7 +243,7 @@ function Production() {
                             options={unitOptions}
                         />
                         <InputField
-                            label="Production Cost"
+                            label="Production Cost (₹)"
                             name="production_cost"
                             type="number"
                             placeholder="Enter cost"
@@ -290,18 +300,20 @@ function Production() {
                         })
                     }
                 />
-                <SelectField
-                    label="Product Name"
-                    name="product_id"
-                    value={editData.product_id}
-                    onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            product_id: e.target.value,
-                        })
-                    }
-                    options={productOptions}
-                />
+                {settings.inventory_mode !== "COMMON_POOL" && (
+                    <SelectField
+                        label="Product Name"
+                        name="product_id"
+                        value={editData.product_id}
+                        onChange={(e) =>
+                            setEditData({
+                                ...editData,
+                                product_id: e.target.value,
+                            })
+                        }
+                        options={productOptions}
+                    />
+                )}
                 <InputField
                     label="Quantity"
                     type="number"
@@ -326,7 +338,7 @@ function Production() {
                     options={unitOptions}
                 />
                 <InputField
-                    label="Production Cost"
+                    label="Production Cost (₹)"
                     type="number"
                     value={editData.production_cost}
                     onChange={(e) =>

@@ -89,6 +89,25 @@ def run():
     conn.commit()
     print("Alters successfully applied.")
 
+    print("Running settings migrations...")
+    try:
+        with open("DB/migration_settings.sql", "r") as f:
+            settings_sql = f.read()
+        for stmt in settings_sql.split(";"):
+            stmt = stmt.strip()
+            if not stmt or stmt.upper().startswith("USE "):
+                continue
+            try:
+                cursor.execute(stmt)
+            except Exception as e:
+                if "already exists" not in str(e) and "Duplicate" not in str(e):
+                    print(f"Settings migration warning: {e}")
+        conn.commit()
+        print("Settings migrations applied successfully.")
+    except Exception as e:
+        print(f"Error running settings migrations: {e}")
+
+
     # Hash default passwords
     manager_pw = bcrypt.hashpw(b"admin123", bcrypt.gensalt()).decode()
     clerk_pw = bcrypt.hashpw(b"clerk123", bcrypt.gensalt()).decode()

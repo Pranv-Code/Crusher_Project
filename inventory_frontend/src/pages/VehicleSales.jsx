@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
 import { getVehicleSales } from "../services/vehicleSaleApi";
 import Pagination from "../components/common/Pagination";
+import { formatDate, formatTime, formatInr } from "../utils/formatUtils";
 
 // ─── Dual-unit quantity cell ──────────────────────────────────────────────────
 const QtyCell = ({ displayQty, displayUnit, convertedQty, convertedUnit }) => (
@@ -137,7 +138,7 @@ function VehicleSales() {
                                 <th>Product</th>
                                 <th>Quantity</th>
                                 <th>Site</th>
-                                <th>Price</th>
+                                <th>Price (₹)</th>
                                 <th>Loading</th>
                                 <th>Unloading</th>
                                 <th>Remarks</th>
@@ -165,7 +166,7 @@ function VehicleSales() {
                                             <td style={{ color: "var(--text-muted,#888)", fontSize: "0.85em" }}>
                                                 {(currentPage - 1) * pageSize + idx + 1}
                                             </td>
-                                            <td>{row.sales_date}</td>
+                                            <td>{formatDate(row.sales_date)}</td>
                                             <td><strong>{row.vehicle_number}</strong></td>
                                             <td>{row.vehicle_owner || "—"}</td>
                                             <td>{row.party_name}</td>
@@ -179,9 +180,9 @@ function VehicleSales() {
                                                 />
                                             </td>
                                             <td>{row.site || "—"}</td>
-                                            <td>{row.price}</td>
-                                            <td>{row.loading_time || "—"}</td>
-                                            <td>{row.unloading_time || "—"}</td>
+                                            <td>{row.price ? `₹${formatInr(row.price)}` : "—"}</td>
+                                            <td>{formatTime(row.loading_time)}</td>
+                                            <td>{formatTime(row.unloading_time)}</td>
                                             <td
                                                 style={{
                                                     maxWidth: "180px",

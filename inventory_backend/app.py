@@ -14,6 +14,7 @@ from routes.reports_routes import reports_bp
 from routes.auth_routes import auth_bp
 from routes.user_routes import user_bp
 from routes.approval_routes import approval_bp
+from routes.settings_routes import settings_bp
 
 import os
 
@@ -81,6 +82,8 @@ app.register_blueprint(reports_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(approval_bp)
+app.register_blueprint(settings_bp)
+
 
 
 if __name__ == "__main__":

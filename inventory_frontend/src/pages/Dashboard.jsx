@@ -6,6 +6,8 @@ import { getProduction } from "../services/productionApi";
 import { getSales } from "../services/salesApi";
 import { getVehicles } from "../services/vehicleApi";
 import { getParties } from "../services/partyApi";
+import { getSettings } from "../services/settingsApi";
+import { formatDate, formatInr } from "../utils/formatUtils";
 
 import "../css/dashboard.css";
 
@@ -18,17 +20,19 @@ export default function Dashboard() {
     const [sales, setSales] = useState([]);
     const [vehicles, setVehicles] = useState([]);
     const [parties, setParties] = useState([]);
+    const [settings, setSettings] = useState({ inventory_mode: "COMMON_POOL", common_pool_stock: 0 });
 
     useEffect(() => {
         const loadDashboardData = async () => {
             setLoading(true);
             try {
-                const [productsRes, productionRes, salesRes, vehiclesRes, partiesRes] = await Promise.all([
+                const [productsRes, productionRes, salesRes, vehiclesRes, partiesRes, settingsRes] = await Promise.all([
                     getProducts(),
                     getProduction(),
                     getSales(),
                     getVehicles(),
-                    getParties()
+                    getParties(),
+                    getSettings()
                 ]);
 
                 setProducts(productsRes.data || []);
@@ -36,6 +40,7 @@ export default function Dashboard() {
                 setSales(salesRes.data.sales || (Array.isArray(salesRes.data) ? salesRes.data : []));
                 setVehicles(vehiclesRes.data || []);
                 setParties(partiesRes.data || []);
+                setSettings(settingsRes.data || { inventory_mode: "COMMON_POOL", common_pool_stock: 0 });
             } catch (err) {
                 console.error("Failed to load dashboard data:", err);
             } finally {
@@ -169,7 +174,36 @@ const totalProductionTons = production.reduce(
                             <h3>Current Stock Levels</h3>
                         </div>
                         <div className="dashboard-card-body">
-                            {activeProducts.length === 0 ? (
+                            {settings.inventory_mode === "COMMON_POOL" ? (
+                                <div style={{ padding: "1rem", textAlign: "center" }}>
+                                    <div style={{
+                                        fontSize: "2rem",
+                                        fontWeight: "700",
+                                        color: "#309be8",
+                                        marginBottom: "0.5rem"
+                                    }}>
+                                        {Number(settings.common_pool_stock).toFixed(2)} MT
+                                    </div>
+                                    <div style={{
+                                        fontSize: "0.9rem",
+                                        color: "var(--text-muted, #888)",
+                                        marginBottom: "1rem"
+                                    }}>
+                                        ≈ {(Number(settings.common_pool_stock) * 4.2).toFixed(2)} Brass
+                                    </div>
+                                    <div style={{
+                                        fontSize: "0.85rem",
+                                        backgroundColor: "rgba(48, 155, 232, 0.05)",
+                                        border: "1px solid rgba(48, 155, 232, 0.2)",
+                                        borderRadius: "6px",
+                                        padding: "0.75rem",
+                                        color: "var(--text-primary, #1e293b)",
+                                        lineHeight: "1.4"
+                                    }}>
+                                        ℹ️ The system is currently in <strong>Common Pool</strong> mode. All stock is consolidated into a single total pool rather than tracked per product.
+                                    </div>
+                                </div>
+                            ) : activeProducts.length === 0 ? (
                                 <p style={{ textAlign: "center", color: "#64748b" }}>No active products in database.</p>
                             ) : (
                                 <div className="stock-bar-container">
@@ -252,7 +286,7 @@ const totalProductionTons = production.reduce(
                                     <tbody>
                                         {recentSales.map(item => (
                                             <tr key={item.sales_id}>
-                                                <td>{item.sales_date}</td>
+                                                <td>{formatDate(item.sales_date)}</td>
                                                 <td><strong>{item.vehicle_number}</strong></td>
                                                 <td>{item.product_name || `ID: ${item.product_id}`}</td>
                                                 <td>
@@ -283,20 +317,20 @@ const totalProductionTons = production.reduce(
                                             <th>Date</th>
                                             <th>Product</th>
                                             <th>Quantity</th>
-                                            <th>Cost</th>
+                                            <th>Cost (₹)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {recentProduction.map(item => (
                                             <tr key={item.production_id}>
-                                                <td>{item.production_date}</td>
+                                                <td>{formatDate(item.production_date)}</td>
                                                 <td>{item.product_name || `ID: ${item.product_id}`}</td>
                                                 <td>
                                                     <span className="db-badge db-badge-brass">
                                                         {parseFloat(item.quantity_tons).toFixed(2)} MT 
                                                     </span>
                                                 </td>
-                                                <td>₹{parseFloat(item.production_cost).toFixed(2)}</td>
+                                                <td>{item.production_cost ? `₹${formatInr(item.production_cost)}` : "—"}</td>
                                             </tr>
                                         ))}
                                     </tbody>

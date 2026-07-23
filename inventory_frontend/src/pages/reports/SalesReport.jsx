@@ -5,9 +5,11 @@ import {
     PieChart, Pie, Cell, Legend, LineChart, Line,
 } from "recharts";
 import * as XLSX from "xlsx";
+import { exportToFormattedExcel } from "../../utils/excelGenerator";
 import { useAuth } from "../../context/AuthContext";
 import { generateSalesReportPdf } from "../../utils/pdfGenerator";
 import { requestReportPrint } from "../../services/approvalApi";
+import { formatDate, formatTime, formatInr } from "../../utils/formatUtils";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777", "#d97706", "#059669"];
 
@@ -156,10 +158,11 @@ export default function SalesReport({ sales, parties, vehicles }) {
     // ── Export ────────────────────────────────────────────────────────────────
     const handleExport = () => {
         const partyName = parties.find(p => String(p.party_id) === partyFilter)?.party_name || "All";
-        const label = `Sales Report (Excel) | Filters: Party: ${partyName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Vehicle: ${vehicleFilter || "All"}, Search: ${searchQuery || "None"}`;
+        const label = `Sales Report (Excel) | Unit: ${pdfUnit} | Filters: Party: ${partyName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Vehicle: ${vehicleFilter || "All"}, Search: ${searchQuery || "None"}`;
         const requestData = {
             report_type: "sales",
             format: "excel",
+            pdf_unit: pdfUnit,
             filters: {
                 dateFrom,
                 dateTo,
@@ -176,21 +179,34 @@ export default function SalesReport({ sales, parties, vehicles }) {
             return;
         }
 
+        const multiplier = pdfUnit === "brass" ? 4.2 : 1.0;
+        const qtyHeader = pdfUnit === "brass" ? "Quantity (Brass)" : "Quantity (MT)";
+        const unitLabel = pdfUnit === "brass" ? "brass" : "MT";
+
+        const subtitle = `Unit: ${pdfUnit.toUpperCase()} | Party: ${partyName} | Date: ${dateFrom || "Start"} to ${dateTo || "End"} | Month: ${monthFilter || "All"} | Vehicle: ${vehicleFilter || "All"}${searchQuery ? ` | Search: "${searchQuery}"` : ""}`;
+
         const rows = filtered.map(s => ({
-            "Date":           s.sales_date,
+            "Date":           formatDate(s.sales_date),
             "Party":          s.party_name,
             "Product":        s.product_name,
             "Vehicle":        s.vehicle_number || "",
             "Vehicle Owner":  s.vehicle_owner || "",
-            "Quantity (MT)":fmtTons(s.quantity_tons),
-            "Unit":           s.unit,
+            [qtyHeader]:      Number((Number(s.quantity_tons || 0) * multiplier).toFixed(2)),
+            "Unit":           unitLabel,
             "Site":           s.site || "",
-            "Price":          s.price || "",
-            "Loading Time":   s.loading_time || "",
-            "Unloading Time": s.unloading_time || "",
+            "Price (₹)":      Number(s.price || 0),
+            "Loading Time":   formatTime(s.loading_time),
+            "Unloading Time": formatTime(s.unloading_time),
             "Remarks":        s.remarks || "",
         }));
-        exportToExcel(rows, "sales_report.xlsx");
+
+        exportToFormattedExcel({
+            title: `Sales Report (${pdfUnit.toUpperCase()})`,
+            subtitle,
+            sheetName: "Sales Report",
+            rows,
+            fileName: "sales_report.xlsx"
+        });
     };
 
     const handlePdfExport = () => {
@@ -383,32 +399,34 @@ export default function SalesReport({ sales, parties, vehicles }) {
                         <span className="report-count">{filtered.length} records</span>
                     </div>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                        <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+                            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>Unit:</span>
+                            <select 
+                                value={pdfUnit} 
+                                onChange={(e) => setPdfUnit(e.target.value)}
+                                style={{
+                                    padding: "0.4rem 0.6rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #cbd5e1",
+                                    fontSize: "0.85rem",
+                                    backgroundColor: "white",
+                                    cursor: "pointer",
+                                    height: "36px",
+                                    fontWeight: 600,
+                                    boxSizing: "border-box"
+                                }}
+                            >
+                                <option value="tons">Metric Tons (MT)</option>
+                                <option value="brass">Brass (B)</option>
+                            </select>
+                        </div>
                         <button className="export-btn" onClick={handleExport}>
                             ⬇ Export to Excel
                         </button>
                         {(isManager || isClerk) && (
-                            <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-                                <select 
-                                    value={pdfUnit} 
-                                    onChange={(e) => setPdfUnit(e.target.value)}
-                                    style={{
-                                        padding: "0.5rem",
-                                        borderRadius: "6px",
-                                        border: "1px solid #cbd5e1",
-                                        fontSize: "0.85rem",
-                                        backgroundColor: "white",
-                                        cursor: "pointer",
-                                        height: "36px",
-                                        boxSizing: "border-box"
-                                    }}
-                                >
-                                    <option value="tons">Metric Tons (MT)</option>
-                                    <option value="brass">Brass (B)</option>
-                                </select>
-                                <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
-                                    PDF Generate
-                                </button>
-                            </div>
+                            <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
+                                PDF Generate
+                            </button>
                         )}
                     </div>
                 </div>
@@ -427,7 +445,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                     <th>Owner</th>
                                     <th>Quantity</th>
                                     <th>Site</th>
-                                    <th>Price</th>
+                                    <th>Price (₹)</th>
                                     <th>Remarks</th>
                                 </tr>
                             </thead>
@@ -439,7 +457,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                             <td style={{ color:"#9ca3af", fontSize:12 }}>
                                                 {(currentPage - 1) * pageSize + i + 1}
                                             </td>
-                                            <td>{s.sales_date}</td>
+                                            <td>{formatDate(s.sales_date)}</td>
                                             <td><strong>{s.party_name}</strong></td>
                                             <td>{s.product_name}</td>
                                             <td>{s.vehicle_number || "—"}</td>
@@ -454,7 +472,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                                 </div>
                                             </td>
                                             <td>{s.site || "—"}</td>
-                                            <td>{s.price || "—"}</td>
+                                            <td>{s.price ? `₹${formatInr(s.price)}` : "—"}</td>
                                             <td style={{ maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
                                                 title={s.remarks}>{s.remarks || "—"}</td>
                                         </tr>

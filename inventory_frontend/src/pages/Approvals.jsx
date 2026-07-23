@@ -2,10 +2,12 @@ import React, { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
 import { getApprovals, actionApproval } from "../services/approvalApi";
 import Pagination from "../components/common/Pagination";
+import ApprovalChangeDetails from "../components/common/ApprovalChangeDetails";
 
 export default function Approvals() {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedRequest, setSelectedRequest] = useState(null);
     const [rejectId, setRejectId] = useState(null);
     const [remark, setRemark] = useState("");
 
@@ -45,6 +47,7 @@ export default function Approvals() {
         try {
             await actionApproval(id, { status: "approved" });
             alert("Request approved successfully.");
+            setSelectedRequest(null);
             fetchPendingApprovals();
         } catch (err) {
             alert(err.response?.data?.message || "Failed to approve request.");
@@ -65,6 +68,7 @@ export default function Approvals() {
             await actionApproval(rejectId, { status: "rejected", remark });
             alert("Request rejected successfully.");
             setRejectId(null);
+            setSelectedRequest(null);
             fetchPendingApprovals();
         } catch (err) {
             alert(err.response?.data?.message || "Failed to reject request.");
@@ -76,7 +80,7 @@ export default function Approvals() {
             <div className="page-header">
                 <h1>Pending Approvals</h1>
                 <span style={{ fontSize: "0.9em", color: "var(--text-muted, #888)" }}>
-                    Process pending vehicle additions and unloading delay requests
+                    Process pending record edits, deletions, vehicle additions, and report export requests
                 </span>
             </div>
 
@@ -95,7 +99,7 @@ export default function Approvals() {
                                 <th>Requester</th>
                                 <th>Type</th>
                                 <th>Reference</th>
-                                <th>Details</th>
+                                <th>Proposed Changes Summary</th>
                                 <th>Created At</th>
                                 <th>Action</th>
                             </tr>
@@ -106,7 +110,7 @@ export default function Approvals() {
                                 .map((req) => (
                                     <tr key={req.request_id}>
                                         <td>{req.request_id}</td>
-                                        <td>{req.requester_name}</td>
+                                        <td><strong>{req.requester_name}</strong></td>
                                         <td>
                                             <span style={{
                                                 backgroundColor: req.request_type === "vehicle" 
@@ -130,17 +134,28 @@ export default function Approvals() {
                                                 padding: "0.25rem 0.5rem",
                                                 borderRadius: "4px",
                                                 fontSize: "0.85em",
-                                                fontWeight: "500",
+                                                fontWeight: "600",
                                                 textTransform: "capitalize"
                                             }}>
                                                 {req.request_type.replace("_", " ")}
                                             </span>
                                         </td>
                                         <td>{req.reference_id}</td>
-                                        <td style={{ maxWidth: "300px", wordBreak: "break-all" }}>{req.details}</td>
+                                        <td style={{ maxWidth: "320px", wordBreak: "break-word" }}>
+                                            <span style={{ fontWeight: 600, color: "#2563eb" }}>
+                                                {req.change_details?.short_summary || req.details}
+                                            </span>
+                                        </td>
                                         <td>{new Date(req.created_at).toLocaleString()}</td>
                                         <td>
-                                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                                            <div style={{ display: "flex", gap: "0.4rem" }}>
+                                                <button
+                                                    className="edit-btn"
+                                                    style={{ backgroundColor: "#2563eb", color: "white" }}
+                                                    onClick={() => setSelectedRequest(req)}
+                                                >
+                                                    🔍 View Changes
+                                                </button>
                                                 <button
                                                     className="edit-btn"
                                                     style={{ backgroundColor: "#10b981", color: "white" }}
@@ -173,8 +188,8 @@ export default function Approvals() {
                 )}
             </div>
 
-            {/* Rejection Remark Prompt */}
-            {rejectId !== null && (
+            {/* Detailed Changes Modal */}
+            {selectedRequest && (
                 <div style={{
                     position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
                     backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
@@ -182,9 +197,62 @@ export default function Approvals() {
                 }}>
                     <div style={{
                         background: "white", padding: "2rem", borderRadius: "12px",
+                        width: "90%", maxWidth: "650px", maxHeight: "90vh", overflowY: "auto",
+                        boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
+                    }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                            <h2 style={{ margin: 0, color: "#1f2937", fontSize: "1.2rem" }}>
+                                Proposed Changes Review
+                            </h2>
+                            <button 
+                                onClick={() => setSelectedRequest(null)}
+                                style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer" }}
+                            >
+                                ✖
+                            </button>
+                        </div>
+
+                        <ApprovalChangeDetails request={selectedRequest} />
+
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
+                            <button
+                                className="primary-btn"
+                                style={{ backgroundColor: "#10b981", color: "white", border: "none" }}
+                                onClick={() => handleApprove(selectedRequest.request_id)}
+                            >
+                                ✓ Approve Changes
+                            </button>
+                            <button
+                                className="primary-btn"
+                                style={{ backgroundColor: "#ef4444", color: "white", border: "none" }}
+                                onClick={() => handleRejectClick(selectedRequest.request_id)}
+                            >
+                                ✖ Reject Request
+                            </button>
+                            <button
+                                className="primary-btn"
+                                style={{ backgroundColor: "#6b7280", color: "white", border: "none" }}
+                                onClick={() => setSelectedRequest(null)}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rejection Remark Prompt */}
+            {rejectId !== null && (
+                <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
+                    justifyContent: "center", alignItems: "center", zIndex: 1100
+                }}>
+                    <div style={{
+                        background: "white", padding: "2rem", borderRadius: "12px",
                         width: "100%", maxWidth: "450px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
                     }}>
-                        <h3 style={{ margin: "0 0 1rem 0" }}>Reject Request</h3>
+                        <h3 style={{ margin: "0 0 1rem 0" }}>Reject Request #{rejectId}</h3>
                         <div style={{ marginBottom: "1.5rem" }}>
                             <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9em", fontWeight: 500 }}>
                                 Compulsory Rejection Remark
@@ -207,7 +275,7 @@ export default function Approvals() {
                                 style={{ backgroundColor: "#ef4444", border: "none" }}
                                 onClick={handleRejectSave}
                             >
-                                Reject
+                                Reject Request
                             </button>
                             <button
                                 className="primary-btn"

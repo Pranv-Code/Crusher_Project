@@ -52,8 +52,8 @@ def add_product():
     except (ValueError, TypeError):
         return jsonify({"message": "Invalid quantity value"}), 400
 
-    if qty_val <= 0:
-        return jsonify({"message": "Quantity must be greater than zero"}), 400
+    if qty_val < 0:
+        return jsonify({"message": "Quantity cannot be negative"}), 400
 
     qty = unit_convertor(
         data["unit"],
@@ -81,6 +81,13 @@ def add_product():
         data["product_name"],
         qty
     ))
+
+    # If in COMMON_POOL mode, also add the initial quantity to the consolidated pool stock setting
+    from db import get_system_setting, set_system_setting
+    inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+    if inv_mode == "COMMON_POOL":
+        pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
+        set_system_setting("common_pool_stock", str(pool_stock + qty), user_id=None, cursor=cursor)
 
     conn.commit()
 

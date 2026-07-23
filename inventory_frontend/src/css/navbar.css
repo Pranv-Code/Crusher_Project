@@ -1,67 +1,57 @@
-.navbar{
-
-    height:70px;
-
-    background:white;
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    padding:0 30px;
-
-    box-shadow:0 2px 10px rgba(0,0,0,.08);
-
+.navbar {
+    height: 70px;
+    background: #FAF8F5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 30px;
+    border-bottom: 1px solid #E8E2D9;
+    box-shadow: 0 2px 8px rgba(44, 38, 35, 0.04);
 }
 
-.navbar h2{
-
-    color:#1e293b;
-
+.navbar h2 {
+    color: #2C2623;
 }
 
-.navbar span{
-
-    color:#64748b;
-
+.navbar span {
+    color: #786F66;
 }
+
 /* Container positioning for the navbar alignment */
 .nav-logo {
     display: flex;
     flex-direction: column;
     justify-content: center;
     cursor: pointer;
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; /* Modern, clean tech fonts */
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 /* Main Brand Header */
 .nav-logo h2 {
     margin: 0;
     padding: 0;
-    font-size: 1.15rem;          /* Crisp, professional size for a nav bar */
-    font-weight: 700;           /* Bold and dominant */
-    color: #2051a0;
-    letter-spacing: 1.5px;      /* Gives it a premium, spaced-out look */
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #B45309;
+    letter-spacing: 1.5px;
     line-height: 1.2;
 }
 
 /* Sub-branding / Tagline */
 .nav-logo p {
-    margin: 2px 0 0 0;          /* Tiny gap below the main heading */
+    margin: 2px 0 0 0;
     padding: 0;
-    font-size: 0.65rem;         /* Small, elegant tag size */
-    font-weight: 500;
-    color: #94a3b8;             /* Subtle slate-blue/gray color so it doesn't fight the main title */
-    letter-spacing: 3px;        /* High letter-spacing makes small text look intentional and high-end */
-    text-transform: uppercase;   /* Ensures it stays perfectly capitalized */
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #786F66;
+    letter-spacing: 3px;
+    text-transform: uppercase;
     opacity: 0.85;
 }
 
-/* Optional: Subtle hover effect if it's acting as a link home */
+/* Optional: Subtle hover effect */
 .nav-logo:hover h2 {
-    color: #38bdf8;             /* Changes to a soft electric blue on hover */
+    color: #D97706;
     transition: color 0.2s ease;
 }
 

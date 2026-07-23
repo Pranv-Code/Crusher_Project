@@ -5,9 +5,11 @@ import {
     PieChart, Pie, Cell, LineChart, Line,
 } from "recharts";
 import * as XLSX from "xlsx";
+import { exportToFormattedExcel } from "../../utils/excelGenerator";
 import { useAuth } from "../../context/AuthContext";
 import { generateProductionReportPdf } from "../../utils/pdfGenerator";
 import { requestReportPrint } from "../../services/approvalApi";
+import { formatDate, formatInr } from "../../utils/formatUtils";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777", "#d97706", "#059669"];
 
@@ -129,10 +131,11 @@ export default function ProductionReport({ productions, products }) {
 
     const handleExport = () => {
         const productName = products.find(p => String(p.product_id) === productFilter)?.product_name || "All";
-        const label = `Production Report (Excel) | Filters: Product: ${productName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
+        const label = `Production Report (Excel) | Unit: ${pdfUnit} | Filters: Product: ${productName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
         const requestData = {
             report_type: "production",
             format: "excel",
+            pdf_unit: pdfUnit,
             filters: {
                 dateFrom,
                 dateTo,
@@ -148,14 +151,27 @@ export default function ProductionReport({ productions, products }) {
             return;
         }
 
+        const multiplier = pdfUnit === "brass" ? 4.2 : 1.0;
+        const qtyHeader = pdfUnit === "brass" ? "Quantity (Brass)" : "Quantity (Tons)";
+        const unitLabel = pdfUnit === "brass" ? "brass" : "Tons";
+
+        const subtitle = `Unit: ${pdfUnit.toUpperCase()} | Product: ${productName} | Date: ${dateFrom || "Start"} to ${dateTo || "End"} | Month: ${monthFilter || "All"}${searchQuery ? ` | Search: "${searchQuery}"` : ""}`;
+
         const rows = filtered.map(r => ({
-            "Date": r.production_date,
+            "Date": formatDate(r.production_date),
             "Product": r.product_name,
-            "Quantity (Tons)": fmtTons(r.quantity_tons),
-            "Unit": r.unit,
-            "Production Cost": r.production_cost,
+            [qtyHeader]: Number((Number(r.quantity_tons || 0) * multiplier).toFixed(2)),
+            "Unit": unitLabel,
+            "Production Cost (₹)": Number(r.production_cost || 0),
         }));
-        exportToExcel(rows, "production_report.xlsx");
+
+        exportToFormattedExcel({
+            title: `Production Report (${pdfUnit.toUpperCase()})`,
+            subtitle,
+            sheetName: "Production Report",
+            rows,
+            fileName: "production_report.xlsx"
+        });
     };
 
     const handlePdfExport = () => {
@@ -319,30 +335,32 @@ export default function ProductionReport({ productions, products }) {
                         <span className="report-count">{filtered.length} records</span>
                     </div>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                        <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+                            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>Unit:</span>
+                            <select
+                                value={pdfUnit}
+                                onChange={(e) => setPdfUnit(e.target.value)}
+                                style={{
+                                    padding: "0.4rem 0.6rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #cbd5e1",
+                                    fontSize: "0.85rem",
+                                    backgroundColor: "white",
+                                    cursor: "pointer",
+                                    height: "36px",
+                                    fontWeight: 600,
+                                    boxSizing: "border-box"
+                                }}
+                            >
+                                <option value="tons">Metric Ton (MT)</option>
+                                <option value="brass">Brass (B)</option>
+                            </select>
+                        </div>
                         <button className="export-btn" onClick={handleExport}>⬇ Export to Excel</button>
                         {(isManager || isClerk) && (
-                            <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-                                <select
-                                    value={pdfUnit}
-                                    onChange={(e) => setPdfUnit(e.target.value)}
-                                    style={{
-                                        padding: "0.5rem",
-                                        borderRadius: "6px",
-                                        border: "1px solid #cbd5e1",
-                                        fontSize: "0.85rem",
-                                        backgroundColor: "white",
-                                        cursor: "pointer",
-                                        height: "36px",
-                                        boxSizing: "border-box"
-                                    }}
-                                >
-                                    <option value="tons"> Metric Ton  (T)</option>
-                                    <option value="brass">Brass (B)</option>
-                                </select>
-                                <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
-                                    PDF Generate
-                                </button>
-                            </div>
+                            <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
+                                PDF Generate
+                            </button>
                         )}
                     </div>
                 </div>
@@ -357,7 +375,7 @@ export default function ProductionReport({ productions, products }) {
                                     <th>Date</th>
                                     <th>Product</th>
                                     <th>Quantity</th>
-                                    <th>Production Cost</th>
+                                    <th>Production Cost (₹)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -370,7 +388,7 @@ export default function ProductionReport({ productions, products }) {
                                                 <td style={{ color: "#9ca3af", fontSize: 12 }}>
                                                     {(currentPage - 1) * pageSize + i + 1}
                                                 </td>
-                                                <td>{r.production_date}</td>
+                                                <td>{formatDate(r.production_date)}</td>
                                                 <td><strong>{r.product_name}</strong></td>
                                                 <td>
                                                     <div style={{ lineHeight: 1.4 }}>
@@ -381,7 +399,7 @@ export default function ProductionReport({ productions, products }) {
                                                         </span>
                                                     </div>
                                                 </td>
-                                                <td>₹{parseFloat(r.production_cost || 0).toLocaleString("en-IN")}</td>
+                                                <td>{r.production_cost ? `₹${formatInr(r.production_cost)}` : "—"}</td>
                                             </tr>
                                         );
                                     })}

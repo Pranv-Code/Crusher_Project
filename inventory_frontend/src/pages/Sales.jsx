@@ -16,6 +16,7 @@ import InputField from "../components/common/InputField";
 import SelectField from "../components/common/SelectField";
 import EditModal from "../components/modal/EditModal";
 import Pagination from "../components/common/Pagination";
+import { formatDate, formatTime, formatInr } from "../utils/formatUtils";
 
 // ─── Helper: format a quantity cell with dual-unit display ───────────────────
 const QtyCell = ({ displayQty, displayUnit, convertedQty, convertedUnit }) => (
@@ -561,7 +562,7 @@ const Sales = () => {
 
                                 {/* Price */}
                                 <div className="form-group">
-                                    <label>Price</label>
+                                    <label>Price (₹)</label>
                                     <input
                                         type="number"
                                         value={newSale.price}
@@ -679,7 +680,7 @@ const Sales = () => {
                                             <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.85em" }}>Quantity</th>
                                             <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.85em" }}>Unit</th>
                                             <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.85em" }}>Loading Time</th>
-                                            <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.85em" }}>Price (Opt)</th>
+                                            <th style={{ padding: "0.75rem 1rem", textAlign: "left", fontSize: "0.85em" }}>Price (₹) (Opt)</th>
                                             <th style={{ padding: "0.75rem 1rem", textAlign: "center", fontSize: "0.85em" }}>Action</th>
                                         </tr>
                                     </thead>
@@ -834,7 +835,7 @@ const Sales = () => {
                                 .map((sale) => (
                                     <tr key={sale.sales_id}>
                                         <td>{sale.sales_id}</td>
-                                        <td>{sale.sales_date}</td>
+                                        <td>{formatDate(sale.sales_date)}</td>
                                         <td>{sale.party_name}</td>
                                         <td>{sale.site || "—"}</td>
                                         <td>
@@ -852,7 +853,7 @@ const Sales = () => {
                                                 convertedUnit={sale.converted_unit.toLowerCase()==="tons"?"MT":"Brass"}
                                             />
                                         </td>
-                                        <td>{sale.loading_time || "—"}</td>
+                                        <td>{formatTime(sale.loading_time)}</td>
                                         <td>{getPendingSince(sale.sales_date, sale.loading_time)}</td>
                                         <td>
                                             <span style={{
@@ -911,7 +912,7 @@ const Sales = () => {
                             <th>Vehicle</th>
                             <th>Quantity</th>
                             <th>Site</th>
-                            <th>Price</th>
+                            <th>Price (₹)</th>
                             <th>Loading</th>
                             <th>Unloading</th>
                             <th>Remarks</th>
@@ -930,7 +931,7 @@ const Sales = () => {
                                 .slice((completedPage - 1) * completedPageSize, completedPage * completedPageSize)
                                 .map((sale) => (
                                     <tr key={sale.sales_id}>
-                                        <td>{sale.sales_date}</td>
+                                        <td>{formatDate(sale.sales_date)}</td>
                                         <td>{sale.party_name}</td>
                                         <td>{sale.product_name}</td>
                                         <td>
@@ -948,9 +949,9 @@ const Sales = () => {
                                             />
                                         </td>
                                         <td>{sale.site || "—"}</td>
-                                        <td>{sale.price}</td>
-                                        <td>{sale.loading_time || "—"}</td>
-                                        <td>{sale.unloading_time || "—"}</td>
+                                        <td>{sale.price ? `₹${formatInr(sale.price)}` : "—"}</td>
+                                        <td>{formatTime(sale.loading_time)}</td>
+                                        <td>{formatTime(sale.unloading_time)}</td>
                                         <td>{sale.remarks || "—"}</td>
                                         <td>
                                             <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
@@ -1073,7 +1074,7 @@ const Sales = () => {
                 />
 
                 <InputField
-                    label="Price"
+                    label="Price (₹)"
                     type="number"
                     value={editData.price || ""}
                     onChange={(e) =>

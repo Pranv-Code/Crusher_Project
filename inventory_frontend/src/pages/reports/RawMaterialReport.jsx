@@ -8,6 +8,7 @@ import * as XLSX from "xlsx";
 import { useAuth } from "../../context/AuthContext";
 import { generateRawMaterialReportPdf } from "../../utils/pdfGenerator";
 import { requestReportPrint } from "../../services/approvalApi";
+import { formatDate, formatTime } from "../../utils/formatUtils";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777", "#d97706", "#059669"];
 
@@ -19,73 +20,9 @@ const monthLabel = (dateStr) => {
     return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
 };
 
-import ExcelJS from "exceljs";
-import { saveAs } from "file-saver";
+import { exportToFormattedExcel } from "../../utils/excelGenerator";
 
-export const exportToExcel = async (rows, fileName) => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Report");
 
-    // Add header
-    worksheet.columns = Object.keys(rows[0]).map((key) => ({
-        header: key,
-        key,
-        width: Math.max(key.length + 5, 18),
-    }));
-
-    // Add data
-    rows.forEach((row) => worksheet.addRow(row));
-
-    // Header formatting
-    const headerRow = worksheet.getRow(1);
-    headerRow.font = {
-        bold: true,
-        color: { argb: "FFFFFFFF" },
-    };
-    headerRow.alignment = {
-        horizontal: "center",
-        vertical: "middle",
-    };
-    headerRow.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF4472C4" }, // Blue
-    };
-
-    // Format all cells
-    worksheet.eachRow((row, rowNumber) => {
-        row.eachCell((cell) => {
-            cell.border = {
-                top: { style: "thin" },
-                left: { style: "thin" },
-                bottom: { style: "thin" },
-                right: { style: "thin" },
-            };
-
-            cell.alignment = {
-                vertical: "middle",
-                horizontal: rowNumber === 1 ? "center" : "left",
-            };
-        });
-    });
-
-    // Auto filter
-    worksheet.autoFilter = {
-        from: "A1",
-        to: `${String.fromCharCode(64 + worksheet.columnCount)}1`,
-    };
-
-    // Freeze header
-    worksheet.views = [{ state: "frozen", ySplit: 1 }];
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(
-        new Blob([buffer], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        }),
-        fileName
-    );
-};
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
@@ -200,10 +137,11 @@ export default function RawMaterialReport({ activities, vehicles }) {
     }, [filtered]);
 
     const handleExport = () => {
-        const label = `Raw Material Report (Excel) | Filters: Vehicle: ${vehicleFilter || "All"}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
+        const label = `Raw Material Report (Excel) | Unit: ${pdfUnit} | Filters: Vehicle: ${vehicleFilter || "All"}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
         const requestData = {
             report_type: "raw",
             format: "excel",
+            pdf_unit: pdfUnit,
             filters: {
                 dateFrom,
                 dateTo,
@@ -219,21 +157,33 @@ export default function RawMaterialReport({ activities, vehicles }) {
             return;
         }
 
+        const multiplier = pdfUnit === "brass" ? 4.2 : 1.0;
+        const totalHeader = pdfUnit === "brass" ? "Total Weight (Brass)" : "Total Weight (MT)";
+        const vehHeader   = pdfUnit === "brass" ? "Vehicle Weight (Brass)" : "Vehicle Weight (MT)";
+        const netHeader   = pdfUnit === "brass" ? "Net Weight (Brass)" : "Net Weight (MT)";
+
+        const subtitle = `Unit: ${pdfUnit.toUpperCase()} | Vehicle: ${vehicleFilter || "All"} | Date: ${dateFrom || "Start"} to ${dateTo || "End"} | Month: ${monthFilter || "All"}${searchQuery ? ` | Search: "${searchQuery}"` : ""}`;
+
         const rows = filtered.map(r => ({
-            "Date": r.activity_date,
+            "Date": formatDate(r.activity_date),
             "Vehicle": r.vehicle_number,
             "Site": r.site || "",
-            "Arrival Time": r.arrival_time || "",
-            "Loading Start": r.loading_start_time || "",
-            "Unloading End": r.unloading_end_time || "",
+            "Arrival Time": formatTime(r.arrival_time),
+            "Loading Start": formatTime(r.loading_start_time),
+            "Unloading End": formatTime(r.unloading_end_time),
             "Turnaround Time": r.turnaround_time || "",
-            "Total Weight (MT)": fmtNum(r.total_weight),
-            "Vehicle Weight (MT)": fmtNum(r.vehicle_weight),
-            "Net Weight (MT)": fmtNum(r.net_weight),
+            [totalHeader]: Number((Number(r.total_weight || 0) * multiplier).toFixed(2)),
+            [vehHeader]:   Number((Number(r.vehicle_weight || 0) * multiplier).toFixed(2)),
+            [netHeader]:   Number((Number(r.net_weight || 0) * multiplier).toFixed(2)),
         }));
-        exportToExcel(rows, "raw_material_report.xlsx");
 
-
+        exportToFormattedExcel({
+            title: `Raw Material Report (${pdfUnit.toUpperCase()})`,
+            subtitle,
+            sheetName: "Raw Material Report",
+            rows,
+            fileName: "raw_material_report.xlsx"
+        });
     };
 
     const handlePdfExport = () => {
@@ -412,30 +362,32 @@ export default function RawMaterialReport({ activities, vehicles }) {
                         <span className="report-count">{filtered.length} records</span>
                     </div>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                        <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+                            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>Unit:</span>
+                            <select
+                                value={pdfUnit}
+                                onChange={(e) => setPdfUnit(e.target.value)}
+                                style={{
+                                    padding: "0.4rem 0.6rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #cbd5e1",
+                                    fontSize: "0.85rem",
+                                    backgroundColor: "white",
+                                    cursor: "pointer",
+                                    height: "36px",
+                                    fontWeight: 600,
+                                    boxSizing: "border-box"
+                                }}
+                            >
+                                <option value="tons">Metric Ton (MT)</option>
+                                <option value="brass">Brass (B)</option>
+                            </select>
+                        </div>
                         <button className="export-btn" onClick={handleExport}>⬇ Export to Excel</button>
                         {(isManager || isClerk) && (
-                            <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-                                <select
-                                    value={pdfUnit}
-                                    onChange={(e) => setPdfUnit(e.target.value)}
-                                    style={{
-                                        padding: "0.5rem",
-                                        borderRadius: "6px",
-                                        border: "1px solid #cbd5e1",
-                                        fontSize: "0.85rem",
-                                        backgroundColor: "white",
-                                        cursor: "pointer",
-                                        height: "36px",
-                                        boxSizing: "border-box"
-                                    }}
-                                >
-                                    <option value="tons">Metric Ton (MT)</option>
-                                    <option value="brass">Brass (B)</option>
-                                </select>
-                                <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
-                                    PDF Generate
-                                </button>
-                            </div>
+                            <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
+                                PDF Generate
+                            </button>
                         )}
                     </div>
                 </div>
@@ -467,12 +419,12 @@ export default function RawMaterialReport({ activities, vehicles }) {
                                             <td style={{ color: "#9ca3af", fontSize: 12 }}>
                                                 {(currentPage - 1) * pageSize + i + 1}
                                             </td>
-                                            <td>{r.activity_date}</td>
+                                            <td>{formatDate(r.activity_date)}</td>
                                             <td><strong>{r.vehicle_number}</strong></td>
                                             <td>{r.site || "—"}</td>
-                                            <td>{r.arrival_time}</td>
-                                            <td>{r.loading_start_time}</td>
-                                            <td>{r.unloading_end_time}</td>
+                                            <td>{formatTime(r.arrival_time)}</td>
+                                            <td>{formatTime(r.loading_start_time)}</td>
+                                            <td>{formatTime(r.unloading_end_time)}</td>
                                             <td>{r.turnaround_time}</td>
                                             <td>{fmtNum(r.total_weight)}</td>
                                             <td style={{ color: "#6b7280" }}>{fmtNum(r.vehicle_weight)}</td>

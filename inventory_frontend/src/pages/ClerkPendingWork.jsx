@@ -5,6 +5,7 @@ import Pagination from "../components/common/Pagination";
 import { addVehicle } from "../services/vehicleApi";
 import { addParty } from "../services/partyApi";
 import * as XLSX from "xlsx";
+import { exportToFormattedExcel } from "../utils/excelGenerator";
 import { getSales } from "../services/salesApi";
 import { getParties } from "../services/partyApi";
 import { getProduction } from "../services/productionApi";
@@ -17,8 +18,11 @@ import {
     generatePartyReportPdf,
     generateRawMaterialReportPdf
 } from "../utils/pdfGenerator";
+import { formatDate, formatTime, formatInr } from "../utils/formatUtils";
+import ApprovalChangeDetails from "../components/common/ApprovalChangeDetails";
 
 export default function ClerkPendingWork() {
+    const [selectedRequest, setSelectedRequest] = useState(null);
     const capitalizeWords = (str) => {
         if (!str) return "";
         return str
@@ -56,13 +60,6 @@ export default function ClerkPendingWork() {
         try {
             const { report_type, format, filters: f, pdf_unit } = req.reference_data;
             
-            const exportToExcelLocal = (rows, filename, sheetName) => {
-                const ws = XLSX.utils.json_to_sheet(rows);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                XLSX.writeFile(wb, filename);
-            };
-
             if (report_type === "sales") {
                 const salesRes = await getSales();
                 const salesData = salesRes.data?.sales || salesRes.data || [];
@@ -88,22 +85,37 @@ export default function ClerkPendingWork() {
                     return true;
                 });
 
+                const unit = pdf_unit || "tons";
+                const multiplier = unit === "brass" ? 4.2 : 1.0;
+
                 if (format === "excel") {
+                    const partiesRes = await getParties();
+                    const partiesList = partiesRes.data || [];
+                    const partyName = partiesList.find(p => String(p.party_id) === f.partyFilter)?.party_name || "All";
+                    const qtyHeader = unit === "brass" ? "Quantity (Brass)" : "Quantity (MT)";
+                    const unitLabel = unit === "brass" ? "brass" : "MT";
+                    const subtitle = `Unit: ${unit.toUpperCase()} | Party: ${partyName} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"} | Vehicle: ${f.vehicleFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
                     const rows = filtered.map(s => ({
-                        "Date":           s.sales_date,
+                        "Date":           formatDate(s.sales_date),
                         "Party":          s.party_name,
                         "Product":        s.product_name,
                         "Vehicle":        s.vehicle_number || "",
                         "Vehicle Owner":  s.vehicle_owner || "",
-                        "Quantity (Tons)": s.quantity_tons ? Number(s.quantity_tons).toFixed(2) : "0.00",
-                        "Unit":           s.unit,
+                        [qtyHeader]:      Number((Number(s.quantity_tons || 0) * multiplier).toFixed(2)),
+                        "Unit":           unitLabel,
                         "Site":           s.site || "",
-                        "Price":          s.price || "",
-                        "Loading Time":   s.loading_time || "",
-                        "Unloading Time": s.unloading_time || "",
+                        "Price (₹)":      Number(s.price || 0),
+                        "Loading Time":   formatTime(s.loading_time),
+                        "Unloading Time": formatTime(s.unloading_time),
                         "Remarks":        s.remarks || "",
                     }));
-                    exportToExcelLocal(rows, "sales_report.xlsx", "Sales Report");
+                    await exportToFormattedExcel({
+                        title: `Sales Report (${unit.toUpperCase()})`,
+                        subtitle,
+                        sheetName: "Sales Report",
+                        rows,
+                        fileName: "sales_report.xlsx"
+                    });
                 } else {
                     const partiesRes = await getParties();
                     const partiesList = partiesRes.data || [];
@@ -135,15 +147,30 @@ export default function ClerkPendingWork() {
                     return true;
                 });
 
+                const unit = pdf_unit || "tons";
+                const multiplier = unit === "brass" ? 4.2 : 1.0;
+
                 if (format === "excel") {
+                    const productsRes = await getProducts();
+                    const productsList = productsRes.data || [];
+                    const productName = productsList.find(p => String(p.product_id) === f.productFilter)?.product_name || "All";
+                    const qtyHeader = unit === "brass" ? "Quantity (Brass)" : "Quantity (Tons)";
+                    const unitLabel = unit === "brass" ? "brass" : "Tons";
+                    const subtitle = `Unit: ${unit.toUpperCase()} | Product: ${productName} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
                     const rows = filtered.map(r => ({
-                        "Date":            r.production_date,
+                        "Date":            formatDate(r.production_date),
                         "Product":         r.product_name,
-                        "Quantity (Tons)": r.quantity_tons ? Number(r.quantity_tons).toFixed(2) : "0.00",
-                        "Unit":            r.unit,
-                        "Production Cost": r.production_cost,
+                        [qtyHeader]:       Number((Number(r.quantity_tons || 0) * multiplier).toFixed(2)),
+                        "Unit":            unitLabel,
+                        "Production Cost (₹)": Number(r.production_cost || 0),
                     }));
-                    exportToExcelLocal(rows, "production_report.xlsx", "Production Report");
+                    await exportToFormattedExcel({
+                        title: `Production Report (${unit.toUpperCase()})`,
+                        subtitle,
+                        sheetName: "Production Report",
+                        rows,
+                        fileName: "production_report.xlsx"
+                    });
                 } else {
                     const productsRes = await getProducts();
                     const productsList = productsRes.data || [];
@@ -158,19 +185,32 @@ export default function ClerkPendingWork() {
             } else if (report_type === "party") {
                 const partyRes = await getPartyReport(f.party_id);
                 const partyData = partyRes.data;
+                const unit = pdf_unit || "tons";
+                const multiplier = unit === "brass" ? 4.2 : 1.0;
+
                 if (format === "excel") {
+                    const partyName = partyData.party.party_name;
+                    const qtyHeader = unit === "brass" ? "Quantity (Brass)" : "Quantity (Tons)";
+                    const unitLabel = unit === "brass" ? "brass" : "Tons";
+                    const subtitle = `Unit: ${unit.toUpperCase()} | Party Statement: ${partyName}${partyData.party.gst_no ? ` | GSTIN: ${partyData.party.gst_no}` : ""}`;
                     const rows = partyData.sales.map(s => ({
-                        "Date":           s.sales_date,
+                        "Date":           formatDate(s.sales_date),
                         "Product":        s.product_name,
                         "Vehicle":        s.vehicle_number || "",
                         "Vehicle Owner":  s.vehicle_owner || "",
-                        "Quantity (Tons)": s.quantity_tons ? Number(s.quantity_tons).toFixed(2) : "0.00",
-                        "Unit":           s.unit,
+                        [qtyHeader]:      Number((Number(s.quantity_tons || 0) * multiplier).toFixed(2)),
+                        "Unit":           unitLabel,
                         "Site":           s.site || "",
-                        "Price":          s.price || "",
+                        "Price (₹)":      Number(s.price || 0),
                         "Remarks":        s.remarks || "",
                     }));
-                    exportToExcelLocal(rows, `party_${partyData.party.party_name.replace(/\s/g,"_")}_report.xlsx`, "Party Report");
+                    await exportToFormattedExcel({
+                        title: `PARTY STATEMENT - ${partyName} (${unit.toUpperCase()})`,
+                        subtitle,
+                        sheetName: "Party Statement",
+                        rows,
+                        fileName: `party_${partyName.replace(/\s/g,"_")}_report.xlsx`
+                    });
                 } else {
                     generatePartyReportPdf(partyData, pdf_unit);
                 }
@@ -194,20 +234,33 @@ export default function ClerkPendingWork() {
                     return true;
                 });
 
+                const unit = pdf_unit || "tons";
+                const multiplier = unit === "brass" ? 4.2 : 1.0;
+
                 if (format === "excel") {
+                    const totalHeader = unit === "brass" ? "Total Weight (Brass)" : "Total Weight (MT)";
+                    const vehHeader   = unit === "brass" ? "Vehicle Weight (Brass)" : "Vehicle Weight (MT)";
+                    const netHeader   = unit === "brass" ? "Net Weight (Brass)" : "Net Weight (MT)";
+                    const subtitle = `Unit: ${unit.toUpperCase()} | Vehicle: ${f.vehicleFilter || "All"} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
                     const rows = filtered.map(r => ({
-                        "Date":                r.activity_date,
+                        "Date":                formatDate(r.activity_date),
                         "Vehicle":             r.vehicle_number,
                         "Site":                r.site || "",
-                        "Arrival Time":        r.arrival_time || "",
-                        "Loading Start":       r.loading_start_time || "",
-                        "Unloading End":       r.unloading_end_time || "",
+                        "Arrival Time":        formatTime(r.arrival_time),
+                        "Loading Start":       formatTime(r.loading_start_time),
+                        "Unloading End":       formatTime(r.unloading_end_time),
                         "Turnaround Time":     r.turnaround_time || "",
-                        "Total Weight (T)":    r.total_weight ? Number(r.total_weight).toFixed(2) : "0.00",
-                        "Vehicle Weight (T)":  r.vehicle_weight ? Number(r.vehicle_weight).toFixed(2) : "0.00",
-                        "Net Weight (T)":      r.net_weight ? Number(r.net_weight).toFixed(2) : "0.00",
+                        [totalHeader]:         Number((Number(r.total_weight || 0) * multiplier).toFixed(2)),
+                        [vehHeader]:           Number((Number(r.vehicle_weight || 0) * multiplier).toFixed(2)),
+                        [netHeader]:           Number((Number(r.net_weight || 0) * multiplier).toFixed(2)),
                     }));
-                    exportToExcelLocal(rows, "raw_material_report.xlsx", "Raw Material Report");
+                    await exportToFormattedExcel({
+                        title: `Raw Material Report (${unit.toUpperCase()})`,
+                        subtitle,
+                        sheetName: "Raw Material Report",
+                        rows,
+                        fileName: "raw_material_report.xlsx"
+                    });
                 } else {
                     generateRawMaterialReportPdf(filtered, {
                         dateFrom: f.dateFrom,
@@ -403,20 +456,33 @@ export default function ClerkPendingWork() {
                                             {req.remark || "—"}
                                         </td>
                                         <td>
-                                            {req.request_type === "report_print" && req.status === "approved" && (
+                                            <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
                                                 <button
                                                     className="primary-btn"
                                                     style={{
                                                         padding: "0.25rem 0.5rem",
-                                                        fontSize: "0.8rem",
-                                                        backgroundColor: downloadingId === req.request_id ? "#9ca3af" : "#10b981"
+                                                        fontSize: "0.78rem",
+                                                        backgroundColor: "#2563eb"
                                                     }}
-                                                    onClick={() => handleDownloadReport(req)}
-                                                    disabled={downloadingId === req.request_id}
+                                                    onClick={() => setSelectedRequest(req)}
                                                 >
-                                                    {downloadingId === req.request_id ? "Generating..." : "⬇ Download"}
+                                                    🔍 View Details
                                                 </button>
-                                            )}
+                                                {req.request_type === "report_print" && req.status === "approved" && (
+                                                    <button
+                                                        className="primary-btn"
+                                                        style={{
+                                                            padding: "0.25rem 0.5rem",
+                                                            fontSize: "0.78rem",
+                                                            backgroundColor: downloadingId === req.request_id ? "#9ca3af" : "#10b981"
+                                                        }}
+                                                        onClick={() => handleDownloadReport(req)}
+                                                        disabled={downloadingId === req.request_id}
+                                                    >
+                                                        {downloadingId === req.request_id ? "Generating..." : "⬇ Download"}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -434,6 +500,45 @@ export default function ClerkPendingWork() {
                     />
                 )}
             </div>
+
+            {/* Detailed Changes Modal for Clerks */}
+            {selectedRequest && (
+                <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
+                    justifyContent: "center", alignItems: "center", zIndex: 1000
+                }}>
+                    <div style={{
+                        background: "white", padding: "2rem", borderRadius: "12px",
+                        width: "90%", maxWidth: "650px", maxHeight: "90vh", overflowY: "auto",
+                        boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
+                    }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                            <h2 style={{ margin: 0, color: "#1f2937", fontSize: "1.2rem" }}>
+                                Requested Changes Details
+                            </h2>
+                            <button 
+                                onClick={() => setSelectedRequest(null)}
+                                style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer" }}
+                            >
+                                ✖
+                            </button>
+                        </div>
+
+                        <ApprovalChangeDetails request={selectedRequest} />
+
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1.5rem" }}>
+                            <button
+                                className="primary-btn"
+                                style={{ backgroundColor: "#6b7280", color: "white", border: "none" }}
+                                onClick={() => setSelectedRequest(null)}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Request Vehicle Modal */}
             {showRequestModal && (
