@@ -41,7 +41,7 @@ export default function Users() {
         fetchUsers();
 
         const interval = setInterval(() => {
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem("token") || localStorage.getItem("token");
             if (!token) return;
             getUsers()
                 .then((res) => setUsers(res.data))

@@ -29,7 +29,7 @@ def get_party_report(party_id):
             SELECT
                 s.sales_id,
                 s.sales_date,
-                p.product_name,
+                COALESCE(p.product_name, 'Common Pool') AS product_name,
                 s.vehicle_number,
                 v.owner          AS vehicle_owner,
                 s.quantity_tons,
@@ -40,7 +40,7 @@ def get_party_report(party_id):
                 s.unloading_time,
                 s.remarks
             FROM Sales s
-            JOIN Product p  ON s.product_id  = p.product_id
+            LEFT JOIN Product p  ON s.product_id  = p.product_id
             LEFT JOIN Vehicle v ON s.vehicle_number = v.vehicle_number
             WHERE s.party_id = %s
             ORDER BY s.sales_date DESC, s.sales_id DESC

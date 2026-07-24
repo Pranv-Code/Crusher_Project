@@ -39,7 +39,7 @@ function VehicleSales() {
             .finally(() => setLoading(false));
 
         const interval = setInterval(() => {
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem("token") || localStorage.getItem("token");
             if (!token) return;
             getVehicleSales()
                 .then((res) => setData(res.data))

@@ -16,6 +16,7 @@ import Approvals from "./pages/Approvals";
 import ClerkPendingWork from "./pages/ClerkPendingWork";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
+import AuditLogs from "./pages/AuditLogs";
 
 function AppRoutes() {
     return (
@@ -130,6 +131,14 @@ function AppRoutes() {
                 element={
                     <ProtectedRoute allowedRoles={["Manager"]}>
                         <Settings />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/audit-logs"
+                element={
+                    <ProtectedRoute allowedRoles={["Manager"]}>
+                        <AuditLogs />
                     </ProtectedRoute>
                 }
             />

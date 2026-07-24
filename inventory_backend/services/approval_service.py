@@ -3,6 +3,7 @@ from flask import request, jsonify
 from db import get_connection
 from datetime import datetime
 from utils.unit_converter import unit_convertor
+from services.activity_log_service import log_activity
 
 def clean_time_str(val):
     if val is None or val == "" or str(val).strip() in ("—", "None", "00:00", "00:00:00"):
@@ -137,10 +138,10 @@ def build_change_details(cursor, req):
 
         elif req_type == "production_edit":
             cursor.execute("""
-                SELECT p.production_id, p.production_date, pr.product_name, pr.product_id,
-                       p.quantity_tons, p.unit, p.production_cost
+                SELECT p.production_id, p.production_date, COALESCE(pr.product_name, 'Common Pool') AS product_name, pr.product_id,
+                       p.quantity_tons, p.unit, p.cost_per_unit, p.production_cost
                 FROM Production p
-                JOIN Product pr ON p.product_id = pr.product_id
+                LEFT JOIN Product pr ON p.product_id = pr.product_id
                 WHERE p.production_id = %s
             """, (ref_id,))
             prod = cursor.fetchone()
@@ -511,6 +512,11 @@ def action_approval(request_id, manager_id):
                     else:
                         cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (old["quantity_tons"], old["product_id"]))
                         cursor.execute("UPDATE Product SET quantity_tons = quantity_tons + %s WHERE product_id=%s", (new_qty, ref_data["product_id"]))
+                    cpu = float(ref_data.get("cost_per_unit", 0) or 0)
+                    tc = float(ref_data.get("production_cost", 0) or 0)
+                    if not cpu and float(new_qty) > 0 and tc > 0:
+                        cpu = round(tc / float(new_qty), 2)
+
                     cursor.execute("""
                         UPDATE Production
                         SET
@@ -518,14 +524,16 @@ def action_approval(request_id, manager_id):
                             product_id=%s,
                             unit=%s,
                             quantity_tons=%s,
+                            cost_per_unit=%s,
                             production_cost=%s
                         WHERE production_id=%s
                     """, (
                         ref_data["production_date"],
-                        ref_data["product_id"],
+                        ref_data.get("product_id"),
                         ref_data["unit"],
                         new_qty,
-                        ref_data["production_cost"],
+                        cpu,
+                        tc,
                         prod_id
                     ))
 
@@ -545,6 +553,16 @@ def action_approval(request_id, manager_id):
                     cursor.execute("DELETE FROM Production WHERE production_id=%s", (prod_id,))
         elif req["request_type"] == "report_print":
             pass
+
+        cursor.execute("SELECT name, username, role FROM Users WHERE user_id = %s", (manager_id,))
+        mgr = cursor.fetchone()
+        mgr_name = mgr["name"] if mgr else "Manager"
+        mgr_uname = mgr["username"] if mgr else "manager"
+        action_name = "APPROVE" if status == "approved" else "REJECT"
+        log_desc = f"Manager '{mgr_name}' {status} Request #{request_id} ({req['request_type']})"
+        if status == "rejected" and remark:
+            log_desc += f" — Remark: {remark}"
+        log_activity(manager_id, mgr_uname, "Manager", action_name, "Approvals", log_desc)
 
         conn.commit()
         return jsonify({"message": f"Request has been {status} successfully."}), 200

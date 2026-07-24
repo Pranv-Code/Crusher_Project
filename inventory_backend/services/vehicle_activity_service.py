@@ -1,5 +1,6 @@
 from flask import jsonify, request
 from db import get_connection
+from services.activity_log_service import log_activity
 
 def capitalize_words(s):
     if not s:
@@ -35,9 +36,14 @@ def add_vehicle_activity():
 
         vehicle = cursor.fetchone()
         if not vehicle:
-            return jsonify({
-                "message": "Vehicle not found"
-            }), 404
+            return jsonify({"message": "Vehicle not found"}), 404
+
+        cursor.execute("""
+            SELECT activity_id FROM Vehicle_Activity
+            WHERE activity_date = %s AND vehicle_number = %s AND ABS(total_weight - %s) < 0.001 AND ABS(vehicle_weight - %s) < 0.001
+        """, (data["activity_date"], data["vehicle_number"], float(data["total_weight"]), float(data["vehicle_weight"])))
+        if cursor.fetchone():
+            return jsonify({"message": "Duplicate Entry Detected: A raw material record with the exact same date, vehicle, and weights already exists."}), 400
 
         cursor.execute("""
             INSERT INTO Vehicle_Activity
@@ -66,6 +72,18 @@ def add_vehicle_activity():
             data["net_weight"],
             capitalize_words(data.get("site", ""))
         ))
+
+        act_id = cursor.lastrowid
+        from services.activity_log_service import log_activity
+        u = getattr(request, "user", {}) or {}
+        log_activity(
+            u.get("user_id"),
+            u.get("username", "System"),
+            u.get("role", "User"),
+            "CREATE",
+            "RawMaterial",
+            f"Created Raw Material entry #{act_id} for Vehicle '{data['vehicle_number']}' (Net: {data.get('net_weight')} MT)"
+        )
 
         conn.commit()
         return jsonify({
@@ -174,6 +192,16 @@ def update_vehicle_activity(id):
             id
         ))
 
+        from services.activity_log_service import log_activity
+        u = getattr(request, "user", {}) or {}
+        log_activity(
+            u.get("user_id"),
+            u.get("username", "System"),
+            u.get("role", "User"),
+            "EDIT",
+            "RawMaterial",
+            f"Updated Raw Material entry #{id} for Vehicle '{data.get('vehicle_number')}'"
+        )
         conn.commit()
         return jsonify({
             "message": "Vehicle Activity Updated Successfully"

@@ -8,14 +8,10 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    margin-left: 250px;
+    margin-left: 215px;
     min-height: 100vh;
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     background: #FDFBF7;
-}
-
-.main-content.sidebar-collapsed {
-    margin-left: 76px;
 }
 
 .page-content {

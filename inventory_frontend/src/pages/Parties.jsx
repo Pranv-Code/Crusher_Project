@@ -24,10 +24,7 @@ import EditModal from "../components/modal/EditModal";
 function Parties() {
     const capitalizeWords = (str) => {
         if (!str) return "";
-        return str
-            .split(/\s+/)
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ");
+        return str.replace(/\b\w/g, (char) => char.toUpperCase());
     };
 
     const { parties, fetchParties } = useInventory();
@@ -64,6 +61,12 @@ function Parties() {
     const handleAddParty = async () => {
         if (!newParty.party_name.trim()) {
             alert("Party Name is required");
+            return;
+        }
+        const cleanName = capitalizeWords(newParty.party_name);
+        const isDup = parties.some(p => p.party_name.trim().toLowerCase() === cleanName.trim().toLowerCase());
+        if (isDup) {
+            alert(`Duplicate Entry Detected: Party with name '${cleanName}' already exists.`);
             return;
         }
         try {
@@ -165,9 +168,6 @@ function Parties() {
                             type="text"
                             value={newParty.party_name}
                             onChange={(e) =>
-                                setNewParty({ ...newParty, party_name: e.target.value })
-                            }
-                            onBlur={(e) =>
                                 setNewParty({ ...newParty, party_name: capitalizeWords(e.target.value) })
                             }
                         />
@@ -245,9 +245,6 @@ function Parties() {
                     type="text"
                     value={editData.party_name}
                     onChange={(e) =>
-                        setEditData({ ...editData, party_name: e.target.value })
-                    }
-                    onBlur={(e) =>
                         setEditData({ ...editData, party_name: capitalizeWords(e.target.value) })
                     }
                 />

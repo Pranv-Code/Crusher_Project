@@ -22,7 +22,7 @@ import ActionButtons from "../components/table/ActionButtons";
 
 import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
-import { formatDate, formatTime } from "../utils/formatUtils";
+import { formatDate, formatTime, formatDurationHM } from "../utils/formatUtils";
 
 // Helper utilities for date & weight calculation
 const formatTimeToHM = (timeStr) => {
@@ -34,24 +34,24 @@ const formatTimeToHM = (timeStr) => {
     return timeStr;
 };
 
-const calculateTurnaround = (arrival, unloading) => {
-    if (!arrival || !unloading) return "00:00:00";
+const calculateTurnaround = (loadingStart, unloadingEnd) => {
+    if (!loadingStart || !unloadingEnd) return "00:00:00";
     const getParts = (str) => {
         const parts = str.split(":");
         return [Number(parts[0]) || 0, Number(parts[1]) || 0];
     };
-    const [arrH, arrM] = getParts(arrival);
-    const [unlH, unlM] = getParts(unloading);
+    const [loadH, loadM] = getParts(loadingStart);
+    const [unlH, unlM] = getParts(unloadingEnd);
 
-    let arrMinutes = arrH * 60 + arrM;
+    let loadMinutes = loadH * 60 + loadM;
     let unlMinutes = unlH * 60 + unlM;
 
     // Handle overnight cross-day turnaround
-    if (unlMinutes < arrMinutes) {
+    if (unlMinutes < loadMinutes) {
         unlMinutes += 24 * 60;
     }
 
-    const diffMinutes = unlMinutes - arrMinutes;
+    const diffMinutes = unlMinutes - loadMinutes;
     const h = Math.floor(diffMinutes / 60);
     const m = diffMinutes % 60;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
@@ -60,10 +60,7 @@ const calculateTurnaround = (arrival, unloading) => {
 function RawMaterial() {
     const capitalizeWords = (str) => {
         if (!str) return "";
-        return str
-            .split(/\s+/)
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ");
+        return str.replace(/\b\w/g, (char) => char.toUpperCase());
     };
 
     const { isManager } = useAuth();
@@ -118,16 +115,16 @@ function RawMaterial() {
         ? (Number(newActivity.total_weight) - Number(newActivity.vehicle_weight)).toFixed(2)
         : "";
 
-    const newTurnaround = newActivity.arrival_time && newActivity.unloading_end_time
-        ? formatTimeToHM(calculateTurnaround(newActivity.arrival_time, newActivity.unloading_end_time))
+    const newTurnaround = newActivity.loading_start_time && newActivity.unloading_end_time
+        ? formatDurationHM(calculateTurnaround(newActivity.loading_start_time, newActivity.unloading_end_time))
         : "";
 
     const editNetWeight = editData.total_weight && editData.vehicle_weight
         ? (Number(editData.total_weight) - Number(editData.vehicle_weight)).toFixed(2)
         : "";
 
-    const editTurnaround = editData.arrival_time && editData.unloading_end_time
-        ? formatTimeToHM(calculateTurnaround(editData.arrival_time, editData.unloading_end_time))
+    const editTurnaround = editData.loading_start_time && editData.unloading_end_time
+        ? formatDurationHM(calculateTurnaround(editData.loading_start_time, editData.unloading_end_time))
         : "";
 
     const handleAddActivity = async () => {
@@ -156,7 +153,18 @@ function RawMaterial() {
             return;
         }
 
-        const turnaround_time = calculateTurnaround(newActivity.arrival_time, newActivity.unloading_end_time);
+        const isDup = activities.some(a => 
+            a.activity_date === newActivity.activity_date &&
+            a.vehicle_number === newActivity.vehicle_number &&
+            Math.abs(parseFloat(a.total_weight || 0) - parseFloat(newActivity.total_weight || 0)) < 0.01 &&
+            Math.abs(parseFloat(a.vehicle_weight || 0) - parseFloat(newActivity.vehicle_weight || 0)) < 0.01
+        );
+        if (isDup) {
+            alert("Duplicate Entry Detected: A raw material record with the exact same date, vehicle, and weights already exists.");
+            return;
+        }
+
+        const turnaround_time = calculateTurnaround(newActivity.loading_start_time, newActivity.unloading_end_time);
 
         const payload = {
             ...newActivity,
@@ -225,7 +233,7 @@ function RawMaterial() {
             return;
         }
 
-        const turnaround_time = calculateTurnaround(editData.arrival_time, editData.unloading_end_time);
+        const turnaround_time = calculateTurnaround(editData.loading_start_time, editData.unloading_end_time);
 
         const payload = {
             ...editData,
@@ -286,8 +294,8 @@ function RawMaterial() {
         },
         {
             key: "turnaround_time",
-            label: "Turnaround",
-            render: (row) => formatTimeToHM(row.turnaround_time),
+            label: "Turnaround (hr/min)",
+            render: (row) => formatDurationHM(row.turnaround_time),
         },
         {
             key: "total_weight",
@@ -432,12 +440,6 @@ function RawMaterial() {
                             onChange={(e) =>
                                 setNewActivity({
                                     ...newActivity,
-                                    site: e.target.value,
-                                })
-                            }
-                            onBlur={(e) =>
-                                setNewActivity({
-                                    ...newActivity,
                                     site: capitalizeWords(e.target.value),
                                 })
                             }
@@ -452,7 +454,7 @@ function RawMaterial() {
                         )}
                         {newTurnaround && (
                             <div>
-                                <strong>Calculated Turnaround Time:</strong> {newTurnaround}
+                                <strong>Calculated Turnaround Time (hr/min):</strong> {newTurnaround}
                             </div>
                         )}
                     </div>
@@ -604,12 +606,6 @@ function RawMaterial() {
                     onChange={(e) =>
                         setEditData({
                             ...editData,
-                            site: e.target.value,
-                        })
-                    }
-                    onBlur={(e) =>
-                        setEditData({
-                            ...editData,
                             site: capitalizeWords(e.target.value),
                         })
                     }
@@ -623,7 +619,7 @@ function RawMaterial() {
                     )}
                     {editTurnaround && (
                         <div>
-                            <strong>Calculated Turnaround Time:</strong> {editTurnaround}
+                            <strong>Calculated Turnaround Time (hr/min):</strong> {editTurnaround}
                         </div>
                     )}
                 </div>

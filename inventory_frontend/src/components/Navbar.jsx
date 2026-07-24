@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getApprovals, getMyPendingApprovals } from "../services/approvalApi";
 import "../css/navbar.css";
 
-function Navbar({ onToggleSidebar, isSidebarCollapsed }) {
-    const { user, isManager, isClerk } = useAuth();
+function Navbar() {
+    const { user, logoutUser, isManager, isClerk } = useAuth();
+    const navigate = useNavigate();
     const [showModal, setShowModal] = useState(false);
     const [tons, setTons] = useState("");
     const [brass, setBrass] = useState("");
     const [pendingCount, setPendingCount] = useState(0);
+
+    const handleLogout = () => {
+        logoutUser();
+        navigate("/login");
+    };
 
     const today = new Date().toLocaleDateString();
 
@@ -163,6 +169,17 @@ function Navbar({ onToggleSidebar, isSidebarCollapsed }) {
                     🔄 Unit Converter
                 </button>
                 <span>{today}</span>
+
+                {user && (
+                    <button
+                        className="nav-logout-btn"
+                        onClick={handleLogout}
+                        title="Logout"
+                    >
+                        <span>🚪</span>
+                        <span>Logout</span>
+                    </button>
+                )}
             </div>
 
             {showModal && (

@@ -41,11 +41,14 @@
 
 .actions-column {
     width: 180px;
+    min-width: 170px;
     text-align: center;
+    white-space: nowrap;
 }
 
 .actions-cell {
     text-align: center;
+    white-space: nowrap;
 }
 
 @media (max-width: 768px) {

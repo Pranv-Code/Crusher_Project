@@ -19,7 +19,7 @@ const fmtTons = (v) => Number(v).toFixed(2);
 const monthLabel = (dateStr) => {
     if (!dateStr) return "";
     const [y, m] = dateStr.split("-");
-    return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m)-1]} ${y}`;
+    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
 };
 
 function exportToExcel(rows, filename) {
@@ -33,8 +33,8 @@ function exportToExcel(rows, filename) {
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div style={{ background:"#1e293b", color:"#f8fafc", padding:"10px 14px", borderRadius:8, fontSize:12 }}>
-            <div style={{ fontWeight:700, marginBottom:4 }}>{label}</div>
+        <div style={{ background: "#1e293b", color: "#f8fafc", padding: "10px 14px", borderRadius: 8, fontSize: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
             {payload.map((p, i) => (
                 <div key={i}>{p.name}: <strong>{fmtTons(p.value)} tons</strong></div>
             ))}
@@ -46,13 +46,13 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function SalesReport({ sales, parties, vehicles }) {
     const { isManager, isClerk } = useAuth();
 
-    const [dateFrom, setDateFrom]     = useState("");
-    const [dateTo, setDateTo]         = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
     const [monthFilter, setMonthFilter] = useState("");
     const [partyFilter, setPartyFilter] = useState("");
     const [vehicleFilter, setVehicleFilter] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
-    const [pdfUnit, setPdfUnit] = useState("tons");
+    const [showCharts, setShowCharts] = useState(false);
 
     // --- Pagination States ---
     const [currentPage, setCurrentPage] = useState(1);
@@ -80,16 +80,16 @@ export default function SalesReport({ sales, parties, vehicles }) {
     const filtered = useMemo(() => {
         return sales.filter((s) => {
             if (dateFrom && s.sales_date < dateFrom) return false;
-            if (dateTo   && s.sales_date > dateTo)   return false;
+            if (dateTo && s.sales_date > dateTo) return false;
             if (monthFilter) {
                 const rowMonth = s.sales_date?.slice(0, 7); // "YYYY-MM"
                 if (rowMonth !== monthFilter) return false;
             }
-            if (partyFilter  && String(s.party_id)    !== partyFilter)  return false;
+            if (partyFilter && String(s.party_id) !== partyFilter) return false;
             if (vehicleFilter && s.vehicle_number !== vehicleFilter) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                const match = 
+                const match =
                     s.party_name?.toLowerCase().includes(q) ||
                     s.product_name?.toLowerCase().includes(q) ||
                     s.vehicle_number?.toLowerCase().includes(q) ||
@@ -107,9 +107,9 @@ export default function SalesReport({ sales, parties, vehicles }) {
     }, [filtered.length]);
 
     // ── KPIs ─────────────────────────────────────────────────────────────────
-    const totalTons     = filtered.reduce((s, r) => s + (r.quantity_tons || 0), 0);
+    const totalTons = filtered.reduce((s, r) => s + (r.quantity_tons || 0), 0);
     const uniqueParties = new Set(filtered.map(r => r.party_id)).size;
-    const uniqueVehicles= new Set(filtered.map(r => r.vehicle_number)).size;
+    const uniqueVehicles = new Set(filtered.map(r => r.vehicle_number)).size;
 
     // ── Chart data ────────────────────────────────────────────────────────────
     const byMonth = useMemo(() => {
@@ -151,18 +151,17 @@ export default function SalesReport({ sales, parties, vehicles }) {
             map[r.sales_date] = (map[r.sales_date] || 0) + (r.quantity_tons || 0);
         });
         return Object.entries(map)
-            .sort(([a],[b]) => a.localeCompare(b))
+            .sort(([a], [b]) => a.localeCompare(b))
             .map(([date, tons]) => ({ date, tons: parseFloat(tons.toFixed(2)) }));
     }, [filtered]);
 
     // ── Export ────────────────────────────────────────────────────────────────
     const handleExport = () => {
         const partyName = parties.find(p => String(p.party_id) === partyFilter)?.party_name || "All";
-        const label = `Sales Report (Excel) | Unit: ${pdfUnit} | Filters: Party: ${partyName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Vehicle: ${vehicleFilter || "All"}, Search: ${searchQuery || "None"}`;
+        const label = `Sales Report (Excel) | Filters: Party: ${partyName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Vehicle: ${vehicleFilter || "All"}, Search: ${searchQuery || "None"}`;
         const requestData = {
             report_type: "sales",
             format: "excel",
-            pdf_unit: pdfUnit,
             filters: {
                 dateFrom,
                 dateTo,
@@ -179,29 +178,25 @@ export default function SalesReport({ sales, parties, vehicles }) {
             return;
         }
 
-        const multiplier = pdfUnit === "brass" ? 4.2 : 1.0;
-        const qtyHeader = pdfUnit === "brass" ? "Quantity (Brass)" : "Quantity (MT)";
-        const unitLabel = pdfUnit === "brass" ? "brass" : "MT";
-
-        const subtitle = `Unit: ${pdfUnit.toUpperCase()} | Party: ${partyName} | Date: ${dateFrom || "Start"} to ${dateTo || "End"} | Month: ${monthFilter || "All"} | Vehicle: ${vehicleFilter || "All"}${searchQuery ? ` | Search: "${searchQuery}"` : ""}`;
+        const subtitle = `Party: ${partyName} | Date: ${dateFrom || "Start"} to ${dateTo || "End"} | Month: ${monthFilter || "All"} | Vehicle: ${vehicleFilter || "All"}${searchQuery ? ` | Search: "${searchQuery}"` : ""}`;
 
         const rows = filtered.map(s => ({
-            "Date":           formatDate(s.sales_date),
-            "Party":          s.party_name,
-            "Product":        s.product_name,
-            "Vehicle":        s.vehicle_number || "",
-            "Vehicle Owner":  s.vehicle_owner || "",
-            [qtyHeader]:      Number((Number(s.quantity_tons || 0) * multiplier).toFixed(2)),
-            "Unit":           unitLabel,
-            "Site":           s.site || "",
-            "Price (₹)":      Number(s.price || 0),
-            "Loading Time":   formatTime(s.loading_time),
+            "Date": formatDate(s.sales_date),
+            "Party": s.party_name,
+            "Product": s.product_name,
+            "Vehicle": s.vehicle_number || "",
+            "Vehicle Owner": s.vehicle_owner || "",
+            "Quantity (MT)": Number((Number(s.quantity_tons || 0)).toFixed(2)),
+            "Quantity (Brass)": Number((Number(s.quantity_tons || 0) * 4.2).toFixed(2)),
+            "Site": s.site || "",
+            "Price (₹)": Number(s.price || 0),
+            "Loading Time": formatTime(s.loading_time),
             "Unloading Time": formatTime(s.unloading_time),
-            "Remarks":        s.remarks || "",
+            "Remarks": s.remarks || "",
         }));
 
         exportToFormattedExcel({
-            title: `Sales Report (${pdfUnit.toUpperCase()})`,
+            title: `Sales Report`,
             subtitle,
             sheetName: "Sales Report",
             rows,
@@ -211,11 +206,10 @@ export default function SalesReport({ sales, parties, vehicles }) {
 
     const handlePdfExport = () => {
         const partyName = parties.find(p => String(p.party_id) === partyFilter)?.party_name || "All";
-        const label = `Sales Report (PDF) | Unit: ${pdfUnit} | Filters: Party: ${partyName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Vehicle: ${vehicleFilter || "All"}, Search: ${searchQuery || "None"}`;
+        const label = `Sales Report (PDF) | Filters: Party: ${partyName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Vehicle: ${vehicleFilter || "All"}, Search: ${searchQuery || "None"}`;
         const requestData = {
             report_type: "sales",
             format: "pdf",
-            pdf_unit: pdfUnit,
             filters: {
                 dateFrom,
                 dateTo,
@@ -238,13 +232,12 @@ export default function SalesReport({ sales, parties, vehicles }) {
             month: monthFilter,
             party: partyName,
             vehicle: vehicleFilter
-        }, pdfUnit);
+        });
     };
 
     const resetFilters = () => {
         setDateFrom(""); setDateTo(""); setMonthFilter("");
         setPartyFilter(""); setVehicleFilter(""); setSearchQuery("");
-        setPdfUnit("tons");
     };
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -323,8 +316,44 @@ export default function SalesReport({ sales, parties, vehicles }) {
                 </div>
             </div>
 
-            {/* Charts */}
-            <div className="chart-grid">
+            {/* Collapsible Analytics Graphs */}
+            <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                margin: "18px 0 12px 0",
+                padding: "10px 14px",
+                background: "#f8fafc",
+                borderRadius: "8px",
+                border: "1px solid #e2e8f0"
+            }}>
+                <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: "8px" }}>
+                    📊 Analytics & Visual Charts
+                </span>
+                <button
+                    type="button"
+                    onClick={() => setShowCharts(!showCharts)}
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "6px 14px",
+                        backgroundColor: showCharts ? "#fee2e2" : "#e0f2fe",
+                        color: showCharts ? "#991b1b" : "#0369a1",
+                        border: `1px solid ${showCharts ? "#fca5a5" : "#bae6fd"}`,
+                        borderRadius: "6px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease"
+                    }}
+                >
+                    <span>{showCharts ? "🔼 Hide Graphs" : "📊 Show Graphs"}</span>
+                </button>
+            </div>
+
+            {showCharts && (
+                <div className="chart-grid">
                 {/* Monthly Bar Chart */}
                 <div className="chart-card">
                     <h3>Sales by Month (MT)</h3>
@@ -335,7 +364,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                 <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
                                 <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="tons" fill="#2563eb" radius={[4,4,0,0]} name="Metric Ton" />
+                                <Bar dataKey="tons" fill="#2563eb" radius={[4, 4, 0, 0]} name="Metric Ton" isAnimationActive={false} />
                             </BarChart>
                         </ResponsiveContainer>
                     )}
@@ -348,8 +377,8 @@ export default function SalesReport({ sales, parties, vehicles }) {
                         <ResponsiveContainer width="100%" height={220}>
                             <PieChart>
                                 <Pie data={byParty} cx="50%" cy="50%" outerRadius={80}
-                                    dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}
-                                    labelLine={false} fontSize={10}>
+                                    dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    labelLine={false} fontSize={10} isAnimationActive={false}>
                                     {byParty.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                                 </Pie>
                                 <Tooltip formatter={(v) => [`${fmtTons(v)} tons`]} />
@@ -368,7 +397,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                 <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
                                 <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Line type="monotone" dataKey="tons" stroke="#16a34a" strokeWidth={2} dot={false} name="Metric Tons" />
+                                <Line type="monotone" dataKey="tons" stroke="#16a34a" strokeWidth={2} dot={false} name="Metric Tons" isAnimationActive={false} />
                             </LineChart>
                         </ResponsiveContainer>
                     )}
@@ -384,42 +413,22 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                 <XAxis type="number" tick={{ fontSize: 11 }} />
                                 <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={80} />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="tons" fill="#7c3aed" radius={[0,4,4,0]} name="Metric Ton" />
+                                <Bar dataKey="tons" fill="#7c3aed" radius={[0, 4, 4, 0]} name="Metric Ton" isAnimationActive={false} />
                             </BarChart>
                         </ResponsiveContainer>
                     )}
                 </div>
             </div>
+            )}
 
             {/* Table */}
             <div className="report-table-section">
                 <div className="report-table-header">
-                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <h3>Sales Entries</h3>
                         <span className="report-count">{filtered.length} records</span>
                     </div>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                        <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-                            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>Unit:</span>
-                            <select 
-                                value={pdfUnit} 
-                                onChange={(e) => setPdfUnit(e.target.value)}
-                                style={{
-                                    padding: "0.4rem 0.6rem",
-                                    borderRadius: "6px",
-                                    border: "1px solid #cbd5e1",
-                                    fontSize: "0.85rem",
-                                    backgroundColor: "white",
-                                    cursor: "pointer",
-                                    height: "36px",
-                                    fontWeight: 600,
-                                    boxSizing: "border-box"
-                                }}
-                            >
-                                <option value="tons">Metric Tons (MT)</option>
-                                <option value="brass">Brass (B)</option>
-                            </select>
-                        </div>
                         <button className="export-btn" onClick={handleExport}>
                             ⬇ Export to Excel
                         </button>
@@ -433,7 +442,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                 {filtered.length === 0 ? (
                     <div className="report-empty">No sales match the selected filters.</div>
                 ) : (
-                    <div style={{ overflowX:"auto" }}>
+                    <div style={{ overflowX: "auto" }}>
                         <table className="report-table">
                             <thead>
                                 <tr>
@@ -443,9 +452,10 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                     <th>Product</th>
                                     <th>Vehicle</th>
                                     <th>Owner</th>
-                                    <th>Quantity</th>
+                                    <th style={{ textAlign: "right" }}>Quantity (MT)</th>
+                                    <th style={{ textAlign: "right" }}>Quantity (Brass)</th>
                                     <th>Site</th>
-                                    <th>Price (₹)</th>
+                                    <th style={{ textAlign: "right" }}>Price (₹)</th>
                                     <th>Remarks</th>
                                 </tr>
                             </thead>
@@ -454,26 +464,19 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                     .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                                     .map((s, i) => (
                                         <tr key={s.sales_id}>
-                                            <td style={{ color:"#9ca3af", fontSize:12 }}>
+                                            <td style={{ color: "#9ca3af", fontSize: 12 }}>
                                                 {(currentPage - 1) * pageSize + i + 1}
                                             </td>
                                             <td>{formatDate(s.sales_date)}</td>
                                             <td><strong>{s.party_name}</strong></td>
                                             <td>{s.product_name}</td>
                                             <td>{s.vehicle_number || "—"}</td>
-                                            <td style={{ color:"#6b7280" }}>{s.vehicle_owner || "—"}</td>
-                                            <td>
-                                                <div style={{ lineHeight:1.4 }}>
-                                                    <span style={{ fontWeight:600 }}>{fmtTons(s.quantity_tons)} MT</span>
-                                                    <br/>
-                                                    <span style={{ fontSize:11, color:"#9ca3af" }}>
-                                                        ≈ {(s.quantity_tons * 4.2).toFixed(2)} Brass
-                                                    </span>
-                                                </div>
-                                            </td>
+                                            <td style={{ color: "#6b7280" }}>{s.vehicle_owner || "—"}</td>
+                                            <td style={{ textAlign: "right" }}><strong>{fmtTons(s.quantity_tons)} MT</strong></td>
+                                            <td style={{ textAlign: "right" }}><strong>{(s.quantity_tons * 4.2).toFixed(2)} Brass</strong></td>
                                             <td>{s.site || "—"}</td>
-                                            <td>{s.price ? `₹${formatInr(s.price)}` : "—"}</td>
-                                            <td style={{ maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}
+                                            <td style={{ textAlign: "right" }}>{s.price ? `₹${formatInr(s.price)}` : "—"}</td>
+                                            <td style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                                                 title={s.remarks}>{s.remarks || "—"}</td>
                                         </tr>
                                     ))}
@@ -504,8 +507,8 @@ export default function SalesReport({ sales, parties, vehicles }) {
                         <p style={{ color: "#475569", fontSize: "0.95rem", marginBottom: "1rem" }}>
                             You need manager approval to print or export reports. Would you like to request approval for this report?
                         </p>
-                        <div style={{ 
-                            marginBottom: "1.5rem", padding: "0.75rem", 
+                        <div style={{
+                            marginBottom: "1.5rem", padding: "0.75rem",
                             background: "#f1f5f9", borderRadius: "8px",
                             fontSize: "0.9rem", color: "#334155", borderLeft: "4px solid #3b82f6"
                         }}>

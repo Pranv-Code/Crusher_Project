@@ -23,8 +23,9 @@ export default function Login() {
             await loginUser(username, password);
             navigate("/");
         } catch (err) {
-            const msg = err.response?.data?.message || "Failed to log in. Check credentials.";
+            const msg = err.response?.data?.message || err.response?.data?.error || "Invalid credentials. Please check your username and password.";
             setError(msg);
+            alert(msg);
         } finally {
             setLoading(false);
         }

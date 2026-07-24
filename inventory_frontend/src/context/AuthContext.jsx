@@ -10,7 +10,7 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem("token") || null);
+    const [token, setToken] = useState(sessionStorage.getItem("token") || localStorage.getItem("token") || null);
     const [loading, setLoading] = useState(true);
 
     // Function to set or clear Authorization headers
@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
 
     // Triggered on page load / token changes
     useEffect(() => {
-        const storedToken = localStorage.getItem("token");
+        const storedToken = sessionStorage.getItem("token") || localStorage.getItem("token");
         if (storedToken) {
             fetchProfile(storedToken);
         } else {
@@ -63,24 +63,25 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
-    // Login action
+    // Login action - Uses sessionStorage so user automatically logs out when browser is closed
     const loginUser = async (username, password) => {
-        setLoading(true);
         try {
             const res = await apiLogin({ username, password });
             const tok = res.data.token;
-            localStorage.setItem("token", tok);
+            sessionStorage.setItem("token", tok);
+            localStorage.removeItem("token");
             await fetchProfile(tok);
             return res.data.user;
         } catch (err) {
-            setLoading(false);
             throw err;
         }
     };
 
-    // Logout action
+    // Logout action - Completely clears all storage keys and states
     const logoutUser = () => {
+        sessionStorage.removeItem("token");
         localStorage.removeItem("token");
+        sessionStorage.clear();
         setToken(null);
         setUser(null);
         setAuthHeader(null);
@@ -99,7 +100,7 @@ export const AuthProvider = ({ children }) => {
                 isClerk: user?.role === "Clerk"
             }}
         >
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };

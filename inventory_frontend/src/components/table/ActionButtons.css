@@ -1,11 +1,14 @@
 .action-buttons {
     display: flex;
+    flex-direction: row;
     gap: 8px;
     align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    white-space: nowrap;
 }
 
 .action-buttons .btn {
-    min-width: 80px;
+    min-width: 70px;
+    white-space: nowrap;
 }

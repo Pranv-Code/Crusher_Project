@@ -25,10 +25,7 @@ export default function ClerkPendingWork() {
     const [selectedRequest, setSelectedRequest] = useState(null);
     const capitalizeWords = (str) => {
         if (!str) return "";
-        return str
-            .split(/\s+/)
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ");
+        return str.replace(/\b\w/g, (char) => char.toUpperCase());
     };
 
     const [requests, setRequests] = useState([]);
@@ -85,24 +82,19 @@ export default function ClerkPendingWork() {
                     return true;
                 });
 
-                const unit = pdf_unit || "tons";
-                const multiplier = unit === "brass" ? 4.2 : 1.0;
-
                 if (format === "excel") {
                     const partiesRes = await getParties();
                     const partiesList = partiesRes.data || [];
                     const partyName = partiesList.find(p => String(p.party_id) === f.partyFilter)?.party_name || "All";
-                    const qtyHeader = unit === "brass" ? "Quantity (Brass)" : "Quantity (MT)";
-                    const unitLabel = unit === "brass" ? "brass" : "MT";
-                    const subtitle = `Unit: ${unit.toUpperCase()} | Party: ${partyName} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"} | Vehicle: ${f.vehicleFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
+                    const subtitle = `Party: ${partyName} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"} | Vehicle: ${f.vehicleFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
                     const rows = filtered.map(s => ({
                         "Date":           formatDate(s.sales_date),
                         "Party":          s.party_name,
                         "Product":        s.product_name,
                         "Vehicle":        s.vehicle_number || "",
                         "Vehicle Owner":  s.vehicle_owner || "",
-                        [qtyHeader]:      Number((Number(s.quantity_tons || 0) * multiplier).toFixed(2)),
-                        "Unit":           unitLabel,
+                        "Quantity (MT)":  Number((Number(s.quantity_tons || 0)).toFixed(2)),
+                        "Quantity (Brass)": Number((Number(s.quantity_tons || 0) * 4.2).toFixed(2)),
                         "Site":           s.site || "",
                         "Price (₹)":      Number(s.price || 0),
                         "Loading Time":   formatTime(s.loading_time),
@@ -110,7 +102,7 @@ export default function ClerkPendingWork() {
                         "Remarks":        s.remarks || "",
                     }));
                     await exportToFormattedExcel({
-                        title: `Sales Report (${unit.toUpperCase()})`,
+                        title: `Sales Report`,
                         subtitle,
                         sheetName: "Sales Report",
                         rows,
@@ -126,7 +118,7 @@ export default function ClerkPendingWork() {
                         month: f.monthFilter,
                         party: partyName,
                         vehicle: f.vehicleFilter
-                    }, pdf_unit);
+                    });
                 }
             } else if (report_type === "production") {
                 const prodRes = await getProduction();
@@ -147,25 +139,24 @@ export default function ClerkPendingWork() {
                     return true;
                 });
 
-                const unit = pdf_unit || "tons";
-                const multiplier = unit === "brass" ? 4.2 : 1.0;
-
                 if (format === "excel") {
                     const productsRes = await getProducts();
                     const productsList = productsRes.data || [];
                     const productName = productsList.find(p => String(p.product_id) === f.productFilter)?.product_name || "All";
-                    const qtyHeader = unit === "brass" ? "Quantity (Brass)" : "Quantity (Tons)";
-                    const unitLabel = unit === "brass" ? "brass" : "Tons";
-                    const subtitle = `Unit: ${unit.toUpperCase()} | Product: ${productName} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
-                    const rows = filtered.map(r => ({
-                        "Date":            formatDate(r.production_date),
-                        "Product":         r.product_name,
-                        [qtyHeader]:       Number((Number(r.quantity_tons || 0) * multiplier).toFixed(2)),
-                        "Unit":            unitLabel,
-                        "Production Cost (₹)": Number(r.production_cost || 0),
-                    }));
+                    const subtitle = `Product: ${productName} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
+                    const rows = filtered.map(r => {
+                        const tons = parseFloat(r.quantity_tons || 0);
+                        return {
+                            "Date":            formatDate(r.production_date),
+                            "Product":         r.product_name,
+                            "Quantity (MT)":   Number(tons.toFixed(2)),
+                            "Quantity (Brass)": Number((tons * 4.2).toFixed(2)),
+                            "Cost / Unit (₹)": r.cost_per_unit ? Number(Number(r.cost_per_unit).toFixed(2)) : "",
+                            "Total Production Cost (₹)": r.production_cost ? Number(r.production_cost) : "",
+                        };
+                    });
                     await exportToFormattedExcel({
-                        title: `Production Report (${unit.toUpperCase()})`,
+                        title: `Production Report`,
                         subtitle,
                         sheetName: "Production Report",
                         rows,
@@ -180,39 +171,35 @@ export default function ClerkPendingWork() {
                         dateTo: f.dateTo,
                         month: f.monthFilter,
                         product: productName
-                    }, pdf_unit);
+                    });
                 }
             } else if (report_type === "party") {
                 const partyRes = await getPartyReport(f.party_id);
                 const partyData = partyRes.data;
-                const unit = pdf_unit || "tons";
-                const multiplier = unit === "brass" ? 4.2 : 1.0;
 
                 if (format === "excel") {
                     const partyName = partyData.party.party_name;
-                    const qtyHeader = unit === "brass" ? "Quantity (Brass)" : "Quantity (Tons)";
-                    const unitLabel = unit === "brass" ? "brass" : "Tons";
-                    const subtitle = `Unit: ${unit.toUpperCase()} | Party Statement: ${partyName}${partyData.party.gst_no ? ` | GSTIN: ${partyData.party.gst_no}` : ""}`;
+                    const subtitle = `Party Statement: ${partyName}${partyData.party.gst_no ? ` | GSTIN: ${partyData.party.gst_no}` : ""}`;
                     const rows = partyData.sales.map(s => ({
                         "Date":           formatDate(s.sales_date),
                         "Product":        s.product_name,
                         "Vehicle":        s.vehicle_number || "",
                         "Vehicle Owner":  s.vehicle_owner || "",
-                        [qtyHeader]:      Number((Number(s.quantity_tons || 0) * multiplier).toFixed(2)),
-                        "Unit":           unitLabel,
+                        "Quantity (MT)":  Number((Number(s.quantity_tons || 0)).toFixed(2)),
+                        "Quantity (Brass)": Number((Number(s.quantity_tons || 0) * 4.2).toFixed(2)),
                         "Site":           s.site || "",
                         "Price (₹)":      Number(s.price || 0),
                         "Remarks":        s.remarks || "",
                     }));
                     await exportToFormattedExcel({
-                        title: `PARTY STATEMENT - ${partyName} (${unit.toUpperCase()})`,
+                        title: `PARTY STATEMENT - ${partyName}`,
                         subtitle,
                         sheetName: "Party Statement",
                         rows,
                         fileName: `party_${partyName.replace(/\s/g,"_")}_report.xlsx`
                     });
                 } else {
-                    generatePartyReportPdf(partyData, pdf_unit);
+                    generatePartyReportPdf(partyData);
                 }
             } else if (report_type === "raw") {
                 const actRes = await getVehicleActivities();
@@ -234,14 +221,8 @@ export default function ClerkPendingWork() {
                     return true;
                 });
 
-                const unit = pdf_unit || "tons";
-                const multiplier = unit === "brass" ? 4.2 : 1.0;
-
                 if (format === "excel") {
-                    const totalHeader = unit === "brass" ? "Total Weight (Brass)" : "Total Weight (MT)";
-                    const vehHeader   = unit === "brass" ? "Vehicle Weight (Brass)" : "Vehicle Weight (MT)";
-                    const netHeader   = unit === "brass" ? "Net Weight (Brass)" : "Net Weight (MT)";
-                    const subtitle = `Unit: ${unit.toUpperCase()} | Vehicle: ${f.vehicleFilter || "All"} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
+                    const subtitle = `Vehicle: ${f.vehicleFilter || "All"} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
                     const rows = filtered.map(r => ({
                         "Date":                formatDate(r.activity_date),
                         "Vehicle":             r.vehicle_number,
@@ -249,13 +230,14 @@ export default function ClerkPendingWork() {
                         "Arrival Time":        formatTime(r.arrival_time),
                         "Loading Start":       formatTime(r.loading_start_time),
                         "Unloading End":       formatTime(r.unloading_end_time),
-                        "Turnaround Time":     r.turnaround_time || "",
-                        [totalHeader]:         Number((Number(r.total_weight || 0) * multiplier).toFixed(2)),
-                        [vehHeader]:           Number((Number(r.vehicle_weight || 0) * multiplier).toFixed(2)),
-                        [netHeader]:           Number((Number(r.net_weight || 0) * multiplier).toFixed(2)),
+                        "Turnaround Time (hr/min)": formatDurationHM(r.turnaround_time),
+                        "Gross Weight (MT)":   Number((Number(r.total_weight || 0)).toFixed(2)),
+                        "Vehicle Weight (MT)": Number((Number(r.vehicle_weight || 0)).toFixed(2)),
+                        "Net Weight (MT)":     Number((Number(r.net_weight || 0)).toFixed(2)),
+                        "Net Weight (Brass)":  Number((Number(r.net_weight || 0) * 4.2).toFixed(2)),
                     }));
                     await exportToFormattedExcel({
-                        title: `Raw Material Report (${unit.toUpperCase()})`,
+                        title: `Raw Material Report`,
                         subtitle,
                         sheetName: "Raw Material Report",
                         rows,
@@ -267,7 +249,7 @@ export default function ClerkPendingWork() {
                         dateTo: f.dateTo,
                         month: f.monthFilter,
                         vehicle: f.vehicleFilter
-                    }, pdf_unit);
+                    });
                 }
             }
         } catch (err) {
@@ -630,8 +612,7 @@ export default function ClerkPendingWork() {
                                 }}
                                 placeholder="e.g. ABC Enterprises"
                                 value={newParty.party_name}
-                                onChange={(e) => setNewParty({ ...newParty, party_name: e.target.value })}
-                                onBlur={(e) => setNewParty({ ...newParty, party_name: capitalizeWords(e.target.value) })}
+                                onChange={(e) => setNewParty({ ...newParty, party_name: capitalizeWords(e.target.value) })}
                                 required
                             />
                         </div>

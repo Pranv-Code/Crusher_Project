@@ -39,6 +39,7 @@ function Production() {
         product_id: "",
         quantity_tons: "",
         unit: "",
+        cost_per_unit: "",
         production_cost: "",
     });
     
@@ -49,6 +50,7 @@ function Production() {
         product_id: "",
         quantity_tons: "",
         unit: "",
+        cost_per_unit: "",
         production_cost: "",
     });
 
@@ -59,14 +61,12 @@ function Production() {
     const [settings, setSettings] = useState({ inventory_mode: "PRODUCT_WISE" });
 
     const handleAddProduction = async () => {
-        const isCommonPool = settings.inventory_mode === "COMMON_POOL";
         if (
-            (!isCommonPool && !newProduction.product_id) ||
             newProduction.quantity_tons === "" ||
             newProduction.production_cost === "" ||
             !newProduction.unit
         ) {
-            alert("Please fill all fields and select a unit.");
+            alert("Please fill all required fields (Quantity, Cost, and Unit).");
             return;
         }
 
@@ -74,6 +74,21 @@ function Production() {
             alert("Quantity and Production Cost must be greater than zero.");
             return;
         }
+
+        const isDup = production.some(p => {
+            const sameProd = settings.inventory_mode === "COMMON_POOL" 
+                ? (String(p.product_id || "") === String(newProduction.product_id || ""))
+                : String(p.product_id) === String(newProduction.product_id);
+            const sameQty = Math.abs(parseFloat(p.quantity_tons || 0) - parseFloat(newProduction.quantity_tons || 0)) < 0.01;
+            const sameUnit = String(p.unit || "").toLowerCase() === String(newProduction.unit || "").toLowerCase();
+            return sameProd && sameQty && sameUnit;
+        });
+
+        if (isDup) {
+            alert("Duplicate Entry Detected: A production record with the exact same product, unit, and quantity already exists.");
+            return;
+        }
+
         console.log("Sending to backend:", newProduction);
         try {
             await addProduction(newProduction);
@@ -84,21 +99,27 @@ function Production() {
                 product_id: "",
                 quantity_tons: "",
                 unit: "",
+                cost_per_unit: "",
                 production_cost: "",
             });
             setShowAddForm(false);
         } catch (err) {
             console.error(err);
+            alert(err.response?.data?.message || err.response?.data?.error || "Failed to add production record.");
         }
     };
 
     const handleEdit = (production) => {
         setEditingId(production.production_id);
+        const qty = parseFloat(production.quantity_tons) || 0;
+        const tot = parseFloat(production.production_cost) || 0;
+        const cpu = production.cost_per_unit || (qty > 0 && tot > 0 ? (tot / qty).toFixed(2) : "");
         setEditData({
             production_date: production.production_date,
             product_id: production.product_id,
             quantity_tons: production.quantity_tons,
             unit: production.unit,
+            cost_per_unit: cpu,
             production_cost: production.production_cost,
         });
     };
@@ -169,7 +190,8 @@ function Production() {
         label: "Units",
         render: (row) =>
             row.unit?.toLowerCase() === "tons" ? "MT" : "Brass"},
-        { key: "production_cost", label: "Production Cost (₹)", render: (row) => row.production_cost ? `₹${formatInr(row.production_cost)}` : "—" },
+        { key: "cost_per_unit", label: "Cost / Unit (₹)", render: (row) => row.cost_per_unit ? `₹${formatInr(row.cost_per_unit)}` : (row.production_cost && row.quantity_tons ? `₹${formatInr((parseFloat(row.production_cost)/parseFloat(row.quantity_tons)).toFixed(2))}` : "—") },
+        { key: "production_cost", label: "Total Cost (₹)", render: (row) => row.production_cost ? `₹${formatInr(row.production_cost)}` : "—" },
     ];
 
     return (
@@ -203,32 +225,35 @@ function Production() {
                                 })
                             }
                         />
-                        {settings.inventory_mode !== "COMMON_POOL" && (
-                            <SelectField
-                                label="Select Product"
-                                name="product_id"
-                                value={newProduction.product_id}
-                                onChange={(e) =>
-                                    setNewProduction({
-                                        ...newProduction,
-                                        product_id: e.target.value,
-                                    })
-                                }
-                                options={productOptions}
-                            />
-                        )}
+                        <SelectField
+                            label="Select Product"
+                            name="product_id"
+                            value={newProduction.product_id}
+                            onChange={(e) =>
+                                setNewProduction({
+                                    ...newProduction,
+                                    product_id: e.target.value,
+                                })
+                            }
+                            options={productOptions}
+                        />
                         <InputField
                             label="Quantity"
                             name="quantity_tons"
                             type="number"
                             placeholder="Enter quantity"
                             value={newProduction.quantity_tons}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                                const qtyVal = e.target.value;
+                                const cpu = parseFloat(newProduction.cost_per_unit) || 0;
+                                const qty = parseFloat(qtyVal) || 0;
+                                const tot = (qty > 0 && cpu > 0) ? (qty * cpu).toFixed(2) : newProduction.production_cost;
                                 setNewProduction({
                                     ...newProduction,
-                                    quantity_tons: e.target.value,
-                                })
-                            }
+                                    quantity_tons: qtyVal,
+                                    production_cost: tot
+                                });
+                            }}
                         />
                         <SelectField
                             label="Unit"
@@ -243,17 +268,40 @@ function Production() {
                             options={unitOptions}
                         />
                         <InputField
-                            label="Production Cost (₹)"
-                            name="production_cost"
+                            label="Cost per Unit (₹)"
+                            name="cost_per_unit"
                             type="number"
-                            placeholder="Enter cost"
-                            value={newProduction.production_cost}
-                            onChange={(e) =>
+                            placeholder="Enter cost per unit"
+                            value={newProduction.cost_per_unit}
+                            onChange={(e) => {
+                                const cpuVal = e.target.value;
+                                const cpu = parseFloat(cpuVal) || 0;
+                                const qty = parseFloat(newProduction.quantity_tons) || 0;
+                                const tot = (qty > 0 && cpu > 0) ? (qty * cpu).toFixed(2) : newProduction.production_cost;
                                 setNewProduction({
                                     ...newProduction,
-                                    production_cost: e.target.value,
-                                })
-                            }
+                                    cost_per_unit: cpuVal,
+                                    production_cost: tot
+                                });
+                            }}
+                        />
+                        <InputField
+                            label="Total Cost (₹)"
+                            name="production_cost"
+                            type="number"
+                            placeholder="Calculated automatically"
+                            value={newProduction.production_cost}
+                            onChange={(e) => {
+                                const totVal = e.target.value;
+                                const tot = parseFloat(totVal) || 0;
+                                const qty = parseFloat(newProduction.quantity_tons) || 0;
+                                const cpu = (qty > 0 && tot > 0) ? (tot / qty).toFixed(2) : newProduction.cost_per_unit;
+                                setNewProduction({
+                                    ...newProduction,
+                                    production_cost: totVal,
+                                    cost_per_unit: cpu
+                                });
+                            }}
                         />
                         </div>
                         <Button variant="success" onClick={handleAddProduction}>
@@ -300,20 +348,18 @@ function Production() {
                         })
                     }
                 />
-                {settings.inventory_mode !== "COMMON_POOL" && (
-                    <SelectField
-                        label="Product Name"
-                        name="product_id"
-                        value={editData.product_id}
-                        onChange={(e) =>
-                            setEditData({
-                                ...editData,
-                                product_id: e.target.value,
-                            })
-                        }
-                        options={productOptions}
-                    />
-                )}
+                <SelectField
+                    label="Product Name"
+                    name="product_id"
+                    value={editData.product_id}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            product_id: e.target.value,
+                        })
+                    }
+                    options={productOptions}
+                />
                 <InputField
                     label="Quantity"
                     type="number"
@@ -338,15 +384,40 @@ function Production() {
                     options={unitOptions}
                 />
                 <InputField
-                    label="Production Cost (₹)"
+                    label="Quantity"
+                    type="number"
+                    value={editData.quantity_tons}
+                    onChange={(e) => {
+                        const qtyVal = e.target.value;
+                        const cpu = parseFloat(editData.cost_per_unit) || 0;
+                        const qty = parseFloat(qtyVal) || 0;
+                        const tot = (qty > 0 && cpu > 0) ? (qty * cpu).toFixed(2) : editData.production_cost;
+                        setEditData({ ...editData, quantity_tons: qtyVal, production_cost: tot });
+                    }}
+                />
+                <InputField
+                    label="Cost per Unit (₹)"
+                    type="number"
+                    value={editData.cost_per_unit}
+                    onChange={(e) => {
+                        const cpuVal = e.target.value;
+                        const cpu = parseFloat(cpuVal) || 0;
+                        const qty = parseFloat(editData.quantity_tons) || 0;
+                        const tot = (qty > 0 && cpu > 0) ? (qty * cpu).toFixed(2) : editData.production_cost;
+                        setEditData({ ...editData, cost_per_unit: cpuVal, production_cost: tot });
+                    }}
+                />
+                <InputField
+                    label="Total Production Cost (₹)"
                     type="number"
                     value={editData.production_cost}
-                    onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            production_cost: e.target.value,
-                        })
-                    }
+                    onChange={(e) => {
+                        const totVal = e.target.value;
+                        const tot = parseFloat(totVal) || 0;
+                        const qty = parseFloat(editData.quantity_tons) || 0;
+                        const cpu = (qty > 0 && tot > 0) ? (tot / qty).toFixed(2) : editData.cost_per_unit;
+                        setEditData({ ...editData, production_cost: totVal, cost_per_unit: cpu });
+                    }}
                 />
             </EditModal>
 

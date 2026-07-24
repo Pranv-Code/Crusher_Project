@@ -2,6 +2,7 @@ from flask import request, jsonify
 from db import get_connection
 from utils.unit_converter import unit_convertor, ton_to_brass
 from datetime import datetime, timedelta
+from services.activity_log_service import log_activity
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ _SALES_SELECT = """
         s.party_id,
         s.product_id,
         pt.party_name,
-        p.product_name,
+        COALESCE(p.product_name, 'Common Pool') AS product_name,
         s.vehicle_number,
         v.owner          AS vehicle_owner,
         s.quantity_tons,
@@ -70,7 +71,7 @@ _SALES_SELECT = """
         s.unloading_status,
         s.remarks
     FROM Sales s
-    JOIN Product p  ON s.product_id = p.product_id
+    LEFT JOIN Product p  ON s.product_id = p.product_id
     JOIN Party  pt  ON s.party_id   = pt.party_id
     LEFT JOIN Vehicle v ON s.vehicle_number = v.vehicle_number
 """
@@ -117,7 +118,7 @@ def get_sales():
         where_clause = "WHERE " + " AND ".join(conditions)
 
         # Count
-        cursor.execute(f"SELECT COUNT(*) AS cnt FROM Sales s JOIN Product p ON s.product_id=p.product_id JOIN Party pt ON s.party_id=pt.party_id LEFT JOIN Vehicle v ON s.vehicle_number=v.vehicle_number {where_clause}", params)
+        cursor.execute(f"SELECT COUNT(*) AS cnt FROM Sales s LEFT JOIN Product p ON s.product_id=p.product_id JOIN Party pt ON s.party_id=pt.party_id LEFT JOIN Vehicle v ON s.vehicle_number=v.vehicle_number {where_clause}", params)
         total = cursor.fetchone()["cnt"]
 
         # Data
@@ -333,13 +334,26 @@ def add_sale():
     cursor = conn.cursor(dictionary=True)
 
     try:
-        # Check Product
-        cursor.execute("SELECT product_id, quantity_tons, status FROM Product WHERE product_id=%s", (data["product_id"],))
-        product = cursor.fetchone()
-        if product is None:
-            return jsonify({"message": "Product not found"}), 404
-        if product["status"].lower() != "active":
-            return jsonify({"message": "Product is Inactive"}), 400
+        # Check Stock & Inventory Mode
+        from db import get_system_setting, set_system_setting
+        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+
+        p_id = data.get("product_id")
+        product = None
+        if p_id:
+            cursor.execute("SELECT product_id, quantity_tons, status FROM Product WHERE product_id=%s", (p_id,))
+            product = cursor.fetchone()
+
+        if inv_mode == "COMMON_POOL":
+            if product and product["status"].lower() != "active":
+                return jsonify({"message": "Product is Inactive"}), 400
+            data["product_id"] = product["product_id"] if product else None
+        else:
+            if not product:
+                return jsonify({"message": "Product is required in Product-Wise mode"}), 400
+            if product["status"].lower() != "active":
+                return jsonify({"message": "Product is Inactive"}), 400
+            data["product_id"] = product["product_id"]
 
         # Check Vehicle
         cursor.execute("SELECT vehicle_number FROM Vehicle WHERE vehicle_number=%s", (data["vehicle_number"],))
@@ -347,10 +361,6 @@ def add_sale():
             return jsonify({"message": "Vehicle not found"}), 404
 
         qty = unit_convertor(data["unit"], data["quantity"])
-
-        # Check Stock
-        from db import get_system_setting, set_system_setting
-        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
         
         if inv_mode == "COMMON_POOL":
             pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
@@ -364,6 +374,22 @@ def add_sale():
         cursor.execute("SELECT party_name FROM Party WHERE party_id=%s", (data["party_id"],))
         if cursor.fetchone() is None:
             return jsonify({"message": "Party not found"}), 404
+
+        # Duplicate Sale Check
+        prod_check_id = data.get("product_id")
+        if prod_check_id:
+            cursor.execute("""
+                SELECT sales_id FROM Sales 
+                WHERE sales_date = %s AND party_id = %s AND product_id = %s AND vehicle_number = %s AND unit = %s AND ABS(quantity_tons - %s) < 0.001 AND ABS(price - %s) < 0.01
+            """, (data["sales_date"], data["party_id"], prod_check_id, data["vehicle_number"], data["unit"], qty, price_val))
+        else:
+            cursor.execute("""
+                SELECT sales_id FROM Sales 
+                WHERE sales_date = %s AND party_id = %s AND product_id IS NULL AND vehicle_number = %s AND unit = %s AND ABS(quantity_tons - %s) < 0.001 AND ABS(price - %s) < 0.01
+            """, (data["sales_date"], data["party_id"], data["vehicle_number"], data["unit"], qty, price_val))
+
+        if cursor.fetchone():
+            return jsonify({"message": "Duplicate Entry Detected: A sale record with the exact same date, party, vehicle, quantity, and price already exists."}), 400
 
         # Insert Sale — unloading fields left NULL, status = 'pending'
         cursor.execute("""
@@ -397,6 +423,17 @@ def add_sale():
             set_system_setting("common_pool_stock", str(pool_stock - float(qty)), user_id=request.user.get("user_id"), cursor=cursor)
         else:
             cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (qty, data["product_id"]))
+
+        from services.activity_log_service import log_activity
+        u = getattr(request, "user", {}) or {}
+        log_activity(
+            u.get("user_id"),
+            u.get("username", "System"),
+            u.get("role", "User"),
+            "CREATE",
+            "Sales",
+            f"Created Sale #{sales_id} ({qty} Tons for Vehicle '{data['vehicle_number']}')"
+        )
 
         conn.commit()
         return jsonify({"message": "Sale Added Successfully", "sales_id": sales_id}), 201
@@ -529,13 +566,20 @@ def add_sales_bulk():
                 p_id = product_id
 
             # Validate Product
-            product = products_map.get(p_id)
-            if not product:
-                errors.append(f"{row_label}: Product not found")
-                continue
-            if product["status"].lower() != "active":
-                errors.append(f"{row_label}: Product is Inactive")
-                continue
+            product = products_map.get(p_id) if p_id else None
+            if inv_mode == "COMMON_POOL":
+                if product and product.get("status", "").lower() != "active":
+                    errors.append(f"{row_label}: Product is Inactive")
+                    continue
+                r["product_id"] = product["product_id"] if product else None
+            else:
+                if not product:
+                    errors.append(f"{row_label}: Product not found")
+                    continue
+                if product.get("status", "").lower() != "active":
+                    errors.append(f"{row_label}: Product is Inactive")
+                    continue
+                r["product_id"] = product["product_id"]
 
             # Validate Vehicle
             if vehicle_number not in vehicles_set:
@@ -619,12 +663,21 @@ def delete_sale(id):
 
         user_role = request.user.get("role")
         user_id   = request.user.get("user_id")
+        from services.activity_log_service import log_activity
 
         if user_role == "Clerk":
             cursor.execute("""
                 INSERT INTO Approval_Requests (requester_id, request_type, reference_id, reference_data, status)
                 VALUES (%s, 'sales_delete', %s, NULL, 'pending')
             """, (user_id, str(id)))
+            log_activity(
+                user_id,
+                request.user.get("username", "Clerk"),
+                user_role,
+                "DELETE",
+                "Sales",
+                f"Submitted Delete Request for Sale #{id}"
+            )
             conn.commit()
             return jsonify({
                 "message": "Delete request submitted for Manager approval",
@@ -640,6 +693,15 @@ def delete_sale(id):
             cursor.execute("UPDATE Product SET quantity_tons = quantity_tons + %s WHERE product_id=%s", (sale["quantity_tons"], sale["product_id"]))
         cursor.execute("DELETE FROM VehicleSale WHERE sales_id=%s", (id,))
         cursor.execute("DELETE FROM Sales WHERE sales_id=%s", (id,))
+        
+        log_activity(
+            user_id,
+            request.user.get("username", "Manager"),
+            user_role,
+            "DELETE",
+            "Sales",
+            f"Manager deleted Sale #{id} directly"
+        )
         conn.commit()
         return jsonify({"message": "Sale Deleted Successfully"})
 
@@ -685,6 +747,14 @@ def update_sale(id):
                 INSERT INTO Approval_Requests (requester_id, request_type, reference_id, reference_data, status)
                 VALUES (%s, 'sales_edit', %s, %s, 'pending')
             """, (user_id, str(id), json.dumps(data)))
+            log_activity(
+                user_id,
+                request.user.get("username", "Clerk"),
+                user_role,
+                "EDIT",
+                "Sales",
+                f"Submitted Edit Request for Sale #{id}"
+            )
             conn.commit()
             return jsonify({
                 "message": "Edit request submitted for Manager approval",
@@ -703,20 +773,28 @@ def update_sale(id):
 
         new_qty = unit_convertor(data["unit"], data["quantity"])
 
-        cursor.execute("SELECT quantity_tons, status FROM Product WHERE product_id=%s", (data["product_id"],))
-        product = cursor.fetchone()
-        if not product:
-            conn.rollback(); return jsonify({"message": "Product not found"}), 404
-        if product["status"].lower() != "active":
-            conn.rollback(); return jsonify({"message": "Product is Inactive"}), 400
+        p_id = data.get("product_id")
+        product = None
+        if p_id:
+            cursor.execute("SELECT quantity_tons, status FROM Product WHERE product_id=%s", (p_id,))
+            product = cursor.fetchone()
+
         if inv_mode == "COMMON_POOL":
+            if product and product["status"].lower() != "active":
+                conn.rollback(); return jsonify({"message": "Product is Inactive"}), 400
             if pool_stock < float(new_qty):
                 conn.rollback(); return jsonify({"message": "Insufficient Stock in Common Pool"}), 400
             set_system_setting("common_pool_stock", str(pool_stock - float(new_qty)), user_id=user_id, cursor=cursor)
+            data["product_id"] = p_id if product else None
         else:
+            if not product:
+                conn.rollback(); return jsonify({"message": "Product not found"}), 404
+            if product["status"].lower() != "active":
+                conn.rollback(); return jsonify({"message": "Product is Inactive"}), 400
             if float(product["quantity_tons"]) < float(new_qty):
                 conn.rollback(); return jsonify({"message": "Insufficient Stock"}), 400
-            cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (new_qty, data["product_id"]))
+            cursor.execute("UPDATE Product SET quantity_tons = quantity_tons - %s WHERE product_id=%s", (new_qty, p_id))
+            data["product_id"] = p_id
 
         cursor.execute("""
             UPDATE Sales SET
@@ -735,6 +813,15 @@ def update_sale(id):
 
         cursor.execute("DELETE FROM VehicleSale WHERE sales_id=%s", (id,))
         cursor.execute("INSERT INTO VehicleSale (sales_id, vehicle_number) VALUES (%s,%s)", (id, data["vehicle_number"]))
+
+        log_activity(
+            user_id,
+            request.user.get("username", "Manager"),
+            user_role,
+            "EDIT",
+            "Sales",
+            f"Manager updated Sale #{id} directly"
+        )
 
         conn.commit()
         return jsonify({"message": "Sale Updated Successfully"})

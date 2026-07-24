@@ -62,6 +62,12 @@ function Vehicles() {
             return;
         }
 
+        const isDup = vehicles.some(v => v.vehicle_number.replace(/[\s-]/g, "").toUpperCase() === cleanedNumber);
+        if (isDup) {
+            alert(`Duplicate Entry Detected: Vehicle with number '${cleanedNumber}' already exists.`);
+            return;
+        }
+
         try {
             await addVehicle({
                 ...newVehicle,
@@ -75,6 +81,7 @@ function Vehicles() {
             setShowAddForm(false);
         } catch (err) {
             console.error(err);
+            alert(err.response?.data?.message || err.response?.data?.error || "Failed to add vehicle.");
         }
     };
 

@@ -93,10 +93,7 @@ const emptyNewSale = {
 const Sales = () => {
     const capitalizeWords = (str) => {
         if (!str) return "";
-        return str
-            .split(/\s+/)
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(" ");
+        return str.replace(/\b\w/g, (char) => char.toUpperCase());
     };
 
     // --- Context Hook ---
@@ -245,8 +242,8 @@ const Sales = () => {
             // Basic validation
             for (let i = 0; i < bulkRows.length; i++) {
                 const r = bulkRows[i];
-                if (!r.product_id || !r.vehicle_number || !r.quantity || !r.unit) {
-                    alert(`Row ${i + 1} is missing required fields (Product, Vehicle, Quantity, or Unit).`);
+                if (!r.vehicle_number || !r.quantity || !r.unit) {
+                    alert(`Row ${i + 1} is missing required fields (Vehicle, Quantity, or Unit).`);
                     return;
                 }
                 if (parseFloat(r.quantity) <= 0) {
@@ -256,6 +253,18 @@ const Sales = () => {
                 if (r.price && parseFloat(r.price) < 0) {
                     alert(`Row ${i + 1} price cannot be negative.`);
                     return;
+                }
+            }
+
+            // Duplicate row check
+            for (let i = 0; i < bulkRows.length; i++) {
+                for (let j = i + 1; j < bulkRows.length; j++) {
+                    if (bulkRows[i].vehicle_number === bulkRows[j].vehicle_number &&
+                        String(bulkRows[i].product_id || "") === String(bulkRows[j].product_id || "") &&
+                        Math.abs(parseFloat(bulkRows[i].quantity || 0) - parseFloat(bulkRows[j].quantity || 0)) < 0.01) {
+                        alert(`Duplicate Entry Detected: Row ${i + 1} and Row ${j + 1} have the exact same vehicle, product, and quantity.`);
+                        return;
+                    }
                 }
             }
 
@@ -488,7 +497,7 @@ const Sales = () => {
                                             setNewSale({ ...newSale, product_id: e.target.value })
                                         }
                                     >
-                                        <option value="">Select Product</option>
+                                        <option value="">Select Product (Optional)</option>
                                         {products.map((product) => (
                                             <option key={product.product_id} value={product.product_id}>
                                                 {product.product_name}
@@ -552,9 +561,6 @@ const Sales = () => {
                                         type="text"
                                         value={newSale.site}
                                         onChange={(e) =>
-                                            setNewSale({ ...newSale, site: e.target.value })
-                                        }
-                                        onBlur={(e) =>
                                             setNewSale({ ...newSale, site: capitalizeWords(e.target.value) })
                                         }
                                     />
@@ -661,9 +667,6 @@ const Sales = () => {
                                         type="text"
                                         value={bulkCommon.site}
                                         onChange={(e) =>
-                                            setBulkCommon({ ...bulkCommon, site: e.target.value })
-                                        }
-                                        onBlur={(e) =>
                                             setBulkCommon({ ...bulkCommon, site: capitalizeWords(e.target.value) })
                                         }
                                     />
@@ -693,7 +696,7 @@ const Sales = () => {
                                                         value={row.product_id}
                                                         onChange={(e) => handleBulkRowChange(index, "product_id", e.target.value)}
                                                     >
-                                                        <option value="">Select Product</option>
+                                                        <option value="">Select Product (Optional)</option>
                                                         {products.map((p) => (
                                                             <option key={p.product_id} value={p.product_id}>
                                                                 {p.product_name}
@@ -869,7 +872,7 @@ const Sales = () => {
                                             </span>
                                         </td>
                                         <td>
-                                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
+                                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", flexWrap: "nowrap", whiteSpace: "nowrap" }}>
                                                 <button
                                                     className="edit-btn"
                                                     style={{ backgroundColor: "#3b82f6", color: "white" }}
@@ -954,7 +957,7 @@ const Sales = () => {
                                         <td>{formatTime(sale.unloading_time)}</td>
                                         <td>{sale.remarks || "—"}</td>
                                         <td>
-                                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center" }}>
+                                            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", flexWrap: "nowrap", whiteSpace: "nowrap" }}>
                                                 <button className="edit-btn" onClick={() => handleEdit(sale)}>
                                                     Edit
                                                 </button>
@@ -1066,9 +1069,6 @@ const Sales = () => {
                     type="text"
                     value={editData.site || ""}
                     onChange={(e) =>
-                        setEditData({ ...editData, site: e.target.value })
-                    }
-                    onBlur={(e) =>
                         setEditData({ ...editData, site: capitalizeWords(e.target.value) })
                     }
                 />

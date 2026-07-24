@@ -85,5 +85,33 @@ export const formatDateTime = (dtVal) => {
 export const formatInr = (v) => {
     if (v === null || v === undefined || v === "" || isNaN(v)) return "";
     const n = Number(v);
-    return n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+    return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+/**
+ * Formats a number with specified decimal places (e.g. 500 -> "500.00")
+ * @param {number|string} v 
+ * @param {number} [digits=2]
+ * @returns {string}
+ */
+export const formatDecimal = (v, digits = 2) => {
+    if (v === null || v === undefined || v === "" || isNaN(v)) return "";
+    const n = Number(v);
+    return n.toLocaleString("en-IN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+};
+
+/**
+ * Formats a duration time string (e.g. "01:30:00", "01:30") to "X hr Y min" format
+ * @param {string} timeStr 
+ * @returns {string} Formatted duration string (e.g., "1 hr 30 min")
+ */
+export const formatDurationHM = (timeStr) => {
+    if (!timeStr) return "—";
+    const parts = String(timeStr).trim().split(":");
+    if (parts.length >= 2) {
+        const h = parseInt(parts[0], 10) || 0;
+        const m = parseInt(parts[1], 10) || 0;
+        return `${h} hr ${m} min`;
+    }
+    return timeStr || "—";
 };

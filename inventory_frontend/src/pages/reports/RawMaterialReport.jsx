@@ -8,7 +8,7 @@ import * as XLSX from "xlsx";
 import { useAuth } from "../../context/AuthContext";
 import { generateRawMaterialReportPdf } from "../../utils/pdfGenerator";
 import { requestReportPrint } from "../../services/approvalApi";
-import { formatDate, formatTime } from "../../utils/formatUtils";
+import { formatDate, formatTime, formatDurationHM } from "../../utils/formatUtils";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777", "#d97706", "#059669"];
 
@@ -42,7 +42,6 @@ export default function RawMaterialReport({ activities, vehicles }) {
     const [monthFilter, setMonthFilter] = useState("");
     const [vehicleFilter, setVehicleFilter] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
-    const [pdfUnit, setPdfUnit] = useState("tons");
 
     // --- Pagination States ---
     const [currentPage, setCurrentPage] = useState(1);
@@ -51,6 +50,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
     const [showApprovalModal, setShowApprovalModal] = useState(false);
     const [pendingRequest, setPendingRequest] = useState(null);
     const [submittingRequest, setSubmittingRequest] = useState(false);
+    const [showCharts, setShowCharts] = useState(false);
 
     const handleRequestApproval = async () => {
         if (!pendingRequest) return;
@@ -137,11 +137,10 @@ export default function RawMaterialReport({ activities, vehicles }) {
     }, [filtered]);
 
     const handleExport = () => {
-        const label = `Raw Material Report (Excel) | Unit: ${pdfUnit} | Filters: Vehicle: ${vehicleFilter || "All"}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
+        const label = `Raw Material Report (Excel) | Filters: Vehicle: ${vehicleFilter || "All"}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
         const requestData = {
             report_type: "raw",
             format: "excel",
-            pdf_unit: pdfUnit,
             filters: {
                 dateFrom,
                 dateTo,
@@ -157,12 +156,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
             return;
         }
 
-        const multiplier = pdfUnit === "brass" ? 4.2 : 1.0;
-        const totalHeader = pdfUnit === "brass" ? "Total Weight (Brass)" : "Total Weight (MT)";
-        const vehHeader   = pdfUnit === "brass" ? "Vehicle Weight (Brass)" : "Vehicle Weight (MT)";
-        const netHeader   = pdfUnit === "brass" ? "Net Weight (Brass)" : "Net Weight (MT)";
-
-        const subtitle = `Unit: ${pdfUnit.toUpperCase()} | Vehicle: ${vehicleFilter || "All"} | Date: ${dateFrom || "Start"} to ${dateTo || "End"} | Month: ${monthFilter || "All"}${searchQuery ? ` | Search: "${searchQuery}"` : ""}`;
+        const subtitle = `Vehicle: ${vehicleFilter || "All"} | Date: ${dateFrom || "Start"} to ${dateTo || "End"} | Month: ${monthFilter || "All"}${searchQuery ? ` | Search: "${searchQuery}"` : ""}`;
 
         const rows = filtered.map(r => ({
             "Date": formatDate(r.activity_date),
@@ -171,14 +165,15 @@ export default function RawMaterialReport({ activities, vehicles }) {
             "Arrival Time": formatTime(r.arrival_time),
             "Loading Start": formatTime(r.loading_start_time),
             "Unloading End": formatTime(r.unloading_end_time),
-            "Turnaround Time": r.turnaround_time || "",
-            [totalHeader]: Number((Number(r.total_weight || 0) * multiplier).toFixed(2)),
-            [vehHeader]:   Number((Number(r.vehicle_weight || 0) * multiplier).toFixed(2)),
-            [netHeader]:   Number((Number(r.net_weight || 0) * multiplier).toFixed(2)),
+            "Turnaround Time (hr/min)": formatDurationHM(r.turnaround_time),
+            "Gross Weight (MT)": Number((Number(r.total_weight || 0)).toFixed(2)),
+            "Vehicle Weight (MT)": Number((Number(r.vehicle_weight || 0)).toFixed(2)),
+            "Net Weight (MT)": Number((Number(r.net_weight || 0)).toFixed(2)),
+            "Net Weight (Brass)": Number((Number(r.net_weight || 0) * 4.2).toFixed(2)),
         }));
 
         exportToFormattedExcel({
-            title: `Raw Material Report (${pdfUnit.toUpperCase()})`,
+            title: `Raw Material Report`,
             subtitle,
             sheetName: "Raw Material Report",
             rows,
@@ -187,11 +182,10 @@ export default function RawMaterialReport({ activities, vehicles }) {
     };
 
     const handlePdfExport = () => {
-        const label = `Raw Material Report (PDF) | Unit: ${pdfUnit} | Filters: Vehicle: ${vehicleFilter || "All"}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
+        const label = `Raw Material Report (PDF) | Filters: Vehicle: ${vehicleFilter || "All"}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
         const requestData = {
             report_type: "raw",
             format: "pdf",
-            pdf_unit: pdfUnit,
             filters: {
                 dateFrom,
                 dateTo,
@@ -212,12 +206,11 @@ export default function RawMaterialReport({ activities, vehicles }) {
             dateTo,
             month: monthFilter,
             vehicle: vehicleFilter
-        }, pdfUnit);
+        });
     };
 
     const resetFilters = () => {
         setDateFrom(""); setDateTo(""); setMonthFilter(""); setVehicleFilter(""); setSearchQuery("");
-        setPdfUnit("tons");
     };
 
     return (
@@ -289,8 +282,44 @@ export default function RawMaterialReport({ activities, vehicles }) {
                 </div>
             </div>
 
-            {/* Charts */}
-            <div className="chart-grid">
+            {/* Collapsible Analytics Graphs */}
+            <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                margin: "18px 0 12px 0",
+                padding: "10px 14px",
+                background: "#f8fafc",
+                borderRadius: "8px",
+                border: "1px solid #e2e8f0"
+            }}>
+                <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: "8px" }}>
+                    📊 Analytics & Visual Charts
+                </span>
+                <button
+                    type="button"
+                    onClick={() => setShowCharts(!showCharts)}
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "6px 14px",
+                        backgroundColor: showCharts ? "#fee2e2" : "#e0f2fe",
+                        color: showCharts ? "#991b1b" : "#0369a1",
+                        border: `1px solid ${showCharts ? "#fca5a5" : "#bae6fd"}`,
+                        borderRadius: "6px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease"
+                    }}
+                >
+                    <span>{showCharts ? "🔼 Hide Graphs" : "📊 Show Graphs"}</span>
+                </button>
+            </div>
+
+            {showCharts && (
+                <div className="chart-grid">
                 <div className="chart-card">
                     <h3>Net Weight by Month (MT)</h3>
                     {byMonth.length === 0 ? <div className="report-empty">No data</div> : (
@@ -353,6 +382,7 @@ export default function RawMaterialReport({ activities, vehicles }) {
                     )}
                 </div>
             </div>
+            )}
 
             {/* Table */}
             <div className="report-table-section">
@@ -362,27 +392,6 @@ export default function RawMaterialReport({ activities, vehicles }) {
                         <span className="report-count">{filtered.length} records</span>
                     </div>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                        <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-                            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>Unit:</span>
-                            <select
-                                value={pdfUnit}
-                                onChange={(e) => setPdfUnit(e.target.value)}
-                                style={{
-                                    padding: "0.4rem 0.6rem",
-                                    borderRadius: "6px",
-                                    border: "1px solid #cbd5e1",
-                                    fontSize: "0.85rem",
-                                    backgroundColor: "white",
-                                    cursor: "pointer",
-                                    height: "36px",
-                                    fontWeight: 600,
-                                    boxSizing: "border-box"
-                                }}
-                            >
-                                <option value="tons">Metric Ton (MT)</option>
-                                <option value="brass">Brass (B)</option>
-                            </select>
-                        </div>
                         <button className="export-btn" onClick={handleExport}>⬇ Export to Excel</button>
                         {(isManager || isClerk) && (
                             <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
@@ -405,10 +414,11 @@ export default function RawMaterialReport({ activities, vehicles }) {
                                     <th>Arrival</th>
                                     <th>Loading Start</th>
                                     <th>Unloading End</th>
-                                    <th>Turnaround</th>
-                                    <th>Gross Wt (MT)</th>
-                                    <th>Vehicle Wt (MT)</th>
-                                    <th>Net Wt (MT)</th>
+                                    <th style={{ textAlign: "right" }}>Turnaround (hr/min)</th>
+                                    <th style={{ textAlign: "right" }}>Gross Wt (MT)</th>
+                                    <th style={{ textAlign: "right" }}>Vehicle Wt (MT)</th>
+                                    <th style={{ textAlign: "right" }}>Net Wt (MT)</th>
+                                    <th style={{ textAlign: "right" }}>Net Wt (Brass)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -425,10 +435,11 @@ export default function RawMaterialReport({ activities, vehicles }) {
                                             <td>{formatTime(r.arrival_time)}</td>
                                             <td>{formatTime(r.loading_start_time)}</td>
                                             <td>{formatTime(r.unloading_end_time)}</td>
-                                            <td>{r.turnaround_time}</td>
-                                            <td>{fmtNum(r.total_weight)}</td>
-                                            <td style={{ color: "#6b7280" }}>{fmtNum(r.vehicle_weight)}</td>
-                                            <td style={{ fontWeight: 600, color: "#16a34a" }}>{fmtNum(r.net_weight)}</td>
+                                            <td style={{ textAlign: "right" }}>{formatDurationHM(r.turnaround_time)}</td>
+                                            <td style={{ textAlign: "right" }}>{fmtNum(r.total_weight)}</td>
+                                            <td style={{ textAlign: "right", color: "#6b7280" }}>{fmtNum(r.vehicle_weight)}</td>
+                                            <td style={{ textAlign: "right" }}>{fmtNum(r.net_weight)} MT</td>
+                                            <td style={{ textAlign: "right", fontWeight: 600, color: "#16a34a" }}>{(r.net_weight * 4.2).toFixed(2)} Brass</td>
                                         </tr>
                                     ))}
                             </tbody>

@@ -21,7 +21,7 @@ def get_vehicle_sales():
                 v.owner             AS vehicle_owner,
                 s.sales_date,
                 pt.party_name,
-                pr.product_name,
+                COALESCE(pr.product_name, 'Common Pool') AS product_name,
                 s.quantity_tons,
                 s.unit,
                 s.site,
@@ -34,7 +34,7 @@ def get_vehicle_sales():
                 ON vs.sales_id = s.sales_id
             JOIN Party pt
                 ON s.party_id = pt.party_id
-            JOIN Product pr
+            LEFT JOIN Product pr
                 ON s.product_id = pr.product_id
             LEFT JOIN Vehicle v
                 ON vs.vehicle_number = v.vehicle_number

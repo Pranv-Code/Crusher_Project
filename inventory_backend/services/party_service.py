@@ -1,6 +1,7 @@
 from flask import jsonify, request
 from db import get_connection
 from datetime import datetime
+from services.activity_log_service import log_activity
 
 
 def get_parties():
@@ -84,6 +85,11 @@ def add_party():
         role = user.get("role", "Clerk")
         status = "Active" if role == "Manager" else "Pending"
 
+        party_name_clean = capitalize_words(data["party_name"])
+        cursor.execute("SELECT party_id FROM Party WHERE LOWER(party_name) = LOWER(%s)", (party_name_clean,))
+        if cursor.fetchone():
+            return jsonify({"message": f"Duplicate Entry Detected: Party with name '{party_name_clean}' already exists."}), 400
+
         cursor.execute("""
             INSERT INTO Party
             (
@@ -97,7 +103,7 @@ def add_party():
             )
             VALUES (%s,%s,%s,%s,%s,%s,%s)
         """, (
-            capitalize_words(data["party_name"]),
+            party_name_clean,
             data["gst_no"],
             data["address"],
             data["pan_no"],
@@ -113,6 +119,16 @@ def add_party():
                 INSERT INTO Approval_Requests (requester_id, request_type, reference_id, status)
                 VALUES (%s, 'party', %s, 'pending')
             """, (user["user_id"], str(party_id)))
+
+        from services.activity_log_service import log_activity
+        log_activity(
+            user.get("user_id"),
+            user.get("username", "System"),
+            role,
+            "CREATE",
+            "Party",
+            f"Added Party '{party_name_clean}' (Status: {status})"
+        )
 
         conn.commit()
 
@@ -143,6 +159,10 @@ def update_party(id):
     cursor = conn.cursor()
 
     try:
+        party_name_clean = capitalize_words(data["party_name"])
+        cursor.execute("SELECT party_id FROM Party WHERE LOWER(party_name) = LOWER(%s) AND party_id != %s", (party_name_clean, id))
+        if cursor.fetchone():
+            return jsonify({"message": f"Duplicate Entry Detected: Party with name '{party_name_clean}' already exists."}), 400
 
         cursor.execute("""
             UPDATE Party
@@ -153,7 +173,7 @@ def update_party(id):
                 pan_no=%s
             WHERE party_id=%s
         """, (
-            capitalize_words(data["party_name"]),
+            party_name_clean,
             data["gst_no"],
             data["address"],
             data["pan_no"],

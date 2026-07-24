@@ -1,43 +1,62 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getApprovals, getMyPendingApprovals } from "../services/approvalApi";
 import "../css/sidebar.css";
 
-function Sidebar({ isCollapsed, onToggleSidebar }) {
-    const { user, logoutUser, isManager, isClerk } = useAuth();
-    const navigate = useNavigate();
+function Sidebar() {
+    const { user, isManager, isClerk } = useAuth();
+    const [pendingCount, setPendingCount] = useState(0);
+
+    useEffect(() => {
+        if (!user) return;
+        const fetchCount = async () => {
+            try {
+                if (isManager) {
+                    const res = await getApprovals();
+                    setPendingCount(res.data?.length || 0);
+                } else if (isClerk) {
+                    const res = await getMyPendingApprovals();
+                    const pending = res.data?.filter(r => r.status === "pending") || [];
+                    setPendingCount(pending.length);
+                }
+            } catch (err) {
+                console.error("Sidebar pending count fetch error:", err);
+            }
+        };
+
+        fetchCount();
+        const interval = setInterval(fetchCount, 5000);
+        return () => clearInterval(interval);
+    }, [user, isManager, isClerk]);
 
     const menuItems = [];
     if (user) {
-        menuItems.push({ name: "Dashboard", path: "/", icon: "📊" });
+        menuItems.push({ name: "Dashboard", path: "/" });
 
         if (isManager) {
             menuItems.push(
-                { name: "Products", path: "/products", icon: "📦" },
-                { name: "Production", path: "/production", icon: "🏭" },
-                { name: "Vehicles", path: "/vehicles", icon: "🚚" },
-                { name: "Raw Material", path: "/raw-material", icon: "🪨" },
-                { name: "Sales", path: "/sales", icon: "💰" },
-                { name: "Vehicle Sales", path: "/vehicle-sales", icon: "🔑" },
-                { name: "Parties", path: "/parties", icon: "👥" },
-                { name: "Reports", path: "/reports", icon: "📈" },
-                { name: "Users", path: "/users", icon: "🛡️" },
-                { name: "Settings", path: "/settings", icon: "⚙️" }
+                { name: "Products", path: "/products"},
+                { name: "Production", path: "/production"},
+                { name: "Vehicles", path: "/vehicles"},
+                { name: "Raw Material", path: "/raw-material"},
+                { name: "Sales", path: "/sales"},
+                { name: "Vehicle Sales", path: "/vehicle-sales"},
+                { name: "Parties", path: "/parties"},
+                { name: "Reports", path: "/reports" },
+                { name: "Users", path: "/users" },
+                { name: "Audit Logs", path: "/audit-logs" },
+                { name: "Settings", path: "/settings" }
             );
         } else if (isClerk) {
             menuItems.push(
-                { name: "Production", path: "/production", icon: "🏭" },
-                { name: "Raw Material", path: "/raw-material", icon: "🪨" },
-                { name: "Sales", path: "/sales", icon: "💰" },
-                { name: "Reports", path: "/reports", icon: "📈" }
+                { name: "Production", path: "/production"},
+                { name: "Raw Material", path: "/raw-material"},
+                { name: "Sales", path: "/sales"},
+                { name: "Reports", path: "/reports" }
             );
         }
     }
-
-    const handleLogout = () => {
-        logoutUser();
-        navigate("/login");
-    };
 
     const getInitials = (name) => {
         if (!name) return "E";
@@ -49,55 +68,19 @@ function Sidebar({ isCollapsed, onToggleSidebar }) {
     };
 
     return (
-        <aside className={`sidebar ${isCollapsed ? "collapsed" : ""}`}>
-            {/* Top Sidebar Header with Employee Name & Toggle Arrow */}
+        <aside className="sidebar">
+            {/* Top Sidebar Header with Employee Name */}
             <div className="sidebar-top-header">
-                {isCollapsed ? (
-                    <div 
-                        className="sidebar-employee-avatar-collapsed" 
-                        onClick={onToggleSidebar}
-                        title={`Expand Sidebar — ${user?.name || "Employee"} (${user?.role || ""})`}
-                    >
+                <div className="sidebar-employee-info">
+                    <div className="sidebar-employee-avatar">
                         {getInitials(user?.name)}
                     </div>
-                ) : (
-                    <div className="sidebar-employee-info">
-                        <div className="sidebar-employee-avatar">
-                            {getInitials(user?.name)}
-                        </div>
-                        <div className="sidebar-employee-text">
-                            <span className="sidebar-employee-name" title={user?.name || "Employee Name"}>
-                                {user?.name || "Employee Name"}
-                            </span>
-                            {/* <span className={`sidebar-employee-role ${user?.role?.toLowerCase() || ""}`}>
-                                {user?.role || "User"}
-                            </span> */}
-                        </div>
+                    <div className="sidebar-employee-text">
+                        <span className="sidebar-employee-name" title={user?.name || "Employee Name"}>
+                            {user?.name || "Employee Name"}
+                        </span>
                     </div>
-                )}
-                <button 
-                    className="sidebar-toggle-btn" 
-                    onClick={onToggleSidebar}
-                    title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-                    aria-label="Toggle Sidebar"
-                >
-                    <svg 
-                        width="18" 
-                        height="18" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2.5" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                        style={{ 
-                            transform: isCollapsed ? "rotate(180deg)" : "rotate(0deg)", 
-                            transition: "transform 0.3s ease" 
-                        }}
-                    >
-                        <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
-                </button>
+                </div>
             </div>
 
             {/* Navigation Links */}
@@ -110,23 +93,15 @@ function Sidebar({ isCollapsed, onToggleSidebar }) {
                         className={({ isActive }) =>
                             isActive ? "nav-link active" : "nav-link"
                         }
-                        title={isCollapsed ? item.name : ""}
                     >
-                        <span className="nav-link-icon">{item.icon}</span>
+                        {item.icon && <span className="nav-link-icon">{item.icon}</span>}
                         <span className="nav-link-text">{item.name}</span>
+                        {item.badge > 0 && (
+                            <span className="sidebar-badge">{item.badge}</span>
+                        )}
                     </NavLink>
                 ))}
             </nav>
-
-            {/* Footer Section with Logout */}
-            {user && (
-                <div className="sidebar-footer">
-                    <button className="logout-btn" onClick={handleLogout} title="Logout">
-                        <span className="logout-icon">🚪</span>
-                        <span className="logout-text">Logout</span>
-                    </button>
-                </div>
-            )}
         </aside>
     );
 }

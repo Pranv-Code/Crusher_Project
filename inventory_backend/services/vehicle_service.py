@@ -2,6 +2,7 @@ from flask import jsonify, request
 from db import get_connection
 from datetime import datetime
 import re
+from services.activity_log_service import log_activity
 
 def validate_vehicle_number(v_num):
     # Pattern: 1-2 letters, 2 digits, 1-2 letters, 4 digits
@@ -25,6 +26,10 @@ def add_vehicle():
         
         status = "Active" if role == "Manager" else "Pending"
 
+        cursor.execute("SELECT vehicle_number FROM Vehicle WHERE UPPER(vehicle_number) = %s", (v_num,))
+        if cursor.fetchone():
+            return jsonify({"message": f"Duplicate Entry Detected: Vehicle with number '{v_num}' already exists."}), 400
+
         cursor.execute("""
             INSERT INTO Vehicle (vehicle_number, owner, status, requested_by, requested_at)
             VALUES (%s, %s, %s, %s, %s)
@@ -41,6 +46,16 @@ def add_vehicle():
                 INSERT INTO Approval_Requests (requester_id, request_type, reference_id, status)
                 VALUES (%s, 'vehicle', %s, 'pending')
             """, (user["user_id"], v_num))
+
+        from services.activity_log_service import log_activity
+        log_activity(
+            user.get("user_id"),
+            user.get("username", "System"),
+            role,
+            "CREATE",
+            "Vehicle",
+            f"Added Vehicle '{v_num}' (Owner: {data.get('owner')}, Status: {status})"
+        )
 
         conn.commit()
 
@@ -88,6 +103,10 @@ def update_vehicle(vehicle_number):
     cursor = conn.cursor()
 
     try:
+        if new_v_num != vehicle_number:
+            cursor.execute("SELECT vehicle_number FROM Vehicle WHERE UPPER(vehicle_number) = %s", (new_v_num,))
+            if cursor.fetchone():
+                return jsonify({"message": f"Duplicate Entry Detected: Vehicle with number '{new_v_num}' already exists."}), 400
 
         cursor.execute("""
             UPDATE Vehicle

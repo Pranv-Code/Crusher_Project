@@ -48,7 +48,7 @@ export default function ProductionReport({ productions, products }) {
     const [monthFilter, setMonthFilter] = useState("");
     const [productFilter, setProductFilter] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
-    const [pdfUnit, setPdfUnit] = useState("tons");
+    const [showCharts, setShowCharts] = useState(false);
 
     // --- Pagination States ---
     const [currentPage, setCurrentPage] = useState(1);
@@ -131,11 +131,10 @@ export default function ProductionReport({ productions, products }) {
 
     const handleExport = () => {
         const productName = products.find(p => String(p.product_id) === productFilter)?.product_name || "All";
-        const label = `Production Report (Excel) | Unit: ${pdfUnit} | Filters: Product: ${productName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
+        const label = `Production Report (Excel) | Filters: Product: ${productName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
         const requestData = {
             report_type: "production",
             format: "excel",
-            pdf_unit: pdfUnit,
             filters: {
                 dateFrom,
                 dateTo,
@@ -151,22 +150,22 @@ export default function ProductionReport({ productions, products }) {
             return;
         }
 
-        const multiplier = pdfUnit === "brass" ? 4.2 : 1.0;
-        const qtyHeader = pdfUnit === "brass" ? "Quantity (Brass)" : "Quantity (Tons)";
-        const unitLabel = pdfUnit === "brass" ? "brass" : "Tons";
+        const subtitle = `Product: ${productName} | Date: ${dateFrom || "Start"} to ${dateTo || "End"} | Month: ${monthFilter || "All"}${searchQuery ? ` | Search: "${searchQuery}"` : ""}`;
 
-        const subtitle = `Unit: ${pdfUnit.toUpperCase()} | Product: ${productName} | Date: ${dateFrom || "Start"} to ${dateTo || "End"} | Month: ${monthFilter || "All"}${searchQuery ? ` | Search: "${searchQuery}"` : ""}`;
-
-        const rows = filtered.map(r => ({
-            "Date": formatDate(r.production_date),
-            "Product": r.product_name,
-            [qtyHeader]: Number((Number(r.quantity_tons || 0) * multiplier).toFixed(2)),
-            "Unit": unitLabel,
-            "Production Cost (₹)": Number(r.production_cost || 0),
-        }));
+        const rows = filtered.map(r => {
+            const tons = parseFloat(r.quantity_tons || 0);
+            return {
+                "Date": formatDate(r.production_date),
+                "Product": r.product_name,
+                "Quantity (MT)": Number(tons.toFixed(2)),
+                "Quantity (Brass)": Number((tons * 4.2).toFixed(2)),
+                "Cost / Unit (₹)": r.cost_per_unit ? Number(Number(r.cost_per_unit).toFixed(2)) : "",
+                "Total Production Cost (₹)": r.production_cost ? Number(r.production_cost) : "",
+            };
+        });
 
         exportToFormattedExcel({
-            title: `Production Report (${pdfUnit.toUpperCase()})`,
+            title: `Production Report`,
             subtitle,
             sheetName: "Production Report",
             rows,
@@ -176,11 +175,10 @@ export default function ProductionReport({ productions, products }) {
 
     const handlePdfExport = () => {
         const productName = products.find(p => String(p.product_id) === productFilter)?.product_name || "All";
-        const label = `Production Report (PDF) | Unit: ${pdfUnit} | Filters: Product: ${productName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
+        const label = `Production Report (PDF) | Filters: Product: ${productName}, Date: ${dateFrom || "Start"} to ${dateTo || "End"}, Month: ${monthFilter || "All"}, Search: ${searchQuery || "None"}`;
         const requestData = {
             report_type: "production",
             format: "pdf",
-            pdf_unit: pdfUnit,
             filters: {
                 dateFrom,
                 dateTo,
@@ -201,12 +199,11 @@ export default function ProductionReport({ productions, products }) {
             dateTo,
             month: monthFilter,
             product: productName
-        }, pdfUnit);
+        });
     };
 
     const resetFilters = () => {
         setDateFrom(""); setDateTo(""); setMonthFilter(""); setProductFilter(""); setSearchQuery("");
-        setPdfUnit("tons");
     };
 
     return (
@@ -277,8 +274,44 @@ export default function ProductionReport({ productions, products }) {
                 </div>
             </div>
 
-            {/* Charts */}
-            <div className="chart-grid">
+            {/* Collapsible Analytics Graphs */}
+            <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                margin: "18px 0 12px 0",
+                padding: "10px 14px",
+                background: "#f8fafc",
+                borderRadius: "8px",
+                border: "1px solid #e2e8f0"
+            }}>
+                <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: "8px" }}>
+                    📊 Analytics & Visual Charts
+                </span>
+                <button
+                    type="button"
+                    onClick={() => setShowCharts(!showCharts)}
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "6px 14px",
+                        backgroundColor: showCharts ? "#fee2e2" : "#e0f2fe",
+                        color: showCharts ? "#991b1b" : "#0369a1",
+                        border: `1px solid ${showCharts ? "#fca5a5" : "#bae6fd"}`,
+                        borderRadius: "6px",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease"
+                    }}
+                >
+                    <span>{showCharts ? "🔼 Hide Graphs" : "📊 Show Graphs"}</span>
+                </button>
+            </div>
+
+            {showCharts && (
+                <div className="chart-grid">
                 <div className="chart-card">
                     <h3>Production by Month (MT)</h3>
                     {byMonth.length === 0 ? <div className="report-empty">No data</div> : (
@@ -326,6 +359,7 @@ export default function ProductionReport({ productions, products }) {
                     )}
                 </div>
             </div>
+            )}
 
             {/* Table */}
             <div className="report-table-section">
@@ -335,27 +369,6 @@ export default function ProductionReport({ productions, products }) {
                         <span className="report-count">{filtered.length} records</span>
                     </div>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                        <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-                            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>Unit:</span>
-                            <select
-                                value={pdfUnit}
-                                onChange={(e) => setPdfUnit(e.target.value)}
-                                style={{
-                                    padding: "0.4rem 0.6rem",
-                                    borderRadius: "6px",
-                                    border: "1px solid #cbd5e1",
-                                    fontSize: "0.85rem",
-                                    backgroundColor: "white",
-                                    cursor: "pointer",
-                                    height: "36px",
-                                    fontWeight: 600,
-                                    boxSizing: "border-box"
-                                }}
-                            >
-                                <option value="tons">Metric Ton (MT)</option>
-                                <option value="brass">Brass (B)</option>
-                            </select>
-                        </div>
                         <button className="export-btn" onClick={handleExport}>⬇ Export to Excel</button>
                         {(isManager || isClerk) && (
                             <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
@@ -374,8 +387,10 @@ export default function ProductionReport({ productions, products }) {
                                     <th>#</th>
                                     <th>Date</th>
                                     <th>Product</th>
-                                    <th>Quantity</th>
-                                    <th>Production Cost (₹)</th>
+                                    <th style={{ textAlign: "right" }}>Quantity (MT)</th>
+                                    <th style={{ textAlign: "right" }}>Quantity (Brass)</th>
+                                    <th style={{ textAlign: "right" }}>Cost / Unit (₹)</th>
+                                    <th style={{ textAlign: "right" }}>Total Cost (₹)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -383,6 +398,7 @@ export default function ProductionReport({ productions, products }) {
                                     .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                                     .map((r, i) => {
                                         const tons = parseFloat(r.quantity_tons || 0);
+                                        const cpu = r.cost_per_unit || (r.production_cost && tons > 0 ? (r.production_cost / tons) : 0);
                                         return (
                                             <tr key={r.production_id}>
                                                 <td style={{ color: "#9ca3af", fontSize: 12 }}>
@@ -390,16 +406,10 @@ export default function ProductionReport({ productions, products }) {
                                                 </td>
                                                 <td>{formatDate(r.production_date)}</td>
                                                 <td><strong>{r.product_name}</strong></td>
-                                                <td>
-                                                    <div style={{ lineHeight: 1.4 }}>
-                                                        <span style={{ fontWeight: 600 }}>{fmtTons(r.quantity_tons)} MT</span>
-                                                        <br />
-                                                        <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                                                            ≈ {(r.quantity_tons * 4.2).toFixed(2)} Brass
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td>{r.production_cost ? `₹${formatInr(r.production_cost)}` : "—"}</td>
+                                                <td style={{ textAlign: "right" }}><strong>{fmtTons(r.quantity_tons)} MT</strong></td>
+                                                <td style={{ textAlign: "right" }}><strong>{(r.quantity_tons * 4.2).toFixed(2)} Brass</strong></td>
+                                                <td style={{ textAlign: "right" }}>{cpu ? `₹${formatInr(cpu)}` : "—"}</td>
+                                                <td style={{ textAlign: "right" }}>{r.production_cost ? `₹${formatInr(r.production_cost)}` : "—"}</td>
                                             </tr>
                                         );
                                     })}

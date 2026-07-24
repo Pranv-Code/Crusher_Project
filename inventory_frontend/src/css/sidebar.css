@@ -3,13 +3,13 @@
     top: 0;
     left: 0;
     height: 100vh;
-    width: 250px;
+    width: 215px;
     z-index: 1000;
     background: #F5F0E6; /* Comforting Warm Ivory Background */
     color: #2C2623;
     display: flex;
     flex-direction: column;
-    padding: 18px 14px;
+    padding: 18px 10px;
     border-right: 1px solid #E2D8C8;
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
     overflow-y: auto;
@@ -19,8 +19,8 @@
 
 /* Fix: Prevent collapsed sidebar from scrolling */
 .sidebar.collapsed {
-    width: 76px;
-    padding: 18px 8px;
+    width: 68px;
+    padding: 18px 6px;
     align-items: center;
     overflow: hidden !important;
     overflow-y: hidden !important;
@@ -234,4 +234,40 @@
     background: #DC2626;
     color: #FFFFFF;
     border-color: #DC2626;
+}
+
+/* Sidebar Real-Time Pending Counter Badges */
+.sidebar-badge {
+    margin-left: auto;
+    background-color: #EF4444;
+    color: #FFFFFF;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+    animation: sidebarPulseBadge 2s infinite ease-in-out;
+}
+
+.sidebar-badge-collapsed {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    background-color: #EF4444;
+    color: #FFFFFF;
+    font-size: 0.65rem;
+    font-weight: 800;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #F5F0E6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+@keyframes sidebarPulseBadge {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
 }

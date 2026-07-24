@@ -26,6 +26,27 @@ function CrudTable({
         currentPage * pageSize
     );
 
+    const isNumericCol = (column) => {
+        if (column.align === "right") return true;
+        if (column.align === "left" || column.align === "center") return false;
+        const lower = (column.label || column.key || "").toLowerCase();
+        return (
+            lower.includes("quantity") ||
+            lower.includes("weight") ||
+            lower.includes("cost") ||
+            lower.includes("price") ||
+            lower.includes("amount") ||
+            lower.includes("tons") ||
+            lower.includes("brass") ||
+            lower.includes("rate") ||
+            lower.includes("count") ||
+            lower.includes("gross") ||
+            lower.includes("net") ||
+            lower.includes("total") ||
+            lower.includes("₹")
+        );
+    };
+
     return (
         <div className="crud-table-wrapper" style={{
             background: "#ffffff",
@@ -37,11 +58,14 @@ function CrudTable({
                 <table className="crud-table">
                     <thead>
                         <tr>
-                            {columns.map((column) => (
-                                <th key={column.key}>
-                                    {column.label}
-                                </th>
-                            ))}
+                            {columns.map((column) => {
+                                const align = column.align || (isNumericCol(column) ? "right" : "left");
+                                return (
+                                    <th key={column.key} style={{ textAlign: align }}>
+                                        {column.label}
+                                    </th>
+                                );
+                            })}
 
                             {renderActions && (
                                 <th className="actions-column">
@@ -54,19 +78,26 @@ function CrudTable({
                     <tbody>
                         {paginatedData.map((row) => (
                             <tr key={row[keyField]}>
-                                {columns.map((column) => (
-                                    <td key={column.key}>
-                                        {column.render
-                                            ? column.render(row)
-                                            : column.key === "status"
-                                                ? (
-                                                    <span className={`badge badge-${row[column.key]?.toLowerCase()}`}>
-                                                        {row[column.key]}
-                                                    </span>
-                                                )
-                                                : row[column.key]}
-                                    </td>
-                                ))}
+                                {columns.map((column) => {
+                                    const isNum = isNumericCol(column);
+                                    const align = column.align || (isNum ? "right" : "left");
+                                    const val = row[column.key];
+                                    return (
+                                        <td key={column.key} style={{ textAlign: align }}>
+                                            {column.render
+                                                ? column.render(row)
+                                                : column.key === "status"
+                                                    ? (
+                                                        <span className={`badge badge-${row[column.key]?.toLowerCase()}`}>
+                                                            {val}
+                                                        </span>
+                                                    )
+                                                    : (isNum && val !== null && val !== undefined && val !== "" && !isNaN(val))
+                                                        ? Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                        : val}
+                                        </td>
+                                    );
+                                })}
 
                                 {renderActions && (
                                     <td className="actions-cell">

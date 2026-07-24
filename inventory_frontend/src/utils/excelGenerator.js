@@ -90,9 +90,10 @@ export async function exportToFormattedExcel({
     // Helper to determine alignment & numeric format based on column name
     const getColumnSpec = (colName) => {
         const lower = colName.toLowerCase();
-        const isCurrency = lower.includes("price") || lower.includes("cost") || lower.includes("amount") || lower.includes("₹");
+        const isRateOrPerUnit = lower.includes("/ unit") || lower.includes("/unit") || lower.includes("per unit") || lower.includes("cost/unit") || lower.includes("rate");
+        const isCurrency = (lower.includes("price") || lower.includes("cost") || lower.includes("amount") || lower.includes("₹")) && !isRateOrPerUnit;
         const isQuantity = lower.includes("quantity") || lower.includes("weight") || lower.includes("mt") || lower.includes("tons") || lower.includes("(t)");
-        const isNumeric = isCurrency || isQuantity;
+        const isNumeric = isCurrency || isQuantity || isRateOrPerUnit;
         
         const isCenter = lower.includes("date") || lower.includes("time") || lower.includes("unit") || lower.includes("vehicle") || lower.includes("status");
 
@@ -101,10 +102,10 @@ export async function exportToFormattedExcel({
         else if (isCenter) align = "center";
 
         let numFmt = undefined;
-        if (isCurrency) numFmt = '"₹"#,##0.00';
+        if (isCurrency || isRateOrPerUnit) numFmt = '"₹"#,##0.00';
         else if (isQuantity) numFmt = '#,##0.00';
 
-        return { align, isNumeric, numFmt };
+        return { align, isNumeric, isSummable: isCurrency || isQuantity, numFmt };
     };
 
     // Track column widths
@@ -135,8 +136,10 @@ export async function exportToFormattedExcel({
                 // If column is designated as numeric or value parses nicely as number
                 if (spec.isNumeric && !isNaN(numVal)) {
                     val = numVal;
-                    colTotals[colIdx] += numVal;
-                    colHasNumeric[colIdx] = true;
+                    if (spec.isSummable) {
+                        colTotals[colIdx] += numVal;
+                        colHasNumeric[colIdx] = true;
+                    }
                 }
             }
 

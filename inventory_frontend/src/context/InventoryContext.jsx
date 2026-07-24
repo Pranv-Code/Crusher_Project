@@ -135,7 +135,7 @@ export const InventoryProvider = ({ children }) => {
 
     useEffect(() => {
         const interval = setInterval(() => {
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem("token") || localStorage.getItem("token");
             if (!token) return;
 
             fetchProducts(true);

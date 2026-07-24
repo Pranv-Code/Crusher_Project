@@ -78,6 +78,8 @@ def register_user():
         conn.close()
 
 
+from services.activity_log_service import log_activity
+
 def login_user():
     data = request.json
     username_or_email = data.get("username", "").strip()
@@ -95,13 +97,16 @@ def login_user():
         user = cursor.fetchone()
 
         if not user:
+            log_activity(None, username_or_email, "Guest", "LOGIN_FAILED", "Auth", f"Failed login attempt for: {username_or_email}")
             return jsonify({"message": "Invalid username or password"}), 401
 
         if user["status"] != "Active":
+            log_activity(user["user_id"], user["username"], user["role"], "LOGIN_FAILED", "Auth", f"Login blocked: Account is {user['status']}")
             return jsonify({"message": f"User account is {user['status'].lower()}"}), 403
 
         # Verify password
         if not check_password(password, user["password_hash"]):
+            log_activity(user["user_id"], user["username"], user["role"], "LOGIN_FAILED", "Auth", f"Failed password attempt for user: {user['username']}")
             return jsonify({"message": "Invalid username or password"}), 401
 
         # Generate token
@@ -110,6 +115,8 @@ def login_user():
         # Update last login
         cursor.execute("UPDATE Users SET last_login = %s WHERE user_id = %s", (datetime.utcnow(), user["user_id"]))
         conn.commit()
+
+        log_activity(user["user_id"], user["username"], user["role"], "LOGIN", "Auth", f"User '{user['name']}' ({user['role']}) logged in successfully")
 
         return jsonify({
             "token": token,

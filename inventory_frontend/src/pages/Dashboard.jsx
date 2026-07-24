@@ -154,11 +154,11 @@ const totalProductionTons = production.reduce(
                         <span className="stat-card-value">{totalProductionTons.toFixed(2)} MT</span>
                         <span className="stat-card-subtitle">Cumulative till date</span>
                     </div>
-                    <div className="stat-card">
+                    {/* <div className="stat-card">
                         <span className="stat-card-title">Active Vehicles</span>
                         <span className="stat-card-value">{activeVehiclesCount}</span>
                         <span className="stat-card-subtitle">Out of {vehicles.length} registered</span>
-                    </div>
+                    </div> */}
                     {/* <div className="stat-card">
                         <span className="stat-card-title">Total Customers</span>
                         <span className="stat-card-value">{totalPartiesCount}</span>
