@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
 import { useInventory } from "../context/InventoryContext";
+import { useAuth } from "../context/AuthContext";
 
 import {
     addVehicle,
@@ -23,6 +24,7 @@ import EditModal from "../components/modal/EditModal";
 
 function Vehicles() {
     const { vehicles, fetchVehicles, fetchActiveVehicles } = useInventory();
+    const { isManager, isClerk } = useAuth();
     const [showAddForm, setShowAddForm] = useState(false);
 
     const [newVehicle, setNewVehicle] = useState({
@@ -69,7 +71,7 @@ function Vehicles() {
         }
 
         try {
-            await addVehicle({
+            const res = await addVehicle({
                 ...newVehicle,
                 vehicle_number: cleanedNumber
             });
@@ -79,6 +81,9 @@ function Vehicles() {
                 owner: "",
             });
             setShowAddForm(false);
+            if (res.data?.message) {
+                alert(res.data.message);
+            }
         } catch (err) {
             console.error(err);
             alert(err.response?.data?.message || err.response?.data?.error || "Failed to add vehicle.");
@@ -162,7 +167,7 @@ function Vehicles() {
                         variant={showAddForm ? "secondary" : "primary"}
                         onClick={() => setShowAddForm(!showAddForm)}
                     >
-                        {showAddForm ? "Cancel" : "+ Add Vehicle"}
+                        {showAddForm ? "Cancel" : (isManager ? "+ Add Vehicle" : "+ Request New Vehicle")}
                     </Button>
                 }
             />
@@ -172,7 +177,7 @@ function Vehicles() {
                     <div className="form-card">
                         <div className="form-grid">
                             <InputField
-                                label="Vehicle Number"
+                                label="Vehicle Number *"
                                 name="vehicle_number"
                                 type="text"
                                 placeholder="e.g. MH09AB1234"
@@ -186,7 +191,7 @@ function Vehicles() {
                             />
 
                             <InputField
-                                label="Owner"
+                                label="Owner *"
                                 name="owner"
                                 type="text"
                                 placeholder="Owner name"
@@ -201,7 +206,7 @@ function Vehicles() {
                         </div>
 
                         <Button variant="success" onClick={handleAddVehicle}>
-                            Save Vehicle
+                            {isManager ? "Save Vehicle" : "Submit Vehicle Request"}
                         </Button>
                     </div>
                 )}
@@ -209,19 +214,19 @@ function Vehicles() {
                 {vehicles.length === 0 ? (
                     <EmptyState
                         title="No Vehicles Found"
-                        message="Click Add Vehicle to create one."
+                        message={isManager ? "Click Add Vehicle to create one." : "Click Request New Vehicle to request one."}
                     />
                 ) : (
                     <CrudTable
                         columns={columns}
                         data={vehicles}
                         keyField="vehicle_number"
-                        renderActions={(row) => (
+                        renderActions={isManager ? (row) => (
                             <ActionButtons
                                 onEdit={() => handleEdit(row)}
                                 onDelete={() => handleDeleteClick(row.vehicle_number)}
                             />
-                        )}
+                        ) : null}
                     />
                 )}
             </div>

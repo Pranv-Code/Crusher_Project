@@ -57,7 +57,7 @@ export default function GoodsReturns() {
     const [showModal, setShowModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState("");
-    
+
     // Modal Form inputs
     const [selectedSaleId, setSelectedSaleId] = useState("");
     const [returnDate, setReturnDate] = useState(new Date().toISOString().split("T")[0]);
@@ -217,33 +217,6 @@ export default function GoodsReturns() {
     return (
         <Layout>
             <div className="dashboard-container" style={{ gap: "20px" }}>
-                {/* Header Section */}
-                <div style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: "16px",
-                    backgroundColor: "white",
-                    padding: "20px 24px",
-                    borderRadius: "14px",
-                    border: "1px solid #e2e8f0",
-                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)"
-                }}>
-                    <div>
-                        <h2 style={{ margin: 0, fontSize: "1.5rem", color: "#0f172a", fontWeight: "800" }}>
-                            📦 Goods Return Management
-                        </h2>
-                        <p style={{ margin: "4px 0 0 0", fontSize: "0.9rem", color: "#64748b" }}>
-                            Track returned goods from parties, restock usable items into inventory, or record damaged wastage.
-                        </p>
-                    </div>
-
-                    <Button onClick={handleOpenModal} style={{ backgroundColor: "#2563eb", color: "white", fontWeight: "600" }}>
-                        + Record Goods Return
-                    </Button>
-                </div>
-
                 {/* Summary Metrics Grid */}
                 <div className="stats-grid">
                     <div className="stat-card">
@@ -253,14 +226,14 @@ export default function GoodsReturns() {
                     </div>
 
                     <div className="stat-card" style={{ borderLeft: "4px solid #10b981" }}>
-                        <span className="stat-card-title" style={{ color: "#047857" }}>🟢 Good to Use (Restocked)</span>
-                        <span className="stat-card-value" style={{ color: "#047857" }}>{Number(stats.restocked_tons || 0).toFixed(2)} MT</span>
-                        <span className="stat-card-subtitle">Added back to {settings.inventory_mode === "COMMON_POOL" ? "Common Pool" : "Product Stock"}</span>
+                        <span className="stat-card-title" style={{ color: "#000000ff" }}>🟢 Good to Use (Restocked)</span>
+                        <span className="stat-card-value" style={{ color: "#000000ff" }}>{Number(stats.restocked_tons || 0).toFixed(2)} MT</span>
+                        <span className="stat-card-subtitle">Added back to {settings.inventory_mode === "COMMON_POOL" ? "Quarry Material" : "Product Stock"}</span>
                     </div>
 
                     <div className="stat-card" style={{ borderLeft: "4px solid #ef4444" }}>
-                        <span className="stat-card-title" style={{ color: "#b91c1c" }}>🔴 Damaged / Wastage</span>
-                        <span className="stat-card-value" style={{ color: "#b91c1c" }}>{Number(stats.damaged_tons || 0).toFixed(2)} MT</span>
+                        <span className="stat-card-title" style={{ color: "#090808ff" }}>🔴 Damaged / Wastage</span>
+                        <span className="stat-card-value" style={{ color: "#000000ff" }}>{Number(stats.damaged_tons || 0).toFixed(2)} MT</span>
                         <span className="stat-card-subtitle">Discarded (not added to inventory)</span>
                     </div>
                 </div>
@@ -341,37 +314,20 @@ export default function GoodsReturns() {
                             style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
                         />
 
-                        <button
+                        <Button
                             type="submit"
-                            style={{
-                                padding: "8px 16px",
-                                backgroundColor: "#0f172a",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "6px",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                                fontSize: "0.9rem"
-                            }}
+                            className="btn-primary"
                         >
                             Search
-                        </button>
+                        </Button>
 
-                        <button
+                        <Button
                             type="button"
+                            className="btn-danger"
                             onClick={handleResetFilters}
-                            style={{
-                                padding: "8px 14px",
-                                backgroundColor: "#f1f5f9",
-                                color: "#475569",
-                                border: "1px solid #cbd5e1",
-                                borderRadius: "6px",
-                                cursor: "pointer",
-                                fontSize: "0.9rem"
-                            }}
                         >
                             Reset
-                        </button>
+                        </Button>
                     </form>
                 </div>
 
@@ -387,7 +343,7 @@ export default function GoodsReturns() {
                         <thead>
                             <tr>
                                 <th>Return Date</th>
-                                <th>Sale Ref</th>
+                                {/* <th>Sale Ref</th> */}
                                 <th>Party Name</th>
                                 <th>Product</th>
                                 <th>Vehicle #</th>
@@ -415,7 +371,7 @@ export default function GoodsReturns() {
                                 returns.map((item) => (
                                     <tr key={item.return_id}>
                                         <td>{formatDate(item.return_date)}</td>
-                                        <td>
+                                        {/* <td>
                                             {item.sale_id ? (
                                                 <span style={{ fontWeight: "600", color: "#2563eb" }}>
                                                     Sale #{item.sale_id}
@@ -428,7 +384,7 @@ export default function GoodsReturns() {
                                             ) : (
                                                 <span style={{ color: "#94a3b8" }}>— (Direct)</span>
                                             )}
-                                        </td>
+                                        </td> */}
                                         <td><strong>{item.party_name}</strong></td>
                                         <td>{item.product_name}</td>
                                         <td>{item.vehicle_number || "—"}</td>
@@ -603,7 +559,7 @@ export default function GoodsReturns() {
                                 {/* Product Select */}
                                 <div>
                                     <label style={{ display: "block", marginBottom: "4px", fontSize: "0.85rem", fontWeight: "600", color: "#475569" }}>
-                                        Product: {settings.inventory_mode !== "COMMON_POOL" && conditionType === "GOOD" ? "*" : "(Optional in Common Pool)"}
+                                        Product: {settings.inventory_mode !== "COMMON_POOL" && conditionType === "GOOD" ? "*" : "(Optional in Quarry Material Mode)"}
                                     </label>
                                     <select
                                         value={productId}
@@ -611,7 +567,7 @@ export default function GoodsReturns() {
                                         disabled={!!selectedSaleId}
                                         style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
                                     >
-                                        <option value="">-- Select Product / Common Pool --</option>
+                                        <option value="">-- Select Product / Quarry Material --</option>
                                         {products.map(pr => (
                                             <option key={pr.product_id} value={pr.product_id}>{pr.product_name}</option>
                                         ))}
@@ -689,7 +645,7 @@ export default function GoodsReturns() {
                                             <div>
                                                 <strong style={{ color: "#065f46" }}>🟢 Good to Use (Restock)</strong>
                                                 <div style={{ fontSize: "0.75rem", color: "#047857" }}>
-                                                    Returned material will be added back to {settings.inventory_mode === "COMMON_POOL" ? "Common Pool stock" : "product stock"}.
+                                                    Returned material will be added back to {settings.inventory_mode === "COMMON_POOL" ? "Quarry Material stock" : "product stock"}.
                                                 </div>
                                             </div>
                                         </label>

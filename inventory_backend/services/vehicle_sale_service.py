@@ -21,7 +21,7 @@ def get_vehicle_sales():
                 v.owner             AS vehicle_owner,
                 s.sales_date,
                 pt.party_name,
-                COALESCE(pr.product_name, 'Common Pool') AS product_name,
+                COALESCE(pr.product_name, 'Quarry Material') AS product_name,
                 s.quantity_tons,
                 s.unit,
                 s.site,

@@ -128,7 +128,7 @@ const totalProductionTons = production.reduce(
                 {/* Key Metrics Stats Grid */}
                 <div className="stats-grid">
                     <div className="stat-card">
-                        <span className="stat-card-title">Montly Sales</span>
+                        <span className="stat-card-title">Monthly Sales</span>
                         <span className="stat-card-value">{monthlySalesTons.toFixed(2)} MT</span>
                         {/* <span className="stat-card-subtitle">Revenue: ₹{totalSalesRevenue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span> */}
                         <span className="stat-card-subtitle">Monthly (as of Today)</span>
@@ -174,14 +174,14 @@ const totalProductionTons = production.reduce(
                                     <div style={{
                                         fontSize: "2rem",
                                         fontWeight: "700",
-                                        color: "#309be8",
+                                        color: "#000000ff",
                                         marginBottom: "0.5rem"
                                     }}>
                                         {Number(settings.common_pool_stock).toFixed(2)} MT
                                     </div>
                                     <div style={{
-                                        fontSize: "0.9rem",
-                                        color: "var(--text-muted, #888)",
+                                        fontSize: "1.5rem",
+                                        color: "var(--text-muted, #242222b9)",
                                         marginBottom: "1rem"
                                     }}>
                                         ≈ {tonToBrass(settings.common_pool_stock, settings.tons_per_brass || 4.2).toFixed(2)} Brass
@@ -195,7 +195,7 @@ const totalProductionTons = production.reduce(
                                         color: "var(--text-primary, #1e293b)",
                                         lineHeight: "1.4"
                                     }}>
-                                        ℹ️ The system is currently in <strong>Common Pool</strong> mode. All stock is consolidated into a single total pool rather than tracked per product.
+                                        ℹ️ The system is currently in <strong>Quarry Material</strong> mode. All stock is consolidated into a single total pool rather than tracked per product.
                                     </div>
                                 </div>
                             ) : activeProducts.length === 0 ? (
@@ -272,7 +272,7 @@ const totalProductionTons = production.reduce(
                                 <table className="db-table">
                                     <thead>
                                         <tr>
-                                            <th>Date</th>
+                                            <th style={{ whiteSpace: "nowrap" }}>Date</th>
                                             <th>Vehicle</th>
                                             <th>Product</th>
                                             <th>Quantity</th>
@@ -281,7 +281,7 @@ const totalProductionTons = production.reduce(
                                     <tbody>
                                         {recentSales.map(item => (
                                             <tr key={item.sales_id}>
-                                                <td>{formatDate(item.sales_date)}</td>
+                                                <td style={{ whiteSpace: "nowrap" }}>{formatDate(item.sales_date)}</td>
                                                 <td><strong>{item.vehicle_number}</strong></td>
                                                 <td>{item.product_name || `ID: ${item.product_id}`}</td>
                                                 <td>
@@ -309,23 +309,23 @@ const totalProductionTons = production.reduce(
                                 <table className="db-table">
                                     <thead>
                                         <tr>
-                                            <th>Date</th>
+                                            <th style={{ whiteSpace: "nowrap" }}>Date</th>
                                             <th>Product</th>
                                             <th>Quantity</th>
-                                            <th>Cost (₹)</th>
+                                            <th style={{ textAlign: "right", whiteSpace: "nowrap" }}>Cost (₹)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {recentProduction.map(item => (
                                             <tr key={item.production_id}>
-                                                <td>{formatDate(item.production_date)}</td>
+                                                <td style={{ whiteSpace: "nowrap" }}>{formatDate(item.production_date)}</td>
                                                 <td>{item.product_name || `ID: ${item.product_id}`}</td>
                                                 <td>
                                                     <span className="db-badge db-badge-brass">
                                                         {parseFloat(item.quantity_tons).toFixed(2)} MT 
                                                     </span>
                                                 </td>
-                                                <td>{item.production_cost ? `₹${formatInr(item.production_cost)}` : "—"}</td>
+                                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{item.production_cost ? `₹${formatInr(item.production_cost)}` : "—"}</td>
                                             </tr>
                                         ))}
                                     </tbody>

@@ -138,7 +138,7 @@ def build_change_details(cursor, req):
 
         elif req_type == "production_edit":
             cursor.execute("""
-                SELECT p.production_id, p.production_date, COALESCE(pr.product_name, 'Common Pool') AS product_name, pr.product_id,
+                SELECT p.production_id, p.production_date, COALESCE(pr.product_name, 'Quarry Material') AS product_name, pr.product_id,
                        p.quantity_tons, p.unit, p.cost_per_unit, p.production_cost
                 FROM Production p
                 LEFT JOIN Product pr ON p.product_id = pr.product_id
@@ -281,19 +281,35 @@ def build_change_details(cursor, req):
             ]
 
         elif req_type == "report_print":
-            rtype = ref_data.get("report_type", "report").capitalize()
-            rfmt = ref_data.get("format", "EXCEL").upper()
-            runit = ref_data.get("pdf_unit", "tons").upper()
+            rtype = str(ref_data.get("report_type", "report"))
+            rfmt = str(ref_data.get("format", "PDF")).upper()
+            runit = str(ref_data.get("pdf_unit", "tons")).upper()
             rlabel = ref_data.get("label", "")
-            change_details["title"] = f"Export {rtype} Report"
-            change_details["action_badge"] = "REPORT"
-            change_details["short_summary"] = f"Export {rtype} Report ({rfmt}, {runit})"
-            change_details["fields"] = [
-                { "field": "Report Type", "current": "—", "proposed": f"{rtype} Report", "changed": True },
+            rreason = ref_data.get("reason", "")
+
+            if rfmt == "INVOICE":
+                change_details["title"] = f"Export Invoice ({rtype})"
+                change_details["action_badge"] = "INVOICE"
+                change_details["short_summary"] = f"Export Non-GST Invoice for {rtype}"
+            elif rfmt == "EXCEL":
+                change_details["title"] = f"Export {rtype} Excel"
+                change_details["action_badge"] = "EXCEL"
+                change_details["short_summary"] = f"Export {rtype} to Excel"
+            else:
+                change_details["title"] = f"Export {rtype} PDF"
+                change_details["action_badge"] = "REPORT"
+                change_details["short_summary"] = f"Export {rtype} PDF Report"
+
+            fields = [
+                { "field": "Report Type", "current": "—", "proposed": rtype, "changed": True },
                 { "field": "Export Format", "current": "—", "proposed": rfmt, "changed": True },
-                { "field": "Selected Unit", "current": "—", "proposed": runit, "changed": True },
-                { "field": "Filter Criteria", "current": "—", "proposed": rlabel, "changed": True }
             ]
+            if rreason:
+                fields.append({ "field": "Reason", "current": "—", "proposed": rreason, "changed": True })
+            if rlabel:
+                fields.append({ "field": "Filter Details", "current": "—", "proposed": rlabel, "changed": True })
+
+            change_details["fields"] = fields
     except Exception as e:
         print(f"Error building change details: {e}")
 
@@ -627,17 +643,20 @@ def get_my_pending_approvals(clerk_id):
 
 def request_report_print(clerk_id):
     data = request.json
-    report_type = data.get("report_type")
-    fmt = data.get("format")
-    filters = data.get("filters", {})
+    report_type = data.get("report_type", "Report")
+    fmt = data.get("format", "pdf")
+    parameters = data.get("parameters") or data.get("filters") or {}
     pdf_unit = data.get("pdf_unit")
-    label = data.get("label", f"{report_type.capitalize()} Report ({fmt.upper()})")
+    reason = data.get("reason", "")
+    label = data.get("label", f"{report_type} ({str(fmt).upper()})")
     
     reference_data_dict = {
         "report_type": report_type,
         "format": fmt,
-        "filters": filters,
+        "parameters": parameters,
+        "filters": parameters,
         "pdf_unit": pdf_unit,
+        "reason": reason,
         "label": label
     }
     

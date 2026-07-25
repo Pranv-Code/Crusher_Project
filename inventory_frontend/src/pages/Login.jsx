@@ -38,10 +38,6 @@ export default function Login() {
                 <div className="auth-left">
                     <div className="logo-hero-container">
                         <img src={logoImg} alt="White Cloud Global Solutions" className="auth-large-logo" />
-                        <div className="brand-tagline">
-                            <h3>Crusher IMS</h3>
-                            <p>Inventory & Logistics Management System</p>
-                        </div>
                     </div>
                 </div>
 

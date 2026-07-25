@@ -92,9 +92,9 @@
 }
 
 .pagination-btn.active {
-    background: #2563eb;
-    color: #ffffff;
-    border-color: #2563eb;
+    background: #f1f5f9;
+    color: #000;
+    border-color: #98e9e2;
 }
 
 .pagination-btn.arrow {

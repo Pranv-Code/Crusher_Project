@@ -141,8 +141,8 @@ function Navbar() {
     }, [user, isManager, isClerk]);
 
     return (
-        <header className="navbar-container">
-            <div className="navbar-brand" style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
+        <header className="navbar navbar-container">
+            <div className="navbar-brand" onClick={() => navigate("/")}>
                 <img 
                     src="/logo.png" 
                     alt="Vishwajeet Enterprises Logo" 
@@ -153,32 +153,22 @@ function Navbar() {
                 />
                 <div>
                     <h2 className="navbar-title">VISHWAJEET ENTERPRISES</h2>
-                    <span className="navbar-subtitle">Inventory &amp; Production Portal</span>
                 </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <div className="navbar-right-actions">
                 {user && (isManager || isClerk) && (
                     <NavLink
                         to={isManager ? "/approvals" : "/my-pending"}
+                        className="nav-pending-link"
                         style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            padding: "6px 12px",
                             backgroundColor: pendingCount > 0 ? "#fee2e2" : "#f1f5f9",
                             color: pendingCount > 0 ? "#b91c1c" : "#475569",
                             border: pendingCount > 0 ? "1px solid #fca5a5" : "1px solid #cbd5e1",
-                            textDecoration: "none",
-                            borderRadius: "6px",
-                            fontWeight: 600,
-                            fontSize: "0.85rem",
-                            position: "relative",
-                            transition: "all 0.2s"
                         }}
                     >
                         <span style={{ fontSize: "1.1rem" }}>💬</span>
-                        <span>{isManager ? "Pending Approvals" : "Pending Work"}</span>
+                        <span style={{color: "black"}}>{isManager ? "Pending Approvals" : "Pending Work"}</span>
                         {pendingCount > 0 && (
                             <span className="pulse-badge" style={{
                                 position: "absolute",
@@ -190,7 +180,7 @@ function Navbar() {
                                 width: "18px",
                                 height: "18px",
                                 display: "flex",
-                                justifyCenter: "center",
+                                justifyContent: "center",
                                 alignItems: "center",
                                 fontSize: "0.75rem",
                                 fontWeight: "bold",
@@ -204,20 +194,7 @@ function Navbar() {
                 )}
                 
                 <button 
-                    style={{ 
-                        fontSize: "0.85rem", 
-                        padding: "6px 12px", 
-                        backgroundColor: "#f1f5f9", 
-                        color: "#0f172a", 
-                        border: "1px solid #cbd5e1",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        transition: "all 0.2s"
-                    }}
+                    className="nav-btn"
                     onClick={() => {
                         fetchConversionFactor();
                         setShowModal(true);
@@ -226,18 +203,7 @@ function Navbar() {
                     🔄 Unit Converter
                 </button>
 
-                <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "6px 12px",
-                    backgroundColor: "#f8fafc",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: "6px",
-                    fontSize: "0.85rem",
-                    fontWeight: 600,
-                    color: "#334155"
-                }}>
+                <div className="nav-date-badge">
                     <span>🕒</span>
                     <span>
                         {currentDateTime.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}

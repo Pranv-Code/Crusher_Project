@@ -411,18 +411,18 @@ export default function RawMaterialReport({ activities, vehicles }) {
                                         style={{ cursor: "pointer", width: "16px", height: "16px" }}
                                     />
                                 </th>
-                                <th>#</th>
-                                <th>Date</th>
-                                <th>Vehicle Number</th>
-                                <th>Site</th>
-                                <th>Arrival</th>
-                                <th>Start</th>
-                                <th>End</th>
-                                <th style={{ textAlign: "right" }}>T/Around</th>
-                                <th style={{ textAlign: "right" }}>Gross (MT)</th>
-                                <th style={{ textAlign: "right" }}>Tare (MT)</th>
-                                <th style={{ textAlign: "right" }}>Net (MT)</th>
-                                <th style={{ textAlign: "right" }}>Net (Brass)</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>#</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Date</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Vehicle Number</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Site</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Arrival</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Start</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>End</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>T/Around</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Gross (MT)</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Tare (MT)</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Net (MT)</th>
+                                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Net (Brass)</th>
                             </tr>
                         </thead>
                         <tbody>

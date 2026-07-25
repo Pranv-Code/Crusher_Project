@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
 import { useInventory } from "../context/InventoryContext";
+import { useAuth } from "../context/AuthContext";
 
 import {
     addParty,
@@ -28,6 +29,7 @@ function Parties() {
     };
 
     const { parties, fetchParties } = useInventory();
+    const { isManager, isClerk } = useAuth();
     const [search, setSearch] = useState("");
     const [showAddForm, setShowAddForm] = useState(false);
 
@@ -70,7 +72,7 @@ function Parties() {
             return;
         }
         try {
-            await addParty({
+            const res = await addParty({
                 ...newParty,
                 party_name: capitalizeWords(newParty.party_name)
             });
@@ -82,8 +84,12 @@ function Parties() {
                 pan_no: "",
             });
             setShowAddForm(false);
+            if (res.data?.message) {
+                alert(res.data.message);
+            }
         } catch (err) {
             console.error(err);
+            alert(err.response?.data?.message || err.response?.data?.error || "Failed to submit party.");
         }
     };
 
@@ -154,7 +160,7 @@ function Parties() {
                         variant={showAddForm ? "secondary" : "primary"}
                         onClick={() => setShowAddForm(!showAddForm)}
                     >
-                        {showAddForm ? "Cancel" : "+ Add Party"}
+                        {showAddForm ? "Cancel" : (isManager ? "+ Add Party" : "+ Request New Party")}
                     </Button>
                 }
             />
@@ -163,7 +169,7 @@ function Parties() {
                 <div className="form-card">
                     <div className="form-grid">
                         <InputField
-                            label="Party Name"
+                            label="Party Name *"
                             name="party_name"
                             type="text"
                             value={newParty.party_name}
@@ -200,7 +206,7 @@ function Parties() {
                         />
                     </div>
                     <Button variant="success" onClick={handleAddParty}>
-                        Save Party
+                        {isManager ? "Save Party" : "Submit Party Request"}
                     </Button>
                 </div>
             )}
@@ -215,19 +221,19 @@ function Parties() {
                 {filteredParties.length === 0 ? (
                     <EmptyState
                         title="No Parties Found"
-                        message="Click Add Party to create one."
+                        message={isManager ? "Click Add Party to create one." : "Click Request New Party to request one."}
                     />
                 ) : (
                     <CrudTable
                         columns={columns}
                         data={filteredParties}
                         keyField="party_id"
-                        renderActions={(row) => (
+                        renderActions={isManager ? (row) => (
                             <ActionButtons
                                 onEdit={() => handleEdit(row)}
                                 onDelete={() => handleDeleteClick(row.party_id)}
                             />
-                        )}
+                        ) : null}
                     />
                 )}
             </div>

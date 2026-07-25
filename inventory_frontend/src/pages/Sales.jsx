@@ -44,7 +44,7 @@ const QtyCell = ({ displayQty, displayUnit, convertedQty, convertedUnit, returne
                 fontSize: "0.8em",
                 display: "inline-block"
             }}>
-                ↩ -{Number(returnedTons).toFixed(2)} MT
+                -{Number(returnedTons).toFixed(2)} MT
             </div>
         )}
     </div>
@@ -154,7 +154,7 @@ const Sales = () => {
                     setTonsPerBrass(parseFloat(res.data.tons_per_brass) || 4.2);
                 }
             })
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     // --- Pagination States ---
@@ -731,7 +731,7 @@ const Sales = () => {
                                 </div>
                             </div>
                             <button className="primary-btn" onClick={() => {
-                                if(!newSale.sales_date || !newSale.party_id || !newSale.product_id || !newSale.vehicle_number || !newSale.unit || !newSale.quantity) {
+                                if (!newSale.sales_date || !newSale.party_id || !newSale.product_id || !newSale.vehicle_number || !newSale.unit || !newSale.quantity) {
                                     alert("Please fill all required fields.");
                                     return;
                                 }
@@ -912,7 +912,7 @@ const Sales = () => {
                 <table>
                     <thead>
                         <tr>
-                            <th>Date</th>
+                            <th style={{ whiteSpace: "nowrap" }}>Date</th>
                             <th>Party</th>
                             <th>Site</th>
                             <th>Vehicle</th>
@@ -941,7 +941,7 @@ const Sales = () => {
                                     return (
                                         <React.Fragment key={sale.sales_id}>
                                             <tr>
-                                                <td>{formatDate(sale.sales_date)}</td>
+                                                <td style={{ whiteSpace: "nowrap" }}>{formatDate(sale.sales_date)}</td>
                                                 <td>{sale.party_name}</td>
                                                 <td>{sale.site || "—"}</td>
                                                 <td>
@@ -954,9 +954,9 @@ const Sales = () => {
                                                 <td>
                                                     <QtyCell
                                                         displayQty={sale.display_quantity}
-                                                        displayUnit={sale.unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                        displayUnit={sale.unit.toLowerCase() === "tons" ? "MT" : "Brass"}
                                                         convertedQty={sale.converted_quantity}
-                                                        convertedUnit={sale.converted_unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                        convertedUnit={sale.converted_unit.toLowerCase() === "tons" ? "MT" : "Brass"}
                                                         returnedTons={totalRetTons}
                                                     />
                                                 </td>
@@ -1050,13 +1050,13 @@ const Sales = () => {
                 <table>
                     <thead>
                         <tr>
-                            <th>Date</th>
+                            <th style={{ whiteSpace: "nowrap" }}>Date</th>
                             <th>Party</th>
                             <th>Product</th>
                             <th>Vehicle</th>
                             <th>Quantity</th>
                             <th>Site</th>
-                            <th>Price (₹)</th>
+                            <th style={{ textAlign: "right", whiteSpace: "nowrap" }}>Price (₹)</th>
                             <th>Loading</th>
                             <th>Unloading</th>
                             <th>Remarks</th>
@@ -1080,7 +1080,7 @@ const Sales = () => {
                                     return (
                                         <React.Fragment key={sale.sales_id}>
                                             <tr>
-                                                <td>{formatDate(sale.sales_date)}</td>
+                                                <td style={{ whiteSpace: "nowrap" }}>{formatDate(sale.sales_date)}</td>
                                                 <td>{sale.party_name}</td>
                                                 <td>{sale.product_name}</td>
                                                 <td>
@@ -1092,14 +1092,14 @@ const Sales = () => {
                                                 <td>
                                                     <QtyCell
                                                         displayQty={sale.display_quantity}
-                                                        displayUnit={sale.unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                        displayUnit={sale.unit.toLowerCase() === "tons" ? "MT" : "Brass"}
                                                         convertedQty={sale.converted_quantity}
-                                                        convertedUnit={sale.converted_unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                        convertedUnit={sale.converted_unit.toLowerCase() === "tons" ? "MT" : "Brass"}
                                                         returnedTons={totalRetTons}
                                                     />
                                                 </td>
                                                 <td>{sale.site || "—"}</td>
-                                                <td>{sale.price ? `₹${formatInr(sale.price)}` : "—"}</td>
+                                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{sale.price ? `₹${formatInr(sale.price)}` : "—"}</td>
                                                 <td>{formatTime(sale.loading_time)}</td>
                                                 <td>{formatTime(sale.unloading_time)}</td>
                                                 <td>{sale.remarks || "—"}</td>

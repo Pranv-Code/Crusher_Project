@@ -29,7 +29,7 @@ def get_party_report(party_id):
             SELECT
                 s.sales_id,
                 s.sales_date,
-                COALESCE(p.product_name, 'Common Pool') AS product_name,
+                COALESCE(p.product_name, 'Quarry Material') AS product_name,
                 s.vehicle_number,
                 v.owner          AS vehicle_owner,
                 s.quantity_tons,

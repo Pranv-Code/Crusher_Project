@@ -211,7 +211,7 @@ function Products() {
                     alignItems: "center"
                 }}>
                     <div>
-                        <span style={{ fontSize: "1.1rem" }}>ℹ️</span> <strong>Common Pool Mode Active:</strong> Individual product stocks are static and suspended. Transactions affect only the consolidated pool.
+                        <span style={{ fontSize: "1.1rem" }}>ℹ️</span> <strong>Quarry Material Mode Active:</strong> Individual product stocks are static and suspended. Transactions affect only the consolidated pool.
                     </div>
                     <div style={{
                         backgroundColor: "#309be8",
@@ -221,7 +221,7 @@ function Products() {
                         fontWeight: "bold",
                         fontSize: "0.95rem"
                     }}>
-                        Consolidated Pool: {Number(settings.common_pool_stock).toFixed(2)} MT
+                        Quarry Material: {Number(settings.common_pool_stock).toFixed(2)} MT
                     </div>
                 </div>
             )}

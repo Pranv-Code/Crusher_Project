@@ -13,15 +13,18 @@ import { saveAs } from "file-saver";
  * @param {Object} [options.summaryRow] - Optional custom summary/total row object
  * @param {boolean} [options.includeTotals=true] - Auto calculate totals row for numeric columns
  */
-export async function exportToFormattedExcel({
-    title,
-    subtitle,
-    sheetName = "Report",
-    rows = [],
-    fileName = "report.xlsx",
-    summaryRow = null,
-    includeTotals = true,
-}) {
+export async function exportToFormattedExcel(options = {}) {
+    const {
+        title,
+        subtitle,
+        sheetName = "Report",
+        summaryRow = null,
+        includeTotals = true,
+    } = options;
+
+    const rows = options.rows || options.data || [];
+    const fileName = options.fileName || options.filename || "report.xlsx";
+
     if (!rows || rows.length === 0) {
         console.warn("exportToFormattedExcel: No data rows provided");
         return;
@@ -30,8 +33,13 @@ export async function exportToFormattedExcel({
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet(sheetName);
 
-    const headers = Object.keys(rows[0]);
+    const headers = Object.keys(rows[0] || {});
     const numCols = headers.length;
+
+    if (numCols === 0) {
+        console.warn("exportToFormattedExcel: Data rows have no columns");
+        return;
+    }
 
     let currentRowIdx = 1;
 
@@ -238,7 +246,17 @@ export async function exportToFormattedExcel({
     });
 
     // 8. Auto Filter on Header Row
-    const lastColLetter = String.fromCharCode(64 + numCols);
+    const getColLetter = (colIdx) => {
+        let temp, letter = '';
+        let c = colIdx;
+        while (c > 0) {
+            temp = (c - 1) % 26;
+            letter = String.fromCharCode(65 + temp) + letter;
+            c = Math.floor((c - 1) / 26);
+        }
+        return letter;
+    };
+    const lastColLetter = getColLetter(numCols);
     worksheet.autoFilter = {
         from: `A${headerRowIdx}`,
         to: `${lastColLetter}${headerRowIdx}`,

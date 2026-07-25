@@ -7,19 +7,25 @@ const fmtNum = (v) => Number(v || 0).toFixed(2);
 const fmtFilterDate = (d) => (d ? formatDate(d) : "All time");
 
 // ── Draw Clean Short Report Header ───────────────────────────────────────────
-const drawReportHeader = (doc, title, filterText) => {
-    // Title
+const drawReportHeader = (doc, title, filterText, companyName = "VISHWAJEET ENTERPRISES") => {
+    // Company Header
     doc.setTextColor(15, 23, 42); // slate-900
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text(title, 15, 14);
+    doc.text(companyName, 15, 12);
+
+    // Report Subtitle
+    doc.setTextColor(51, 65, 85); // slate-700
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.text(title, 15, 18);
 
     // Filters line
     if (filterText) {
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
+        doc.setFontSize(8.5);
         doc.setTextColor(100, 116, 139); // slate-500
-        doc.text(filterText, 15, 20);
+        doc.text(filterText, 15, 23);
     }
 };
 
@@ -75,11 +81,11 @@ export const generateSalesReportPdf = (filteredData, filters, returnsBySaleId = 
     });
 
     autoTable(doc, {
-        startY: 25,
+        startY: 28,
         head: [tableColumns],
         body: tableRows,
         theme: "striped",
-        headStyles: { fillColor: [15, 23, 42], fontSize: 8, fontStyle: "bold" },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8, fontStyle: "bold" },
         bodyStyles: { fontSize: 8 },
         columnStyles: {
             0: { cellWidth: 8, halign: "center" },
@@ -89,7 +95,7 @@ export const generateSalesReportPdf = (filteredData, filters, returnsBySaleId = 
             7: { halign: "right" },
             9: { halign: "right" }
         },
-        margin: { top: 25, bottom: 16 }
+        margin: { top: 28, bottom: 16 }
     });
 
     drawReportFooters(doc);
@@ -114,11 +120,11 @@ export const generateProductionReportPdf = (filteredData, filters, tonsPerBrass 
     ]);
 
     autoTable(doc, {
-        startY: 25,
+        startY: 28,
         head: [tableColumns],
         body: tableRows,
         theme: "striped",
-        headStyles: { fillColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
         bodyStyles: { fontSize: 8.5 },
         columnStyles: {
             0: { cellWidth: 10, halign: "center" },
@@ -127,7 +133,7 @@ export const generateProductionReportPdf = (filteredData, filters, tonsPerBrass 
             4: { halign: "right" },
             5: { halign: "right" }
         },
-        margin: { top: 25, bottom: 16 }
+        margin: { top: 28, bottom: 16 }
     });
 
     drawReportFooters(doc);
@@ -157,11 +163,11 @@ export const generatePartyReportPdf = (partyData, tonsPerBrass = 4.2) => {
     ]);
 
     autoTable(doc, {
-        startY: 25,
+        startY: 28,
         head: [tableColumns],
         body: tableRows,
         theme: "striped",
-        headStyles: { fillColor: [15, 23, 42], fontSize: 8, fontStyle: "bold" },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8, fontStyle: "bold" },
         bodyStyles: { fontSize: 8 },
         columnStyles: {
             0: { cellWidth: 8, halign: "center" },
@@ -170,7 +176,7 @@ export const generatePartyReportPdf = (partyData, tonsPerBrass = 4.2) => {
             6: { halign: "right" },
             8: { halign: "right" }
         },
-        margin: { top: 25, bottom: 16 }
+        margin: { top: 28, bottom: 16 }
     });
 
     drawReportFooters(doc);
@@ -207,7 +213,7 @@ export const generatePartyInvoicePdf = (partyData, dateFrom, dateTo, companyDeta
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.setTextColor(15, 23, 42);
-    doc.text("INVOICE", 105, 14, { align: "center" });
+    doc.text("INVOICE SUMMARY", 105, 14, { align: "center" });
 
     // Outer Header Box Grid
     const startX = 12;
@@ -281,7 +287,7 @@ export const generatePartyInvoicePdf = (partyData, dateFrom, dateTo, companyDeta
     doc.setFontSize(7.5);
     doc.setTextColor(15, 23, 42);
 
-    const invNo = `VE/${String(party.party_id || '1').padStart(4, '0')}/${new Date().getFullYear().toString().substr(-2)}-${(new Date().getFullYear()+1).toString().substr(-2)}`;
+    const invNo = `VE/${String(party.party_id || '1').padStart(4, '0')}/${new Date().getFullYear().toString().substr(-2)}-${(new Date().getFullYear() + 1).toString().substr(-2)}`;
     const invDate = dateTo ? formatDate(dateTo) : formatDate(new Date());
     const periodStr = (dateFrom || dateTo) ? `${fmtFilterDate(dateFrom)} to ${fmtFilterDate(dateTo)}` : "All Time";
 
@@ -312,7 +318,7 @@ export const generatePartyInvoicePdf = (partyData, dateFrom, dateTo, companyDeta
     // --- Prepare Table Data ---
     const productGroupMap = {};
     filteredSales.forEach(s => {
-        const prod = s.product_name || "Common Pool";
+        const prod = (s.product_name === "Common Pool" || !s.product_name) ? "Quarry Material" : s.product_name;
         const qty = parseFloat(s.quantity_tons || 0);
         const price = parseFloat(s.price || 0);
         const amount = qty * price;
@@ -377,7 +383,7 @@ export const generatePartyInvoicePdf = (partyData, dateFrom, dateTo, companyDeta
             5: { cellWidth: 34, halign: "right" }
         },
         margin: { left: 12, right: 12 },
-        didParseCell: function(data) {
+        didParseCell: function (data) {
             if (data.row.index === tableRows.length - 1) {
                 data.cell.styles.fontStyle = "bold";
                 data.cell.styles.fillColor = [248, 250, 252];
@@ -402,32 +408,6 @@ export const generatePartyInvoicePdf = (partyData, dateFrom, dateTo, companyDeta
     doc.setTextColor(15, 23, 42);
     doc.text(numberToWordsIndian(grandTotalAmount), startX + 3, finalY + 13);
 
-    // --- Declaration & Signatory Section ---
-    const decY = finalY + 20;
-    doc.rect(startX, decY, 110, 22);
-    doc.rect(startX + 110, decY, 76, 22);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text("Declaration:", startX + 3, decY + 4);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(70, 70, 70);
-    const decText = "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.";
-    const decLines = doc.splitTextToSize(decText, 104);
-    doc.text(decLines, startX + 3, decY + 8);
-
-    // Signatory Right Box
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`for ${compName}`, startX + 113, decY + 4);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.text("Authorised Signatory", startX + 113, decY + 18);
 
     // Bottom Footer
     doc.setFont("helvetica", "normal");
@@ -459,11 +439,11 @@ export const generateRawMaterialReportPdf = (filteredData, filters, tonsPerBrass
     ]);
 
     autoTable(doc, {
-        startY: 25,
+        startY: 28,
         head: [tableColumns],
         body: tableRows,
         theme: "striped",
-        headStyles: { fillColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
         bodyStyles: { fontSize: 8.5 },
         columnStyles: {
             0: { cellWidth: 10, halign: "center" },
@@ -472,7 +452,7 @@ export const generateRawMaterialReportPdf = (filteredData, filters, tonsPerBrass
             6: { halign: "right" },
             7: { halign: "right" }
         },
-        margin: { top: 25, bottom: 16 }
+        margin: { top: 28, bottom: 16 }
     });
 
     drawReportFooters(doc);

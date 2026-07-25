@@ -4,7 +4,6 @@ import { getMyPendingApprovals } from "../services/approvalApi";
 import Pagination from "../components/common/Pagination";
 import { addVehicle } from "../services/vehicleApi";
 import { addParty } from "../services/partyApi";
-import * as XLSX from "xlsx";
 import { exportToFormattedExcel } from "../utils/excelGenerator";
 import { getSales } from "../services/salesApi";
 import { getParties } from "../services/partyApi";
@@ -13,10 +12,12 @@ import { getProducts } from "../services/productApi";
 import { getPartyReport } from "../services/reportsApi";
 import { getVehicleActivities } from "../services/vehicleActivityApi";
 import { getSettings } from "../services/settingsApi";
+import { getAuditLogs } from "../services/auditApi";
 import {
     generateSalesReportPdf,
     generateProductionReportPdf,
     generatePartyReportPdf,
+    generatePartyInvoicePdf,
     generateRawMaterialReportPdf
 } from "../utils/pdfGenerator";
 import { formatDate, formatTime, formatInr, formatDurationHM, tonToBrass } from "../utils/formatUtils";
@@ -88,7 +89,10 @@ export default function ClerkPendingWork() {
             if (report_type === "Sales Report") {
                 const salesRes = await getSales();
                 const salesData = salesRes.data.sales || (Array.isArray(salesRes.data) ? salesRes.data : []);
+                const selectedSet = (f.selected_ids && f.selected_ids.length > 0) ? new Set(f.selected_ids.map(String)) : null;
+
                 const filtered = salesData.filter((s) => {
+                    if (selectedSet && !selectedSet.has(String(s.sales_id))) return false;
                     if (f.date_from && s.sales_date < f.date_from) return false;
                     if (f.date_to   && s.sales_date > f.date_to)   return false;
                     if (f.month     && s.sales_date?.slice(0,7) !== f.month) return false;
@@ -98,7 +102,7 @@ export default function ClerkPendingWork() {
                 });
 
                 if (format === "excel") {
-                    const subtitle = `Filter: ${f.date_from || "Start"} to ${f.date_to || "End"} | Month: ${f.month || "All"}`;
+                    const subtitle = `Filter: ${f.date_from || "Start"} to ${f.date_to || "End"}${selectedSet ? ` | Selected (${selectedSet.size} entries)` : ` | Month: ${f.month || "All"}`}`;
                     const rows = filtered.map(s => ({
                         "Date":           formatDate(s.sales_date),
                         "Party":          s.party_name,
@@ -128,8 +132,10 @@ export default function ClerkPendingWork() {
                 const prodData = prodRes.data || [];
                 const productsRes = await getProducts();
                 const productsList = productsRes.data || [];
+                const selectedSet = (f.selected_ids && f.selected_ids.length > 0) ? new Set(f.selected_ids.map(String)) : null;
 
                 const filtered = prodData.filter((r) => {
+                    if (selectedSet && !selectedSet.has(String(r.production_id))) return false;
                     if (f.date_from && r.production_date < f.date_from) return false;
                     if (f.date_to   && r.production_date > f.date_to)   return false;
                     if (f.month     && r.production_date?.slice(0,7) !== f.month) return false;
@@ -139,7 +145,7 @@ export default function ClerkPendingWork() {
 
                 if (format === "excel") {
                     const productName = productsList.find(p => String(p.product_id) === f.productFilter)?.product_name || "All";
-                    const subtitle = `Product: ${productName} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
+                    const subtitle = `Product: ${productName} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"}${selectedSet ? ` | Selected (${selectedSet.size} entries)` : ""}`;
                     const rows = filtered.map(r => {
                         const tons = parseFloat(r.quantity_tons || 0);
                         return {
@@ -163,12 +169,19 @@ export default function ClerkPendingWork() {
                 }
             } else if (report_type === "Party Sales Report") {
                 const partyDataRes = await getPartyReport(f.party_id);
-                const partyData = partyDataRes.data;
+                let partyData = partyDataRes.data || {};
+                const selectedSet = (f.selected_ids && f.selected_ids.length > 0) ? new Set(f.selected_ids.map(String)) : null;
+                if (selectedSet && partyData.sales) {
+                    partyData = {
+                        ...partyData,
+                        sales: partyData.sales.filter(s => selectedSet.has(String(s.sales_id)))
+                    };
+                }
 
                 if (format === "excel") {
                     const partyName = partyData.party.party_name;
-                    const subtitle = `Party Statement: ${partyName}${partyData.party.gst_no ? ` | GSTIN: ${partyData.party.gst_no}` : ""}`;
-                    const rows = partyData.sales.map(s => ({
+                    const subtitle = `Party Statement: ${partyName}${partyData.party.gst_no ? ` | GSTIN: ${partyData.party.gst_no}` : ""}${selectedSet ? ` | Selected (${selectedSet.size} entries)` : ""}`;
+                    const rows = (partyData.sales || []).map(s => ({
                         "Date":           formatDate(s.sales_date),
                         "Product":        s.product_name,
                         "Vehicle":        s.vehicle_number || "",
@@ -186,13 +199,20 @@ export default function ClerkPendingWork() {
                         rows,
                         fileName: `party_${partyName.replace(/\s/g,"_")}_report.xlsx`
                     });
+                } else if (format === "invoice") {
+                    const settingsRes = await getSettings();
+                    const companyDetails = settingsRes.data || {};
+                    generatePartyInvoicePdf(partyData, f.date_from, f.date_to, companyDetails);
                 } else {
                     generatePartyReportPdf(partyData, tonsPerBrass);
                 }
             } else if (report_type === "Raw Material Report") {
                 const actRes = await getVehicleActivities();
                 const actData = actRes.data || [];
+                const selectedSet = (f.selected_ids && f.selected_ids.length > 0) ? new Set(f.selected_ids.map(String)) : null;
+
                 const filtered = actData.filter((a) => {
+                    if (selectedSet && !selectedSet.has(String(a.activity_id))) return false;
                     if (f.dateFrom && a.activity_date < f.dateFrom) return false;
                     if (f.dateTo   && a.activity_date > f.dateTo)   return false;
                     if (f.monthFilter && a.activity_date?.slice(0,7) !== f.monthFilter) return false;
@@ -210,7 +230,7 @@ export default function ClerkPendingWork() {
                 });
 
                 if (format === "excel") {
-                    const subtitle = `Vehicle: ${f.vehicleFilter || "All"} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"} | Month: ${f.monthFilter || "All"}${f.searchQuery ? ` | Search: "${f.searchQuery}"` : ""}`;
+                    const subtitle = `Vehicle: ${f.vehicleFilter || "All"} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"}${selectedSet ? ` | Selected (${selectedSet.size} entries)` : ""}`;
                     const rows = filtered.map(r => ({
                         "Date":                formatDate(r.activity_date),
                         "Vehicle":             r.vehicle_number,
@@ -234,6 +254,25 @@ export default function ClerkPendingWork() {
                 } else {
                     generateRawMaterialReportPdf(filtered, { dateFrom: f.dateFrom, dateTo: f.dateTo, month: f.monthFilter, vehicle: f.vehicleFilter }, tonsPerBrass);
                 }
+            } else if (report_type === "Audit Logs") {
+                const logsRes = await getAuditLogs(f);
+                const logs = logsRes.data || [];
+                const rows = logs.map(l => ({
+                    "Timestamp": l.created_at,
+                    "User": l.username,
+                    "Role": l.role,
+                    "Action": l.action_type,
+                    "Module": l.module,
+                    "Description": l.description,
+                    "IP Address": l.ip_address || "127.0.0.1"
+                }));
+                await exportToFormattedExcel({
+                    title: "User Activity Audit Logs",
+                    subtitle: `Generated on ${new Date().toLocaleString()}`,
+                    sheetName: "Audit Logs",
+                    rows,
+                    fileName: "user_activity_audit_logs.xlsx"
+                });
             }
         } catch (err) {
             console.error("Failed to generate report:", err);
@@ -292,6 +331,11 @@ export default function ClerkPendingWork() {
         rejected: requests.filter(r => r.status === "rejected").length,
     };
 
+    const approvedReportRequests = requests.filter(r => 
+        r.status === "approved" && (r.request_type === "PRINT_REPORT" || r.request_type === "report_print")
+    );
+    const approvedReportCount = approvedReportRequests.length;
+
     return (
         <Layout>
             <div className="page-header" style={{ marginBottom: "1.5rem" }}>
@@ -300,7 +344,6 @@ export default function ClerkPendingWork() {
                     Track all your submitted requests, view approval statuses, and access approved report downloads.
                 </p>
             </div>
-
             {/* Filter Tabs */}
             <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
                 {[
@@ -356,7 +399,7 @@ export default function ClerkPendingWork() {
                                 {filteredRequests
                                     .slice((currentPage - 1) * pageSize, currentPage * pageSize)
                                     .map((item, i) => {
-                                        const isReport = item.request_type === "PRINT_REPORT";
+                                        const isReport = item.request_type === "PRINT_REPORT" || item.request_type === "report_print";
                                         const refData = item.reference_data || {};
 
                                         return (
@@ -442,26 +485,40 @@ export default function ClerkPendingWork() {
                                                         </button>
                                                     ) : isReport && item.status === "approved" ? (
                                                         <div style={{ display: "flex", gap: "6px" }}>
-                                                            <button
-                                                                onClick={() => handleDownloadReport(item, "pdf")}
-                                                                disabled={downloadingId === item.approval_id}
-                                                                style={{
-                                                                    padding: "4px 8px", borderRadius: "6px", border: "none",
-                                                                    backgroundColor: "#dc2626", color: "white", fontWeight: 600, fontSize: "0.75rem", cursor: "pointer"
-                                                                }}
-                                                            >
-                                                                {downloadingId === item.approval_id ? "..." : "📄 PDF"}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDownloadReport(item, "excel")}
-                                                                disabled={downloadingId === item.approval_id}
-                                                                style={{
-                                                                    padding: "4px 8px", borderRadius: "6px", border: "none",
-                                                                    backgroundColor: "#16a34a", color: "white", fontWeight: 600, fontSize: "0.75rem", cursor: "pointer"
-                                                                }}
-                                                            >
-                                                                {downloadingId === item.approval_id ? "..." : "📥 Excel"}
-                                                            </button>
+                                                            {((item.reference_data?.format || "").toLowerCase() === "excel") ? (
+                                                                <button
+                                                                    onClick={() => handleDownloadReport(item, "excel")}
+                                                                    disabled={downloadingId === item.approval_id}
+                                                                    style={{
+                                                                        padding: "4px 10px", borderRadius: "6px", border: "none",
+                                                                        backgroundColor: "#16a34a", color: "white", fontWeight: 600, fontSize: "0.75rem", cursor: "pointer"
+                                                                    }}
+                                                                >
+                                                                    {downloadingId === item.approval_id ? "..." : "📥 Download Excel"}
+                                                                </button>
+                                                            ) : ((item.reference_data?.format || "").toLowerCase() === "invoice") ? (
+                                                                <button
+                                                                    onClick={() => handleDownloadReport(item, "invoice")}
+                                                                    disabled={downloadingId === item.approval_id}
+                                                                    style={{
+                                                                        padding: "4px 10px", borderRadius: "6px", border: "none",
+                                                                        backgroundColor: "#2563eb", color: "white", fontWeight: 600, fontSize: "0.75rem", cursor: "pointer"
+                                                                    }}
+                                                                >
+                                                                    {downloadingId === item.approval_id ? "..." : "📄 Download Invoice"}
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => handleDownloadReport(item, "pdf")}
+                                                                    disabled={downloadingId === item.approval_id}
+                                                                    style={{
+                                                                        padding: "4px 10px", borderRadius: "6px", border: "none",
+                                                                        backgroundColor: "#dc2626", color: "white", fontWeight: 600, fontSize: "0.75rem", cursor: "pointer"
+                                                                    }}
+                                                                >
+                                                                    {downloadingId === item.approval_id ? "..." : "📄 Download PDF"}
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     ) : item.status === "rejected" && (item.request_type === "ADD_VEHICLE" || item.request_type === "ADD_PARTY") ? (
                                                         <button

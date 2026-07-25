@@ -39,7 +39,7 @@ export default function Reports() {
         setError(null);
 
         if (activeTab === "sales") {
-            if (sales.length > 0 && parties.length > 0 && vehicles.length > 0) {
+            if (sales.length > 0 && parties.length > 0 && vehicles.length > 0 && products.length > 0) {
                 setLoading(false);
                 return;
             }
@@ -48,12 +48,14 @@ export default function Reports() {
                 sales.length === 0 ? getSales() : Promise.resolve(null),
                 parties.length === 0 ? getParties() : Promise.resolve(null),
                 vehicles.length === 0 ? getVehicles() : Promise.resolve(null),
+                products.length === 0 ? getProducts() : Promise.resolve(null),
             ])
-                .then(([salesRes, partiesRes, vehiclesRes]) => {
+                .then(([salesRes, partiesRes, vehiclesRes, productsRes]) => {
                     if (cancelled) return;
                     if (salesRes) setSales(salesRes.data?.sales || salesRes.data || []);
                     if (partiesRes) setParties(partiesRes.data || []);
                     if (vehiclesRes) setVehicles(vehiclesRes.data || []);
+                    if (productsRes) setProducts(productsRes.data || []);
                 })
                 .catch((err) => {
                     if (!cancelled) {
@@ -163,6 +165,7 @@ export default function Reports() {
     }, [activeTab]);
 
     const handleSwitchToSales = () => setActiveTab("sales");
+    const handleSwitchToParty = () => setActiveTab("party");
 
     return (
         <Layout>
@@ -173,16 +176,40 @@ export default function Reports() {
                 </span>
             </div>
 
-            <div className="report-tabs">
-                {TABS.map((tab) => (
-                    <button
-                        key={tab.id}
-                        className={`report-tab ${activeTab === tab.id ? "active" : ""}`}
-                        onClick={() => setActiveTab(tab.id)}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "12px" }}>
+                <div className="report-tabs" style={{ marginBottom: 0 }}>
+                    {TABS.map((tab) => (
+                        <button
+                            key={tab.id}
+                            className={`report-tab ${activeTab === tab.id ? "active" : ""}`}
+                            onClick={() => setActiveTab(tab.id)}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                <button
+                    onClick={() => setActiveTab("party")}
+                    style={{
+                        backgroundColor: activeTab === "party" ? "#1d4ed8" : "#2563eb",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "10px 18px",
+                        fontWeight: 600,
+                        fontSize: "0.9rem",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
+                        transition: "all 0.2s"
+                    }}
+                    title="Open Party Report tab to generate non-GST Invoices"
+                >
+                    📄 Generate Invoice
+                </button>
             </div>
 
             {loading && <div className="report-loading">Loading report data…</div>}
@@ -195,6 +222,7 @@ export default function Reports() {
                             sales={sales}
                             parties={parties}
                             vehicles={vehicles}
+                            products={products}
                         />
                     )}
                     {activeTab === "production" && (

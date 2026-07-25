@@ -153,7 +153,7 @@ function RawMaterial() {
             return;
         }
 
-        const isDup = activities.some(a => 
+        const isDup = activities.some(a =>
             a.activity_date === newActivity.activity_date &&
             a.vehicle_number === newActivity.vehicle_number &&
             Math.abs(parseFloat(a.total_weight || 0) - parseFloat(newActivity.total_weight || 0)) < 0.01 &&
@@ -275,44 +275,51 @@ function RawMaterial() {
     };
 
     const columns = [
-        { key: "activity_date", label: "Date", render: (row) => formatDate(row.activity_date) },
-        { key: "vehicle_number", label: "Vehicle Number" },
+        { key: "activity_date", label: "Date", align: "center", render: (row) => <span style={{ whiteSpace: "nowrap" }}>{formatDate(row.activity_date)}</span> },
+        { key: "vehicle_number", label: "Vehicle Number", align: "center", render: (row) => <span style={{ whiteSpace: "nowrap" }}><strong>{row.vehicle_number}</strong></span> },
         {
             key: "arrival_time",
             label: "Arrival",
-            render: (row) => formatTime(row.arrival_time),
+            align: "center",
+            render: (row) => <span style={{ whiteSpace: "nowrap" }}>{formatTime(row.arrival_time)}</span>,
         },
         {
             key: "loading_start_time",
             label: "Loading Start",
-            render: (row) => formatTime(row.loading_start_time),
+            align: "center",
+            render: (row) => <span style={{ whiteSpace: "nowrap" }}>{formatTime(row.loading_start_time)}</span>,
         },
         {
             key: "unloading_end_time",
             label: "Unloading End",
-            render: (row) => formatTime(row.unloading_end_time),
+            align: "center",
+            render: (row) => <span style={{ whiteSpace: "nowrap" }}>{formatTime(row.unloading_end_time)}</span>,
         },
         {
             key: "turnaround_time",
             label: "Turnaround (hr/min)",
-            render: (row) => formatDurationHM(row.turnaround_time),
+            align: "center",
+            render: (row) => <span style={{ whiteSpace: "nowrap" }}>{formatDurationHM(row.turnaround_time)}</span>,
         },
         {
             key: "total_weight",
             label: "Total Wt (MT)",
-            render: (row) => Number(row.total_weight).toFixed(2),
+            align: "center",
+            render: (row) => <span style={{ whiteSpace: "nowrap" }}>{Number(row.total_weight).toFixed(2)}</span>,
         },
         {
             key: "vehicle_weight",
             label: "Vehicle Wt (MT)",
-            render: (row) => Number(row.vehicle_weight).toFixed(2),
+            align: "center",
+            render: (row) => <span style={{ whiteSpace: "nowrap" }}>{Number(row.vehicle_weight).toFixed(2)}</span>,
         },
         {
             key: "net_weight",
             label: "Net Wt (MT)",
-            render: (row) => Number(row.net_weight).toFixed(2),
+            align: "center",
+            render: (row) => <span style={{ whiteSpace: "nowrap", fontWeight: 600 }}>{Number(row.net_weight).toFixed(2)}</span>,
         },
-        { key: "site", label: "Site" },
+        { key: "site", label: "Site", align: "center" },
     ];
 
     return (

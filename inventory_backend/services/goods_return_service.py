@@ -109,7 +109,7 @@ def get_goods_returns():
                 gr.created_by,
                 gr.created_at,
                 pt.party_name,
-                COALESCE(p.product_name, 'Common Pool') AS product_name,
+                COALESCE(p.product_name, 'Quarry Material') AS product_name,
                 u.name AS created_by_name
             FROM Goods_Returns gr
             JOIN Party pt ON gr.party_id = pt.party_id

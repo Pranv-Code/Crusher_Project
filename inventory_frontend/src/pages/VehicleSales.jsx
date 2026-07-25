@@ -178,7 +178,7 @@ function VehicleSales() {
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Date</th>
+                                    <th style={{ whiteSpace: "nowrap" }}>Date</th>
                                     <th>Vehicle No</th>
                                     <th>Vehicle Owner</th>
                                     <th>Party</th>
@@ -187,7 +187,7 @@ function VehicleSales() {
                                     <th>Site</th>
                                     <th>Loading Time</th>
                                     <th>Unloading Time</th>
-                                    <th>Price (₹)</th>
+                                    <th style={{ textAlign: "right", whiteSpace: "nowrap" }}>Price (₹)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -196,7 +196,7 @@ function VehicleSales() {
                                     .map((row, i) => (
                                         <tr key={row.sales_id}>
                                             <td>{(currentPage - 1) * pageSize + i + 1}</td>
-                                            <td>{formatDate(row.sales_date)}</td>
+                                            <td style={{ whiteSpace: "nowrap" }}>{formatDate(row.sales_date)}</td>
                                             <td>
                                                 <strong style={{ fontFamily: "monospace" }}>
                                                     {row.vehicle_number || "—"}
@@ -216,7 +216,7 @@ function VehicleSales() {
                                             <td>{row.site || "—"}</td>
                                             <td>{formatTime(row.loading_time)}</td>
                                             <td>{formatTime(row.unloading_time)}</td>
-                                            <td>{row.price ? `₹${formatInr(row.price)}` : "—"}</td>
+                                            <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{row.price ? `₹${formatInr(row.price)}` : "—"}</td>
                                         </tr>
                                     ))}
                             </tbody>

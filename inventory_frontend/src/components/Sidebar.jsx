@@ -42,7 +42,7 @@ function Sidebar() {
                 { name: "Raw Material", path: "/raw-material"},
                 { name: "Sales", path: "/sales"},
                 { name: "Goods Return", path: "/goods-returns"},
-                { name: "Vehicle Sales", path: "/vehicle-sales"},
+                { name: "Vehicle Outward", path: "/vehicle-sales"},
                 { name: "Parties", path: "/parties"},
                 { name: "Reports", path: "/reports" },
                 { name: "Users", path: "/users" },
@@ -51,10 +51,12 @@ function Sidebar() {
             );
         } else if (isClerk) {
             menuItems.push(
+                { name: "Vehicles", path: "/vehicles"},
                 { name: "Production", path: "/production"},
                 { name: "Raw Material", path: "/raw-material"},
                 { name: "Sales", path: "/sales"},
                 { name: "Goods Return", path: "/goods-returns"},
+                { name: "Parties", path: "/parties"},
                 { name: "Reports", path: "/reports" }
             );
         }

@@ -58,7 +58,7 @@ _SALES_SELECT = """
         s.party_id,
         s.product_id,
         pt.party_name,
-        COALESCE(p.product_name, 'Common Pool') AS product_name,
+        COALESCE(p.product_name, 'Quarry Material') AS product_name,
         s.vehicle_number,
         v.owner          AS vehicle_owner,
         s.quantity_tons,
@@ -365,7 +365,7 @@ def add_sale():
         if inv_mode == "COMMON_POOL":
             pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
             if (pool_stock + 0.0001) < float(qty):
-                return jsonify({"message": f"Insufficient Stock in Common Pool (Available: {pool_stock:.2f} MT, Requested: {float(qty):.2f} MT)"}), 400
+                return jsonify({"message": f"Insufficient Stock in Quarry Material (Available: {pool_stock:.2f} MT, Requested: {float(qty):.2f} MT)"}), 400
         else:
             if (float(product["quantity_tons"]) + 0.0001) < float(qty):
                 return jsonify({"message": f"Insufficient Stock (Available: {float(product['quantity_tons']):.2f} MT, Requested: {float(qty):.2f} MT)"}), 400
@@ -591,7 +591,7 @@ def add_sales_bulk():
             # Validate Stock
             if inv_mode == "COMMON_POOL":
                 if (local_pool_stock + 0.0001) < float(qty):
-                    errors.append(f"{row_label}: Insufficient Stock in Common Pool (Available: {local_pool_stock:.2f} MT, Requested: {float(qty):.2f} MT)")
+                    errors.append(f"{row_label}: Insufficient Stock in Quarry Material (Available: {local_pool_stock:.2f} MT, Requested: {float(qty):.2f} MT)")
                     continue
             else:
                 avail = local_stock.get(p_id, 0.0)
@@ -784,7 +784,7 @@ def update_sale(id):
             if product and product["status"].lower() != "active":
                 conn.rollback(); return jsonify({"message": "Product is Inactive"}), 400
             if (pool_stock + 0.0001) < float(new_qty):
-                conn.rollback(); return jsonify({"message": f"Insufficient Stock in Common Pool (Available: {pool_stock:.2f} MT, Requested: {float(new_qty):.2f} MT)"}), 400
+                conn.rollback(); return jsonify({"message": f"Insufficient Stock in Quarry Material (Available: {pool_stock:.2f} MT, Requested: {float(new_qty):.2f} MT)"}), 400
             set_system_setting("common_pool_stock", str(pool_stock - float(new_qty)), user_id=user_id, cursor=cursor)
             data["product_id"] = p_id if product else None
         else:

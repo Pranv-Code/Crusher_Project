@@ -16,7 +16,7 @@ def view_production():
         SELECT 
         p.production_id,
         p.product_id,
-        COALESCE(pr.product_name, 'Common Pool') AS product_name,
+        COALESCE(pr.product_name, 'Quarry Material') AS product_name,
         p.production_date,
         p.unit,
         p.quantity_tons,
@@ -62,11 +62,8 @@ def add_production():
         from db import get_system_setting, set_system_setting
         inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
 
-        product_id = data.get("product_id")
-        if not product_id:
-            return jsonify({"message": "Product selection is required"}), 400
-
-        inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
+        raw_product_id = data.get("product_id")
+        product_id = raw_product_id if raw_product_id != "" else None
 
         product = None
         if product_id:
@@ -247,14 +244,16 @@ def update_production(id):
         from db import get_system_setting, set_system_setting
         inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
 
-        product_id = data.get("product_id")
-        if not product_id:
-            return jsonify({"message": "Product selection is required"}), 400
+        raw_product_id = data.get("product_id")
+        product_id = raw_product_id if raw_product_id != "" else None
 
         if inv_mode == "COMMON_POOL":
+            product_id = product_id if product_id else None
             pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
             set_system_setting("common_pool_stock", str(pool_stock - float(old["quantity_tons"]) + float(new_qty)), user_id=user_id, cursor=cursor)
         else:
+            if not product_id:
+                return jsonify({"message": "Product selection is required in Product-Wise mode"}), 400
             # Remove old quantity from old product
             cursor.execute("""
                 UPDATE Product

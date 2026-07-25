@@ -130,8 +130,8 @@ export default function Settings() {
     const columns = [
         { key: "changed_at", label: "Date & Time" },
         { key: "user_fullname", label: "Changed By", render: (row) => `${row.user_fullname} (${row.username})` },
-        { key: "previous_mode", label: "Previous Mode", render: (row) => row.previous_mode === "COMMON_POOL" ? "Common Pool" : "Product-Wise" },
-        { key: "new_mode", label: "New Mode", render: (row) => row.new_mode === "COMMON_POOL" ? "Common Pool" : "Product-Wise" },
+        { key: "previous_mode", label: "Previous Mode", render: (row) => row.previous_mode === "COMMON_POOL" ? "Quarry Material" : "Product-Wise" },
+        { key: "new_mode", label: "New Mode", render: (row) => row.new_mode === "COMMON_POOL" ? "Quarry Material" : "Product-Wise" },
         { key: "reason", label: "Reason" }
     ];
 
@@ -281,11 +281,11 @@ export default function Settings() {
                     marginBottom: "1.5rem"
                 }}>
                     <p style={{ margin: 0, fontSize: "0.95rem", lineHeight: "1.5", color: "var(--text-primary, #1e293b)" }}>
-                        <strong>Current Mode:</strong> {settings.inventory_mode === "COMMON_POOL" ? "Common Pool" : "Product-Wise"}
+                        <strong>Current Mode:</strong> {settings.inventory_mode === "COMMON_POOL" ? "Quarry Material" : "Product-Wise"}
                     </p>
                     {settings.inventory_mode === "COMMON_POOL" && (
                         <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.95rem", color: "var(--text-primary, #1e293b)" }}>
-                            <strong>Consolidated Pool Stock:</strong> <span style={{ color: "#309be8", fontWeight: "bold" }}>{Number(settings.common_pool_stock).toFixed(2)} MT</span>
+                            <strong>Quarry Material Stock:</strong> <span style={{ color: "#309be8", fontWeight: "bold" }}>{Number(settings.common_pool_stock).toFixed(2)} MT</span>
                         </p>
                     )}
                 </div>
@@ -297,7 +297,7 @@ export default function Settings() {
                         value={editMode}
                         onChange={(e) => setEditMode(e.target.value)}
                         options={[
-                            { value: "COMMON_POOL", label: "Common Pool" },
+                            { value: "COMMON_POOL", label: "Quarry Material" },
                             { value: "PRODUCT_WISE", label: "Product-Wise" }
                         ]}
                     />

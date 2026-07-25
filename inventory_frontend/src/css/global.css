@@ -10,8 +10,9 @@
 }
 
 body {
-    background: #FDFBF7; /* Comforting Warm Ivory */
-    color: #2C2623;
+    /* background: #f0f7ff;  */
+   background: linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 50%, #eff6ff 100%); /* Blue & White theme background matching login */
+    color: #0f172a;
 }
 
 a {

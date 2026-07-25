@@ -184,7 +184,7 @@ function Production() {
 
     const columns = [
         { key: "production_date", label: "Production Date", render: (row) => formatDate(row.production_date) },
-        { key: "product_name", label: "Product Name" },
+        { key: "product_name", label: "Product Name", render: (row) => (row.product_name === "Common Pool" || !row.product_name) ? "Quarry Material" : row.product_name },
         { key: "quantity_tons", label: "Quantity" },
         { key: "unit",
         label: "Units",
@@ -225,18 +225,20 @@ function Production() {
                                 })
                             }
                         />
-                        <SelectField
-                            label="Select Product"
-                            name="product_id"
-                            value={newProduction.product_id}
-                            onChange={(e) =>
-                                setNewProduction({
-                                    ...newProduction,
-                                    product_id: e.target.value,
-                                })
-                            }
-                            options={productOptions}
-                        />
+                        {settings.inventory_mode !== "COMMON_POOL" && (
+                            <SelectField
+                                label="Select Product"
+                                name="product_id"
+                                value={newProduction.product_id}
+                                onChange={(e) =>
+                                    setNewProduction({
+                                        ...newProduction,
+                                        product_id: e.target.value,
+                                    })
+                                }
+                                options={productOptions}
+                            />
+                        )}
                         <InputField
                             label="Quantity"
                             name="quantity_tons"
@@ -348,29 +350,20 @@ function Production() {
                         })
                     }
                 />
-                <SelectField
-                    label="Product Name"
-                    name="product_id"
-                    value={editData.product_id}
-                    onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            product_id: e.target.value,
-                        })
-                    }
-                    options={productOptions}
-                />
-                <InputField
-                    label="Quantity"
-                    type="number"
-                    value={editData.quantity_tons}
-                    onChange={(e) =>
-                        setEditData({
-                            ...editData,
-                            quantity_tons: e.target.value,
-                        })
-                    }
-                />
+                {settings.inventory_mode !== "COMMON_POOL" && (
+                    <SelectField
+                        label="Product Name"
+                        name="product_id"
+                        value={editData.product_id}
+                        onChange={(e) =>
+                            setEditData({
+                                ...editData,
+                                product_id: e.target.value,
+                            })
+                        }
+                        options={productOptions}
+                    />
+                )}
                 <SelectField
                     label="Units"
                     name="unit"

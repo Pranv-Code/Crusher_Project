@@ -4,7 +4,6 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend, LineChart, Line,
 } from "recharts";
-import * as XLSX from "xlsx";
 import { exportToFormattedExcel } from "../../utils/excelGenerator";
 import { useAuth } from "../../context/AuthContext";
 import { generateSalesReportPdf } from "../../utils/pdfGenerator";
@@ -12,6 +11,8 @@ import { requestReportPrint } from "../../services/approvalApi";
 import { formatDate, formatTime, formatInr, tonToBrass } from "../../utils/formatUtils";
 import { getGoodsReturns } from "../../services/goodsReturnApi";
 import { getSettings } from "../../services/settingsApi";
+
+import Toast from "../../components/common/Toast";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777", "#d97706", "#059669"];
 
@@ -24,7 +25,6 @@ const monthLabel = (dateStr) => {
     return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
 };
 
-// ── Custom Tooltip ────────────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
@@ -35,16 +35,30 @@ const CustomTooltip = ({ active, payload, label }) => {
     );
 };
 
-export default function SalesReport({ sales, parties, vehicles }) {
+export default function SalesReport({ sales, parties, vehicles, products = [], onSwitchToParty }) {
     const { isManager, isClerk } = useAuth();
 
+    const [toast, setToast] = useState({ message: "", type: "success" });
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [monthFilter, setMonthFilter] = useState("");
     const [partyFilter, setPartyFilter] = useState("");
+    const [productFilter, setProductFilter] = useState("");
     const [vehicleFilter, setVehicleFilter] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [showCharts, setShowCharts] = useState(false);
+
+    const productList = useMemo(() => {
+        if (Array.isArray(products) && products.length > 0) return products;
+        const uniqueMap = {};
+        (sales || []).forEach(s => {
+            if (s && s.product_name) {
+                const pr = (s.product_name === "Common Pool" || !s.product_name) ? "Quarry Material" : s.product_name;
+                uniqueMap[pr] = { product_id: s.product_id || pr, product_name: pr };
+            }
+        });
+        return Object.values(uniqueMap);
+    }, [products, sales]);
 
     // Row Checkbox Selection State for Export
     const [selectedSaleIds, setSelectedSaleIds] = useState(new Set());
@@ -100,6 +114,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
         setDateTo("");
         setMonthFilter("");
         setPartyFilter("");
+        setProductFilter("");
         setVehicleFilter("");
         setSearchQuery("");
         setSelectedSaleIds(new Set());
@@ -117,6 +132,12 @@ export default function SalesReport({ sales, parties, vehicles }) {
                 if (rowMonth !== monthFilter) return false;
             }
             if (partyFilter && String(s.party_id) !== partyFilter) return false;
+            if (productFilter) {
+                const pName = (s.product_name === "Common Pool" || !s.product_name) ? "Quarry Material" : s.product_name;
+                const matchId = String(s.product_id || "") === String(productFilter);
+                const matchName = String(pName) === String(productFilter) || String(s.product_name) === String(productFilter);
+                if (!matchId && !matchName) return false;
+            }
             if (vehicleFilter && s.vehicle_number !== vehicleFilter) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
@@ -130,7 +151,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
             }
             return true;
         });
-    }, [sales, dateFrom, dateTo, monthFilter, partyFilter, vehicleFilter, searchQuery]);
+    }, [sales, dateFrom, dateTo, monthFilter, partyFilter, productFilter, vehicleFilter, searchQuery]);
 
     // Reset pagination when report data changes
     useEffect(() => {
@@ -208,7 +229,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
     const byProduct = useMemo(() => {
         const map = {};
         filtered.forEach(r => {
-            const pr = r.product_name || "Common Pool";
+            const pr = (r.product_name === "Common Pool" || !r.product_name) ? "Quarry Material" : r.product_name;
             map[pr] = (map[pr] || 0) + (parseFloat(r.quantity_tons) || 0);
         });
         return Object.entries(map).map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }));
@@ -227,7 +248,9 @@ export default function SalesReport({ sales, parties, vehicles }) {
     }, [filtered]);
 
     // ── Export Handlers ────────────────────────────────────────────────────────
-    const currentFilters = { dateFrom, dateTo, month: monthFilter, party: partyFilter, vehicle: vehicleFilter };
+    const currentFilters = { dateFrom, dateTo, month: monthFilter, party: partyFilter, product: productFilter, vehicle: vehicleFilter };
+
+    const [exportFormat, setExportFormat] = useState("pdf");
 
     const handlePrintOrRequest = () => {
         const exportData = getExportData();
@@ -238,37 +261,48 @@ export default function SalesReport({ sales, parties, vehicles }) {
         if (isManager) {
             generateSalesReportPdf(exportData, currentFilters, returnsBySaleId);
         } else {
+            setExportFormat("pdf");
             setShowApprovalModal(true);
         }
     };
 
     const submitApprovalRequest = async () => {
         if (!approvalReason.trim()) {
-            alert("Please provide a reason for the print approval request.");
+            alert("Please provide a reason for the approval request.");
             return;
         }
 
         const exportData = getExportData();
+        const selectedIds = selectedSaleIds.size > 0 ? Array.from(selectedSaleIds) : [];
         setIsSubmittingApproval(true);
         try {
             await requestReportPrint({
                 report_type: "Sales Report",
+                format: exportFormat,
                 parameters: {
                     date_from: dateFrom,
                     date_to: dateTo,
                     month: monthFilter,
                     party: partyFilter,
+                    product: productFilter,
                     vehicle: vehicleFilter,
+                    selected_ids: selectedIds,
                     records_count: exportData.length
                 },
                 reason: approvalReason.trim()
             });
 
-            alert("Print request submitted successfully! A Manager will review your request.");
+            setToast({
+                message: `Export (${exportFormat.toUpperCase()}) request submitted successfully! A Manager will review your request.`,
+                type: "success"
+            });
             setShowApprovalModal(false);
             setApprovalReason("");
         } catch (err) {
-            alert(err.response?.data?.message || "Failed to submit print request.");
+            setToast({
+                message: err.response?.data?.message || "Failed to submit export request.",
+                type: "failure"
+            });
         } finally {
             setIsSubmittingApproval(false);
         }
@@ -278,6 +312,12 @@ export default function SalesReport({ sales, parties, vehicles }) {
         const exportData = getExportData();
         if (exportData.length === 0) {
             alert("No sales entries selected to export.");
+            return;
+        }
+
+        if (!isManager) {
+            setExportFormat("excel");
+            setShowApprovalModal(true);
             return;
         }
 
@@ -309,8 +349,8 @@ export default function SalesReport({ sales, parties, vehicles }) {
 
         const isSelection = selectedSaleIds.size > 0;
         exportToFormattedExcel({
-            data: dataToExport,
-            filename: `sales_report_${new Date().toISOString().split("T")[0]}.xlsx`,
+            rows: dataToExport,
+            fileName: `sales_report_${new Date().toISOString().split("T")[0]}.xlsx`,
             sheetName: "Sales Report",
             title: "VISHWAJEET ENTERPRISES - SALES REPORT",
             subtitle: `Generated on ${new Date().toLocaleDateString()} ${isSelection ? `| Selected (${selectedSaleIds.size} entries)` : `| Filter: ${dateFrom || "Start"} to ${dateTo || "End"}`}`
@@ -319,6 +359,11 @@ export default function SalesReport({ sales, parties, vehicles }) {
 
     return (
         <div className="report-container">
+            <Toast
+                message={toast.message}
+                type={toast.type}
+                onClose={() => setToast({ message: "", type: "success" })}
+            />
             {/* Action Bar */}
             <div className="report-action-bar">
                 <div className="action-bar-left" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -351,7 +396,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                         className={`toggle-charts-btn ${showCharts ? "active" : ""}`}
                         onClick={() => setShowCharts(!showCharts)}
                     >
-                        {showCharts ? "📊 Hide Analytics" : "📈 Show Analytics"}
+                        {showCharts ? "📊 Hide Graph" : "📈 Show Graph"}
                     </button>
                 </div>
                 <div className="action-bar-right">
@@ -411,6 +456,17 @@ export default function SalesReport({ sales, parties, vehicles }) {
                     </select>
                 </div>
                 <div className="filter-group">
+                    <label>Product</label>
+                    <select value={productFilter} onChange={e => setProductFilter(e.target.value)}>
+                        <option value="">All Products</option>
+                        {productList.map(p => (
+                            <option key={p.product_id || p.product_name} value={p.product_id || p.product_name}>
+                                {p.product_name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div className="filter-group">
                     <label>Vehicle</label>
                     <select value={vehicleFilter} onChange={e => setVehicleFilter(e.target.value)}>
                         <option value="">All Vehicles</option>
@@ -434,8 +490,8 @@ export default function SalesReport({ sales, parties, vehicles }) {
                 </div>
                 <div className="kpi-card orange">
                     <div className="kpi-label">Goods Returned</div>
-                    <div className="kpi-value" style={{ color: "#dc2626" }}>-{fmtTons(totalReturnedTons)} MT</div>
-                    <div className="kpi-sub" style={{ color: "#dc2626" }}>≈ -{tonToBrass(totalReturnedTons, tonsPerBrass).toFixed(2)} Brass</div>
+                    <div className="kpi-value" style={{ color: "#000000ff" }}>{fmtTons(totalReturnedTons)} MT</div>
+                    <div className="kpi-sub" style={{ color: "#000000ff" }}>≈ {tonToBrass(totalReturnedTons, tonsPerBrass).toFixed(2)} Brass</div>
                 </div>
                 <div className="kpi-card purple">
                     <div className="kpi-label">Net Sales (MT)</div>
@@ -524,15 +580,15 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                     />
                                 </th>
                                 <th>#</th>
-                                <th>Date</th>
+                                <th style={{ whiteSpace: "nowrap" }}>Date</th>
                                 <th>Party Name</th>
                                 <th>Product</th>
                                 <th>Vehicle</th>
-                                <th>Vehicle Owner</th>
+                                <th>Veh. Owner</th>
                                 <th style={{ textAlign: "right" }}>Qty (MT)</th>
                                 <th style={{ textAlign: "right" }}>Qty (Brass)</th>
                                 <th>Site</th>
-                                <th style={{ textAlign: "right" }}>Price (₹)</th>
+                                <th style={{ textAlign: "right", whiteSpace: "nowrap" }}>Price (₹)</th>
                                 <th>Remarks</th>
                             </tr>
                         </thead>
@@ -563,7 +619,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                                         />
                                                     </td>
                                                     <td>{(currentPage - 1) * pageSize + i + 1}</td>
-                                                    <td>{formatDate(s.sales_date)}</td>
+                                                    <td style={{ whiteSpace: "nowrap" }}>{formatDate(s.sales_date)}</td>
                                                     <td style={{ fontWeight: 600 }}>{s.party_name}</td>
                                                     <td>
                                                         <span className="product-badge">{s.product_name}</span>
@@ -574,7 +630,7 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                                         <strong>{fmtTons(s.quantity_tons)} MT</strong>
                                                         {retTons > 0 && (
                                                             <div style={{ color: "#dc2626", fontWeight: "bold", fontSize: "0.8em" }}>
-                                                                ↩ -{fmtTons(retTons)} MT
+                                                                -{fmtTons(retTons)} MT
                                                             </div>
                                                         )}
                                                     </td>
@@ -582,12 +638,12 @@ export default function SalesReport({ sales, parties, vehicles }) {
                                                         <strong>{tonToBrass(s.quantity_tons, tonsPerBrass).toFixed(2)} Brass</strong>
                                                         {retTons > 0 && (
                                                             <div style={{ color: "#dc2626", fontWeight: "bold", fontSize: "0.8em" }}>
-                                                                ↩ -{tonToBrass(retTons, tonsPerBrass).toFixed(2)} Brass
+                                                                -{tonToBrass(retTons, tonsPerBrass).toFixed(2)} Brass
                                                             </div>
                                                         )}
                                                     </td>
                                                     <td>{s.site || "—"}</td>
-                                                    <td style={{ textAlign: "right" }}>{s.price ? `₹${formatInr(s.price)}` : "—"}</td>
+                                                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{s.price ? `₹${formatInr(s.price)}` : "—"}</td>
                                                     <td style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                                                         title={s.remarks}>{s.remarks || "—"}</td>
                                                 </tr>

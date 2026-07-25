@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout";
 import { getApprovals, actionApproval } from "../services/approvalApi";
 import Pagination from "../components/common/Pagination";
 import ApprovalChangeDetails from "../components/common/ApprovalChangeDetails";
+import Toast from "../components/common/Toast";
 
 export default function Approvals() {
     const [requests, setRequests] = useState([]);
@@ -10,6 +11,7 @@ export default function Approvals() {
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [rejectId, setRejectId] = useState(null);
     const [remark, setRemark] = useState("");
+    const [toast, setToast] = useState({ message: "", type: "success" });
 
     // --- Pagination States ---
     const [currentPage, setCurrentPage] = useState(1);
@@ -42,15 +44,23 @@ export default function Approvals() {
         return () => clearInterval(interval);
     }, []);
 
-    const handleApprove = async (id) => {
-        if (!window.confirm("Approve this request?")) return;
+    const [confirmApproveId, setConfirmApproveId] = useState(null);
+
+    const handleApproveClick = (id) => {
+        setConfirmApproveId(id);
+    };
+
+    const handleConfirmApprove = async () => {
+        if (!confirmApproveId) return;
+        const id = confirmApproveId;
+        setConfirmApproveId(null);
         try {
             await actionApproval(id, { status: "approved" });
-            alert("Request approved successfully.");
+            setToast({ message: `Request #${id} approved successfully!`, type: "success" });
             setSelectedRequest(null);
             fetchPendingApprovals();
         } catch (err) {
-            alert(err.response?.data?.message || "Failed to approve request.");
+            setToast({ message: err.response?.data?.message || "Failed to approve request.", type: "failure" });
         }
     };
 
@@ -61,28 +71,53 @@ export default function Approvals() {
 
     const handleRejectSave = async () => {
         if (!remark.trim()) {
-            alert("Remark is compulsory for rejections.");
+            setToast({ message: "Remark is compulsory for rejections.", type: "failure" });
             return;
         }
         try {
             await actionApproval(rejectId, { status: "rejected", remark });
-            alert("Request rejected successfully.");
+            setToast({ message: `Request #${rejectId} rejected successfully.`, type: "failure" });
             setRejectId(null);
             setSelectedRequest(null);
             fetchPendingApprovals();
         } catch (err) {
-            alert(err.response?.data?.message || "Failed to reject request.");
+            setToast({ message: err.response?.data?.message || "Failed to reject request.", type: "failure" });
         }
     };
 
     return (
         <Layout>
+            <Toast
+                message={toast.message}
+                type={toast.type}
+                onClose={() => setToast({ message: "", type: "success" })}
+            />
+
             <div className="page-header">
                 <h1>Pending Approvals</h1>
                 <span style={{ fontSize: "0.9em", color: "var(--text-muted, #888)" }}>
                     Process pending record edits, deletions, vehicle additions, and report export requests
                 </span>
             </div>
+
+            {toast.message && (
+                <div style={{
+                    padding: "12px 18px",
+                    borderRadius: "10px",
+                    marginBottom: "16px",
+                    fontWeight: "600",
+                    fontSize: "0.92rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    backgroundColor: toast.type === "success" ? "#d1fae5" : "#fee2e2",
+                    color: toast.type === "success" ? "#065f46" : "#991b1b",
+                    border: `1.5px solid ${toast.type === "success" ? "#10b981" : "#f87171"}`
+                }}>
+                    <span>{toast.type === "success" ? "🟢" : "🔴"}</span>
+                    <span>{toast.message}</span>
+                </div>
+            )}
 
             <div className="table-container">
                 {loading ? (
@@ -113,23 +148,23 @@ export default function Approvals() {
                                         <td><strong>{req.requester_name}</strong></td>
                                         <td>
                                             <span style={{
-                                                backgroundColor: req.request_type === "vehicle" 
-                                                    ? "#dbeafe" 
-                                                    : req.request_type === "user_registration" 
-                                                        ? "#f3e8ff" 
-                                                        : req.request_type.includes("edit") 
-                                                            ? "#fef3c7" 
-                                                            : req.request_type.includes("delete") 
-                                                                ? "#fee2e2" 
+                                                backgroundColor: req.request_type === "vehicle"
+                                                    ? "#dbeafe"
+                                                    : req.request_type === "user_registration"
+                                                        ? "#f3e8ff"
+                                                        : req.request_type.includes("edit")
+                                                            ? "#fef3c7"
+                                                            : req.request_type.includes("delete")
+                                                                ? "#fee2e2"
                                                                 : "#e0f2fe",
-                                                color: req.request_type === "vehicle" 
-                                                    ? "#1e40af" 
-                                                    : req.request_type === "user_registration" 
-                                                        ? "#6b21a8" 
-                                                        : req.request_type.includes("edit") 
-                                                            ? "#b45309" 
-                                                            : req.request_type.includes("delete") 
-                                                                ? "#b91c1c" 
+                                                color: req.request_type === "vehicle"
+                                                    ? "#1e40af"
+                                                    : req.request_type === "user_registration"
+                                                        ? "#6b21a8"
+                                                        : req.request_type.includes("edit")
+                                                            ? "#b45309"
+                                                            : req.request_type.includes("delete")
+                                                                ? "#b91c1c"
                                                                 : "#0369a1",
                                                 padding: "0.25rem 0.5rem",
                                                 borderRadius: "4px",
@@ -157,9 +192,8 @@ export default function Approvals() {
                                                     🔍 View Changes
                                                 </button>
                                                 <button
-                                                    className="edit-btn"
-                                                    style={{ backgroundColor: "#10b981", color: "white" }}
-                                                    onClick={() => handleApprove(req.request_id)}
+                                                    className="approve-btn solid"
+                                                    onClick={() => handleApproveClick(req.request_id)}
                                                 >
                                                     Approve
                                                 </button>
@@ -204,7 +238,7 @@ export default function Approvals() {
                             <h2 style={{ margin: 0, color: "#1f2937", fontSize: "1.2rem" }}>
                                 Proposed Changes Review
                             </h2>
-                            <button 
+                            <button
                                 onClick={() => setSelectedRequest(null)}
                                 style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer" }}
                             >
@@ -218,7 +252,7 @@ export default function Approvals() {
                             <button
                                 className="primary-btn"
                                 style={{ backgroundColor: "#10b981", color: "white", border: "none" }}
-                                onClick={() => handleApprove(selectedRequest.request_id)}
+                                onClick={() => handleApproveClick(selectedRequest.request_id)}
                             >
                                 ✓ Approve Changes
                             </button>
@@ -235,6 +269,52 @@ export default function Approvals() {
                                 onClick={() => setSelectedRequest(null)}
                             >
                                 Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Approve Confirmation Modal */}
+            {confirmApproveId !== null && (
+                <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
+                    justifyContent: "center", alignItems: "center", zIndex: 1100, backdropFilter: "blur(2px)"
+                }}>
+                    <div style={{
+                        background: "white", padding: "2rem", borderRadius: "14px",
+                        width: "100%", maxWidth: "420px", boxShadow: "0 15px 30px rgba(0,0,0,0.25)",
+                        textAlign: "center"
+                    }}>
+                        <div style={{
+                            width: "48px", height: "48px", borderRadius: "50%",
+                            backgroundColor: "#d1fae5", color: "#10b981", border: "2px solid #10b981",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "24px", fontWeight: "bold", margin: "0 auto 1rem auto"
+                        }}>
+                            ✓
+                        </div>
+                        <h3 style={{ margin: "0 0 0.5rem 0", color: "#1e293b", fontSize: "1.15rem" }}>
+                            Approve Request #{confirmApproveId}
+                        </h3>
+                        <p style={{ color: "#64748b", fontSize: "0.95rem", marginBottom: "1.5rem" }}>
+                            Are you sure you want to approve this request? The record changes will take effect immediately.
+                        </p>
+                        <div style={{ display: "flex", justifyContent: "center", gap: "0.75rem" }}>
+                            <button
+                                className="primary-btn"
+                                style={{ backgroundColor: "#10b981", color: "white", border: "none", padding: "0.6rem 1.4rem", borderRadius: "8px", fontWeight: 600 }}
+                                onClick={handleConfirmApprove}
+                            >
+                                Yes, Approve
+                            </button>
+                            <button
+                                className="primary-btn"
+                                style={{ backgroundColor: "#9ca3af", color: "white", border: "none", padding: "0.6rem 1.4rem", borderRadius: "8px", fontWeight: 600 }}
+                                onClick={() => setConfirmApproveId(null)}
+                            >
+                                Cancel
                             </button>
                         </div>
                     </div>
