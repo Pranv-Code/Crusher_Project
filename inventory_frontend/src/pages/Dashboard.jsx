@@ -7,7 +7,7 @@ import { getSales } from "../services/salesApi";
 import { getVehicles } from "../services/vehicleApi";
 import { getParties } from "../services/partyApi";
 import { getSettings } from "../services/settingsApi";
-import { formatDate, formatInr } from "../utils/formatUtils";
+import { formatDate, formatInr, tonToBrass } from "../utils/formatUtils";
 
 import "../css/dashboard.css";
 
@@ -125,11 +125,6 @@ const totalProductionTons = production.reduce(
     return (
         <Layout>
             <div className="dashboard-container">
-
-                    <div style={{ fontSize: "1.2rem", fontWeight: "700", backgroundColor: "rgba(48, 155, 232, 0.1)", padding: "10px 20px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)" }}>
-                        🕒 {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    </div>
-
                 {/* Key Metrics Stats Grid */}
                 <div className="stats-grid">
                     <div className="stat-card">
@@ -189,7 +184,7 @@ const totalProductionTons = production.reduce(
                                         color: "var(--text-muted, #888)",
                                         marginBottom: "1rem"
                                     }}>
-                                        ≈ {(Number(settings.common_pool_stock) * 4.2).toFixed(2)} Brass
+                                        ≈ {tonToBrass(settings.common_pool_stock, settings.tons_per_brass || 4.2).toFixed(2)} Brass
                                     </div>
                                     <div style={{
                                         fontSize: "0.85rem",

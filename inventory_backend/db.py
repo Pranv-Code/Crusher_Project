@@ -99,7 +99,10 @@ def get_system_setting(key, default=None, cursor=None):
         cursor.execute("SELECT setting_value FROM System_Settings WHERE setting_key = %s", (key,))
         row = cursor.fetchone()
         if row:
-            return row["setting_value"]
+            if isinstance(row, dict):
+                return row.get("setting_value", default)
+            elif isinstance(row, (tuple, list)):
+                return row[0]
         return default
     except Exception as e:
         print(f"Error reading system setting {key}: {e}")

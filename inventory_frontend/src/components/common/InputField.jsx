@@ -30,6 +30,11 @@ function InputField({
                 max={max}
                 step={step}
                 onWheel={type === "number" ? (e) => e.target.blur() : undefined}
+                onKeyDown={type === "number" ? (e) => {
+                    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                        e.preventDefault();
+                    }
+                } : undefined}
             />
         </div>
     );

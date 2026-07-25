@@ -41,6 +41,7 @@ function Sidebar() {
                 { name: "Vehicles", path: "/vehicles"},
                 { name: "Raw Material", path: "/raw-material"},
                 { name: "Sales", path: "/sales"},
+                { name: "Goods Return", path: "/goods-returns"},
                 { name: "Vehicle Sales", path: "/vehicle-sales"},
                 { name: "Parties", path: "/parties"},
                 { name: "Reports", path: "/reports" },
@@ -53,6 +54,7 @@ function Sidebar() {
                 { name: "Production", path: "/production"},
                 { name: "Raw Material", path: "/raw-material"},
                 { name: "Sales", path: "/sales"},
+                { name: "Goods Return", path: "/goods-returns"},
                 { name: "Reports", path: "/reports" }
             );
         }

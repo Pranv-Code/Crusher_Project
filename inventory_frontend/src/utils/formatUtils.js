@@ -115,3 +115,85 @@ export const formatDurationHM = (timeStr) => {
     }
     return timeStr || "—";
 };
+
+/**
+ * Converts a numeric amount to Indian Currency Words (e.g. 262410 -> "INR Two Lakh Sixty Two Thousand Four Hundred Ten Only")
+ * @param {number|string} amount 
+ * @returns {string} Amount in words
+ */
+export const numberToWordsIndian = (amount) => {
+    const numVal = Number(amount || 0);
+    if (isNaN(numVal) || numVal === 0) return "INR Zero Only";
+
+    const absoluteVal = Math.abs(numVal);
+    const integerPart = Math.floor(absoluteVal);
+    const paisePart = Math.round((absoluteVal - integerPart) * 100);
+
+    const singleDigits = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+    const teenDigits = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const tensDigits = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+    const convertTwoDigits = (n) => {
+        if (n < 10) return singleDigits[n];
+        if (n >= 10 && n < 20) return teenDigits[n - 10];
+        return (tensDigits[Math.floor(n / 10)] + " " + singleDigits[n % 10]).trim();
+    };
+
+    const convertThreeDigits = (n) => {
+        if (n === 0) return "";
+        let str = "";
+        if (Math.floor(n / 100) > 0) {
+            str += singleDigits[Math.floor(n / 100)] + " Hundred ";
+        }
+        if (n % 100 > 0) {
+            str += convertTwoDigits(n % 100);
+        }
+        return str.trim();
+    };
+
+    let result = "";
+    const crore = Math.floor(integerPart / 10000000);
+    const lakh = Math.floor((integerPart % 10000000) / 100000);
+    const thousand = Math.floor((integerPart % 100000) / 1000);
+    const remainder = integerPart % 1000;
+
+    if (crore > 0) result += convertTwoDigits(crore) + " Crore ";
+    if (lakh > 0) result += convertTwoDigits(lakh) + " Lakh ";
+    if (thousand > 0) result += convertTwoDigits(thousand) + " Thousand ";
+    if (remainder > 0) result += convertThreeDigits(remainder);
+
+    result = result.trim();
+    let finalStr = "INR " + (result || "Zero");
+
+    if (paisePart > 0) {
+        finalStr += " And " + convertTwoDigits(paisePart) + " Paise";
+    }
+    finalStr += " Only";
+    return finalStr;
+};
+
+/**
+ * Converts Tons to Brass using configurable factor (1 Brass = factor Tons)
+ * @param {number|string} tons 
+ * @param {number|string} [factor=4.2] 
+ * @returns {number}
+ */
+export const tonToBrass = (tons, factor = 4.2) => {
+    const t = Number(tons || 0);
+    const f = Number(factor || 4.2);
+    if (isNaN(t) || isNaN(f) || f <= 0) return 0;
+    return t / f;
+};
+
+/**
+ * Converts Brass to Tons using configurable factor (1 Brass = factor Tons)
+ * @param {number|string} brass 
+ * @param {number|string} [factor=4.2] 
+ * @returns {number}
+ */
+export const brassToTon = (brass, factor = 4.2) => {
+    const b = Number(brass || 0);
+    const f = Number(factor || 4.2);
+    if (isNaN(b) || isNaN(f) || f <= 0) return 0;
+    return b * f;
+};

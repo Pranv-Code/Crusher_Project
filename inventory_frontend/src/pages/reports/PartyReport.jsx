@@ -1,152 +1,252 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Pagination from "../../components/common/Pagination";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell,
 } from "recharts";
-import * as XLSX from "xlsx";
 import { exportToFormattedExcel } from "../../utils/excelGenerator";
 import { getPartyReport } from "../../services/reportsApi";
 import { useAuth } from "../../context/AuthContext";
-import { generatePartyReportPdf } from "../../utils/pdfGenerator";
+import { generatePartyReportPdf, generatePartyInvoicePdf } from "../../utils/pdfGenerator";
+import { getSettings } from "../../services/settingsApi";
 import { requestReportPrint } from "../../services/approvalApi";
-import { formatDate, formatInr } from "../../utils/formatUtils";
+import { formatDate, formatInr, tonToBrass } from "../../utils/formatUtils";
 
-const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777"];
+const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777", "#d97706", "#059669"];
 
 const fmtTons = (v) => Number(v || 0).toFixed(2);
 
-const monthLabel = (dateStr) => {
-    if (!dateStr) return "";
-    const [y, m] = dateStr.split("-");
-    return `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
-};
-
-function exportToExcel(rows, filename) {
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Party Report");
-    XLSX.writeFile(wb, filename);
-}
-
-const CustomTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    return (
-        <div style={{ background: "#1e293b", color: "#f8fafc", padding: "10px 14px", borderRadius: 8, fontSize: 12 }}>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
-            {payload.map((p, i) => <div key={i}>{p.name}: <strong>{fmtTons(p.value)} tons</strong></div>)}
-        </div>
-    );
-};
-
-export default function PartyReport({ parties, onSwitchToSales }) {
+export default function PartyReport({ parties, products }) {
     const { isManager, isClerk } = useAuth();
 
-    const [search, setSearch] = useState("");
-    const [selectedPartyId, setSelectedPartyId] = useState(null);
+    const [selectedPartyId, setSelectedPartyId] = useState("");
     const [partyData, setPartyData] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [searchQuery, setSearchQuery] = useState("");
     const [showCharts, setShowCharts] = useState(false);
+
+    // Filters State
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [monthFilter, setMonthFilter] = useState("");
+    const [productFilter, setProductFilter] = useState("");
+
+    // Checkbox selection state for selective export
+    const [selectedSaleIds, setSelectedSaleIds] = useState(new Set());
+
+    // Conversion Factor State
+    const [tonsPerBrass, setTonsPerBrass] = useState(4.2);
+
+    // Company Settings for Invoice
+    const [companyDetails, setCompanyDetails] = useState({});
+
+    useEffect(() => {
+        getSettings()
+            .then(res => {
+                if (res.data) {
+                    setCompanyDetails(res.data);
+                    if (res.data.tons_per_brass) {
+                        setTonsPerBrass(parseFloat(res.data.tons_per_brass) || 4.2);
+                    }
+                }
+            })
+            .catch(err => console.error("Failed to load settings in PartyReport:", err));
+    }, []);
 
     // --- Pagination States ---
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
-    // Reset pagination when report changes
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [partyData]);
-
     const [showApprovalModal, setShowApprovalModal] = useState(false);
-    const [pendingRequest, setPendingRequest] = useState(null);
-    const [submittingRequest, setSubmittingRequest] = useState(false);
+    const [approvalReason, setApprovalReason] = useState("");
+    const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
 
-    const handleRequestApproval = async () => {
-        if (!pendingRequest) return;
-        setSubmittingRequest(true);
-        try {
-            await requestReportPrint(pendingRequest);
-            alert("Request submitted successfully! Check status in 'My Pending Work'.");
-            setShowApprovalModal(false);
-            setPendingRequest(null);
-        } catch (err) {
-            alert(err.response?.data?.message || err.response?.data?.error || "Failed to submit request.");
-        } finally {
-            setSubmittingRequest(false);
-        }
+    const handlePageSizeChange = (newSize) => {
+        setPageSize(newSize);
+        setCurrentPage(1);
     };
 
-    const filteredParties = useMemo(() =>
-        parties.filter(p => p.party_name.toLowerCase().includes(search.toLowerCase())),
-        [parties, search]);
+    const resetFilters = () => {
+        setDateFrom("");
+        setDateTo("");
+        setMonthFilter("");
+        setProductFilter("");
+        setSearchQuery("");
+        setSelectedSaleIds(new Set());
+        setCurrentPage(1);
+    };
 
-    const handleSelectParty = async (partyId) => {
+    const handlePartySelect = (partyId) => {
         setSelectedPartyId(partyId);
-        setLoading(true);
-        setError(null);
-        setPartyData(null);
-        try {
-            const res = await getPartyReport(partyId);
-            setPartyData(res.data);
-        } catch (e) {
-            setError("Failed to load party data.");
-        } finally {
-            setLoading(false);
-        }
-    };
+        setDateFrom("");
+        setDateTo("");
+        setMonthFilter("");
+        setProductFilter("");
+        setSearchQuery("");
+        setSelectedSaleIds(new Set());
+        setCurrentPage(1);
 
-    // Chart data from partyData.sales
-    const byMonth = useMemo(() => {
-        if (!partyData?.sales) return [];
-        const map = {};
-        partyData.sales.forEach(s => {
-            const m = monthLabel(s.sales_date);
-            map[m] = (map[m] || 0) + parseFloat(s.quantity_tons || 0);
-        });
-        return Object.entries(map).map(([month, tons]) => ({ month, tons: parseFloat(tons.toFixed(2)) }));
-    }, [partyData]);
-
-    const byProduct = useMemo(() => {
-        if (!partyData?.sales) return [];
-        const map = {};
-        partyData.sales.forEach(s => {
-            map[s.product_name] = (map[s.product_name] || 0) + parseFloat(s.quantity_tons || 0);
-        });
-        return Object.entries(map)
-            .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
-            .sort((a, b) => b.value - a.value);
-    }, [partyData]);
-
-    const topProduct = byProduct[0]?.name || "—";
-
-    const handleExport = () => {
-        if (!partyData?.sales) return;
-        const label = `Party Report (Excel) - Party: ${partyData.party.party_name}`;
-        const requestData = {
-            report_type: "party",
-            format: "excel",
-            filters: {
-                party_id: partyData.party.party_id,
-                party_name: partyData.party.party_name
-            },
-            label: label
-        };
-        if (isClerk) {
-            setPendingRequest(requestData);
-            setShowApprovalModal(true);
+        if (!partyId) {
+            setPartyData(null);
             return;
         }
-        const partyName = partyData.party.party_name;
-        const subtitle = `Party Statement: ${partyName}${partyData.party.gst_no ? ` | GSTIN: ${partyData.party.gst_no}` : ""}`;
 
-        const rows = partyData.sales.map(s => ({
+        setLoading(true);
+        getPartyReport(partyId)
+            .then(res => setPartyData(res.data))
+            .catch(err => console.error("Failed to fetch party report:", err))
+            .finally(() => setLoading(false));
+    };
+
+    const filteredSales = useMemo(() => {
+        if (!partyData?.sales) return [];
+        return partyData.sales.filter(s => {
+            if (dateFrom && s.sales_date < dateFrom) return false;
+            if (dateTo && s.sales_date > dateTo) return false;
+            if (monthFilter && s.sales_date?.slice(0, 7) !== monthFilter) return false;
+            if (productFilter && String(s.product_id) !== productFilter) return false;
+
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const matchProduct = s.product_name?.toLowerCase().includes(q);
+                const matchVehicle = s.vehicle_number?.toLowerCase().includes(q);
+                const matchSite = s.site?.toLowerCase().includes(q);
+                const matchDate = s.sales_date?.toLowerCase().includes(q);
+                const matchRemarks = s.remarks?.toLowerCase().includes(q);
+                if (!matchProduct && !matchVehicle && !matchSite && !matchDate && !matchRemarks) return false;
+            }
+            return true;
+        });
+    }, [partyData, dateFrom, dateTo, monthFilter, productFilter, searchQuery]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filteredSales.length]);
+
+    // Checkbox Selection Logic
+    const isAllSelected = useMemo(() => {
+        return filteredSales.length > 0 && filteredSales.every(s => selectedSaleIds.has(s.sales_id));
+    }, [filteredSales, selectedSaleIds]);
+
+    const toggleSelectAll = () => {
+        if (isAllSelected) {
+            setSelectedSaleIds(new Set());
+        } else {
+            setSelectedSaleIds(new Set(filteredSales.map(s => s.sales_id)));
+        }
+    };
+
+    const toggleSelectOne = (id) => {
+        setSelectedSaleIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    const getExportSales = () => {
+        if (selectedSaleIds.size > 0) {
+            return filteredSales.filter(s => selectedSaleIds.has(s.sales_id));
+        }
+        return filteredSales;
+    };
+
+    // KPIs
+    const filteredTons = useMemo(() => filteredSales.reduce((acc, s) => acc + (parseFloat(s.quantity_tons) || 0), 0), [filteredSales]);
+    const filteredSpend = useMemo(() => filteredSales.reduce((acc, s) => acc + (parseFloat(s.price) || 0), 0), [filteredSales]);
+
+    const byProductData = useMemo(() => {
+        if (!filteredSales.length) return [];
+        const map = {};
+        filteredSales.forEach(s => {
+            const p = s.product_name || "Common Pool";
+            map[p] = (map[p] || 0) + (parseFloat(s.quantity_tons) || 0);
+        });
+        return Object.entries(map).map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }));
+    }, [filteredSales]);
+
+    const topProduct = useMemo(() => {
+        if (!byProductData.length) return "N/A";
+        const sorted = [...byProductData].sort((a, b) => b.value - a.value);
+        return `${sorted[0].name} (${sorted[0].value} MT)`;
+    }, [byProductData]);
+
+    const handlePrintOrRequest = () => {
+        if (!partyData) return;
+        const exportSales = getExportSales();
+        if (exportSales.length === 0) {
+            alert("No sales entries selected for PDF export.");
+            return;
+        }
+
+        if (isManager) {
+            generatePartyReportPdf({ ...partyData, sales: exportSales }, tonsPerBrass);
+        } else {
+            setShowApprovalModal(true);
+        }
+    };
+
+    const handleGenerateInvoicePdf = () => {
+        if (!partyData) return;
+        const exportSales = getExportSales();
+        if (exportSales.length === 0) {
+            alert("No sales entries selected for Invoice PDF.");
+            return;
+        }
+        generatePartyInvoicePdf({ ...partyData, sales: exportSales }, dateFrom, dateTo, companyDetails);
+    };
+
+    const submitApprovalRequest = async () => {
+        if (!approvalReason.trim()) {
+            alert("Please provide a reason for the print approval request.");
+            return;
+        }
+
+        const exportSales = getExportSales();
+        setIsSubmittingApproval(true);
+        try {
+            await requestReportPrint({
+                report_type: "Party Sales Report",
+                parameters: {
+                    party_id: selectedPartyId,
+                    party_name: partyData?.party?.party_name,
+                    records_count: exportSales.length
+                },
+                reason: approvalReason.trim()
+            });
+
+            alert("Print request submitted successfully! A Manager will review your request.");
+            setShowApprovalModal(false);
+            setApprovalReason("");
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to submit print request.");
+        } finally {
+            setIsSubmittingApproval(false);
+        }
+    };
+
+    const handleExportExcel = () => {
+        const exportSales = getExportSales();
+        if (!partyData || exportSales.length === 0) {
+            alert("No party sales data available to export.");
+            return;
+        }
+
+        const partyName = partyData.party.party_name;
+        const isSelection = selectedSaleIds.size > 0;
+        const subtitle = `Party Statement: ${partyName}${partyData.party.gst_no ? ` | GSTIN: ${partyData.party.gst_no}` : ""}${isSelection ? ` | Selected (${selectedSaleIds.size} entries)` : ""}`;
+
+        const rows = exportSales.map(s => ({
             "Date": formatDate(s.sales_date),
             "Product": s.product_name,
             "Vehicle": s.vehicle_number || "",
             "Vehicle Owner": s.vehicle_owner || "",
             "Quantity (MT)": Number((Number(s.quantity_tons || 0)).toFixed(2)),
-            "Quantity (Brass)": Number((Number(s.quantity_tons || 0) * 4.2).toFixed(2)),
+            "Quantity (Brass)": Number(tonToBrass(s.quantity_tons, tonsPerBrass).toFixed(2)),
             "Site": s.site || "",
             "Price (₹)": Number(s.price || 0),
             "Remarks": s.remarks || "",
@@ -161,221 +261,277 @@ export default function PartyReport({ parties, onSwitchToSales }) {
         });
     };
 
-    const handlePdfExport = () => {
-        if (!partyData) return;
-        const label = `Party Report (PDF) - Party: ${partyData.party.party_name}`;
-        const requestData = {
-            report_type: "party",
-            format: "pdf",
-            filters: {
-                party_id: partyData.party.party_id,
-                party_name: partyData.party.party_name
-            },
-            label: label
-        };
-        if (isClerk) {
-            setPendingRequest(requestData);
-            setShowApprovalModal(true);
-            return;
-        }
-        generatePartyReportPdf(partyData);
-    };
-
     return (
-        <div className="party-layout">
-            {/* Left: Party List */}
-            <div className="party-list-panel">
-                <h3>Parties</h3>
-                <input
-                    className="party-search"
-                    placeholder="Search party..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                />
-                {filteredParties.map(p => (
-                    <div
-                        key={p.party_id}
-                        className={`party-list-item ${selectedPartyId === p.party_id ? "selected" : ""}`}
-                        onClick={() => handleSelectParty(p.party_id)}
+        <div className="report-container">
+            {/* Top Action Bar */}
+            <div className="report-action-bar">
+                <div className="action-bar-left">
+                    <label style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e293b" }}>Select Party:</label>
+                    <select
+                        value={selectedPartyId}
+                        onChange={(e) => handlePartySelect(e.target.value)}
+                        style={{
+                            padding: "6px 12px",
+                            borderRadius: "8px",
+                            border: "1px solid #cbd5e1",
+                            fontSize: "0.9rem",
+                            fontWeight: 600,
+                            minWidth: "220px",
+                            outline: "none"
+                        }}
                     >
-                        {p.party_name}
+                        <option value="">-- Choose a Party --</option>
+                        {parties.map(p => (
+                            <option key={p.party_id} value={p.party_id}>{p.party_name}</option>
+                        ))}
+                    </select>
+
+                    {partyData && (
+                        <span className="report-count-badge">
+                            {filteredSales.length} {filteredSales.length === 1 ? "Record" : "Records"}
+                        </span>
+                    )}
+
+                    {selectedSaleIds.size > 0 && (
+                        <span style={{
+                            backgroundColor: "#e0f2fe",
+                            color: "#0369a1",
+                            padding: "4px 10px",
+                            borderRadius: "16px",
+                            fontSize: "0.85rem",
+                            fontWeight: "700",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px"
+                        }}>
+                            Selected: {selectedSaleIds.size} / {filteredSales.length}
+                            <button
+                                onClick={() => setSelectedSaleIds(new Set())}
+                                style={{ background: "none", border: "none", color: "#ef4444", fontWeight: "bold", cursor: "pointer", fontSize: "0.85rem" }}
+                                title="Clear Selection"
+                            >
+                                ✕
+                            </button>
+                        </span>
+                    )}
+
+                    {partyData && (
+                        <button
+                            className={`toggle-charts-btn ${showCharts ? "active" : ""}`}
+                            onClick={() => setShowCharts(!showCharts)}
+                        >
+                            {showCharts ? "📊 Hide Analytics" : "📈 Show Analytics"}
+                        </button>
+                    )}
+                </div>
+
+                {partyData && (
+                    <div className="action-bar-right">
+                        <button className="export-btn excel" onClick={handleExportExcel}>
+                            📥 Export Excel {selectedSaleIds.size > 0 ? `(${selectedSaleIds.size})` : ""}
+                        </button>
+                        <button
+                            className="export-btn pdf"
+                            onClick={handlePrintOrRequest}
+                            title={isClerk ? "Request Manager approval to print" : "Download Party Statement PDF"}
+                        >
+                            {isClerk ? "💬 Request Print Approval" : `📄 Download PDF ${selectedSaleIds.size > 0 ? `(${selectedSaleIds.size})` : ""}`}
+                        </button>
+                        <button
+                            className="export-btn excel"
+                            onClick={handleGenerateInvoicePdf}
+                            style={{ backgroundColor: "#16a34a" }}
+                            title="Generate Non-GST Invoice PDF"
+                        >
+                            📄 Invoice PDF {selectedSaleIds.size > 0 ? `(${selectedSaleIds.size})` : ""}
+                        </button>
                     </div>
-                ))}
-                {filteredParties.length === 0 && (
-                    <div style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>No parties found.</div>
                 )}
             </div>
 
-            {/* Right: Party Detail */}
-            <div className="party-detail-panel">
-                {!selectedPartyId && (
-                    <div className="party-placeholder">
-                        <div style={{ fontSize: 40 }}>👥</div>
-                        <p>Select a party from the left to view their report</p>
+            {!selectedPartyId && (
+                <div className="report-table-card" style={{ textAlign: "center", padding: "4rem 2rem" }}>
+                    <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🏢</div>
+                    <h3 style={{ color: "#1e293b", margin: "0 0 0.5rem 0" }}>No Party Selected</h3>
+                    <p style={{ color: "#64748b", margin: 0 }}>Select a party from the dropdown above to view their sales history, statement analytics, and generate non-GST invoices.</p>
+                </div>
+            )}
+
+            {loading && (
+                <div className="report-loading">
+                    <h3 style={{ color: "#2563eb" }}>Loading Party Report...</h3>
+                </div>
+            )}
+
+            {!loading && partyData && (
+                <>
+                    {/* Search Bar */}
+                    <div style={{ marginBottom: "1rem" }}>
+                        <input
+                            type="text"
+                            placeholder="🔍 Search party sales by Product, Vehicle, Site, Remarks, or Date..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            style={{
+                                width: "100%",
+                                padding: "0.75rem 1rem",
+                                borderRadius: "8px",
+                                border: "1px solid #cbd5e1",
+                                fontSize: "0.95rem",
+                                outline: "none",
+                                boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+                                transition: "all 0.2s",
+                                boxSizing: "border-box"
+                            }}
+                        />
                     </div>
-                )}
 
-                {loading && <div className="report-loading">Loading party data...</div>}
-                {error && <div className="report-empty" style={{ color: "#dc2626" }}>{error}</div>}
+                    {/* Filter Bar */}
+                    <div className="report-filters">
+                        <div className="filter-group">
+                            <label>From Date</label>
+                            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setMonthFilter(""); }} />
+                        </div>
+                        <div className="filter-group">
+                            <label>To Date</label>
+                            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setMonthFilter(""); }} />
+                        </div>
+                        <div className="filter-group">
+                            <label>Month</label>
+                            <input type="month" value={monthFilter} onChange={e => { setMonthFilter(e.target.value); setDateFrom(""); setDateTo(""); }} />
+                        </div>
+                        <div className="filter-group">
+                            <label>Product</label>
+                            <select value={productFilter} onChange={e => setProductFilter(e.target.value)}>
+                                <option value="">All Products</option>
+                                {Array.isArray(products) && products.map(p => (
+                                    <option key={p.product_id} value={p.product_id}>{p.product_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <button className="filter-reset-btn" onClick={resetFilters}>✕ Reset</button>
+                    </div>
 
-                {partyData && !loading && (
-                    <>
-                        {/* Party Info Card */}
-                        <div className="party-info-card">
-                            <div className="party-info-field">
-                                <label>Party Name</label>
-                                <span>{partyData.party.party_name}</span>
+                    {/* Party Details Header Box */}
+                    <div style={{ background: "#ffffff", padding: "1.2rem 1.5rem", borderRadius: "12px", marginBottom: "1.2rem", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
+                            <div>
+                                <h3 style={{ margin: "0 0 0.25rem 0", color: "#0f172a", fontSize: "1.3rem" }}>{partyData.party.party_name}</h3>
+                                <p style={{ margin: 0, color: "#64748b", fontSize: "0.9rem" }}>
+                                    {partyData.party.address || "No address specified"}
+                                </p>
                             </div>
-                            <div className="party-info-field">
-                                <label>GST No</label>
-                                <span>{partyData.party.gst_no || "—"}</span>
-                            </div>
-                            <div className="party-info-field">
-                                <label>PAN No</label>
-                                <span>{partyData.party.pan_no || "—"}</span>
-                            </div>
-                            <div className="party-info-field">
-                                <label>Address</label>
-                                <span>{partyData.party.address || "—"}</span>
+                            <div style={{ textAlign: "right", fontSize: "0.85rem", color: "#475569" }}>
+                                {partyData.party.contact_person && <div>Contact: <strong>{partyData.party.contact_person}</strong></div>}
+                                {partyData.party.phone && <div>Phone: <strong>{partyData.party.phone}</strong></div>}
+                                {partyData.party.email && <div>Email: <strong>{partyData.party.email}</strong></div>}
+                                {partyData.party.gst_no && <div>GSTIN: <strong>{partyData.party.gst_no}</strong></div>}
                             </div>
                         </div>
+                    </div>
 
-                        {/* KPIs */}
-                        <div className="kpi-row">
-                            <div className="kpi-card blue">
-                                <div className="kpi-label">Total Entries</div>
-                                <div className="kpi-value">{partyData.summary.total_entries}</div>
-                            </div>
-                            <div className="kpi-card green">
-                                <div className="kpi-label">Total Tons Bought</div>
-                                <div className="kpi-value">{fmtTons(partyData.summary.total_tons)}</div>
-                                <div className="kpi-sub">≈ {(partyData.summary.total_tons * 4.2).toFixed(2)} brass</div>
-                            </div>
-                            <div className="kpi-card purple">
-                                <div className="kpi-label">Top Product</div>
-                                <div className="kpi-value" style={{ fontSize: "1rem" }}>{topProduct}</div>
-                            </div>
+                    {/* KPI Grid */}
+                    <div className="kpi-grid">
+                        <div className="kpi-card blue">
+                            <div className="kpi-label">Filtered Sales Entries</div>
+                            <div className="kpi-value">{filteredSales.length}</div>
+                            <div className="kpi-sub">Lifetime Orders: {partyData.summary.total_purchases}</div>
                         </div>
-
-                        {/* Collapsible Analytics Graphs */}
-                        <div style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            margin: "18px 0 12px 0",
-                            padding: "10px 14px",
-                            background: "#f8fafc",
-                            borderRadius: "8px",
-                            border: "1px solid #e2e8f0"
-                        }}>
-                            <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: "8px" }}>
-                                📊 Analytics & Visual Charts
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => setShowCharts(!showCharts)}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                    padding: "6px 14px",
-                                    backgroundColor: showCharts ? "#fee2e2" : "#e0f2fe",
-                                    color: showCharts ? "#991b1b" : "#0369a1",
-                                    border: `1px solid ${showCharts ? "#fca5a5" : "#bae6fd"}`,
-                                    borderRadius: "6px",
-                                    fontSize: "0.85rem",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease"
-                                }}
-                            >
-                                <span>{showCharts ? "🔼 Hide Graphs" : "📊 Show Graphs"}</span>
-                            </button>
+                        <div className="kpi-card green">
+                            <div className="kpi-label">Dispatched Volume (MT)</div>
+                            <div className="kpi-value">{fmtTons(filteredTons)}</div>
+                            <div className="kpi-sub">≈ {tonToBrass(filteredTons, tonsPerBrass).toFixed(2)} Brass</div>
                         </div>
+                        <div className="kpi-card orange">
+                            <div className="kpi-label">Total Spend (₹)</div>
+                            <div className="kpi-value">₹{formatInr(filteredSpend)}</div>
+                            <div className="kpi-sub">Lifetime Spend: ₹{formatInr(partyData.summary.total_spend)}</div>
+                        </div>
+                        <div className="kpi-card purple">
+                            <div className="kpi-label">Top Product Bought</div>
+                            <div className="kpi-value" style={{ fontSize: "1.1rem" }}>{topProduct}</div>
+                        </div>
+                    </div>
 
-                        {showCharts && (
-                            <div className="chart-grid">
+                    {/* Collapsible Analytics Section */}
+                    {showCharts && byProductData.length > 0 && (
+                        <div className="charts-grid">
                             <div className="chart-card">
-                                <h3>Monthly Purchases (Tons)</h3>
-                                {byMonth.length === 0 ? <div className="report-empty">No data</div> : (
-                                    <ResponsiveContainer width="100%" height={220}>
-                                        <BarChart data={byMonth} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                            <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
-                                            <YAxis tick={{ fontSize: 11 }} />
-                                            <Tooltip content={<CustomTooltip />} />
-                                            <Bar dataKey="tons" fill="#2563eb" radius={[4, 4, 0, 0]} name="Tons" isAnimationActive={false} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                )}
+                                <h4 className="chart-title">Purchases by Product (MT)</h4>
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <BarChart data={byProductData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                        <YAxis tick={{ fontSize: 11 }} />
+                                        <Tooltip />
+                                        <Bar dataKey="value" name="Volume (MT)" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
                             </div>
-
                             <div className="chart-card">
-                                <h3>By Product</h3>
-                                {byProduct.length === 0 ? <div className="report-empty">No data</div> : (
-                                    <ResponsiveContainer width="100%" height={220}>
-                                        <PieChart>
-                                            <Pie data={byProduct} cx="50%" cy="50%" outerRadius={80}
-                                                dataKey="value" nameKey="name"
-                                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                                labelLine={false} fontSize={10} isAnimationActive={false}>
-                                                {byProduct.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                                            </Pie>
-                                            <Tooltip formatter={(v) => [`${fmtTons(v)} tons`]} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                )}
+                                <h4 className="chart-title">Product Share Breakdown</h4>
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <PieChart>
+                                        <Pie data={byProductData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} labelLine={false}>
+                                            {byProductData.map((_, idx) => (
+                                                <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
+                                </ResponsiveContainer>
                             </div>
                         </div>
-                        )}
+                    )}
 
-                        {/* Table + Actions */}
-                        <div className="report-table-section">
-                            <div className="report-table-header">
-                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <h3>Sales History</h3>
-                                    <span className="report-count">{partyData.sales.length} records</span>
-                                </div>
-                                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                    <button
-                                        className="filter-reset-btn"
-                                        onClick={() => onSwitchToSales(partyData.party.party_id)}
-                                        style={{ borderColor: "#2563eb", color: "#2563eb" }}
-                                    >
-                                        🔗 View in Sales Report
-                                    </button>
-                                    <button className="export-btn" onClick={handleExport}>⬇ Export to Excel</button>
-                                    {(isManager || isClerk) && (
-                                        <button className="export-btn" style={{ backgroundColor: "#ef4444", color: "white" }} onClick={handlePdfExport}>
-                                            PDF Generate
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {partyData.sales.length === 0 ? (
-                                <div className="report-empty">No sales recorded for this party.</div>
-                            ) : (
-                                <div style={{ overflowX: "auto" }}>
-                                    <table className="report-table">
-                                        <thead>
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Date</th>
-                                                <th>Product</th>
-                                                <th>Vehicle</th>
-                                                <th style={{ textAlign: "right" }}>Quantity (MT)</th>
-                                                <th style={{ textAlign: "right" }}>Quantity (Brass)</th>
-                                                <th>Site</th>
-                                                <th style={{ textAlign: "right" }}>Price (₹)</th>
-                                                <th>Remarks</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {partyData.sales
-                                                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                                                .map((s, i) => (
-                                                    <tr key={s.sales_id}>
+                    {/* Table Card */}
+                    <div className="report-table-card">
+                        <div className="table-wrapper">
+                            <table className="report-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: "38px", textAlign: "center" }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={isAllSelected}
+                                                onChange={toggleSelectAll}
+                                                title={isAllSelected ? "Deselect All" : "Select All Filtered"}
+                                                style={{ cursor: "pointer", width: "16px", height: "16px" }}
+                                            />
+                                        </th>
+                                        <th>#</th>
+                                        <th>Date</th>
+                                        <th>Product Name</th>
+                                        <th>Vehicle</th>
+                                        <th style={{ textAlign: "right" }}>Qty (MT)</th>
+                                        <th style={{ textAlign: "right" }}>Qty (Brass)</th>
+                                        <th>Site</th>
+                                        <th style={{ textAlign: "right" }}>Price (₹)</th>
+                                        <th>Remarks</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredSales.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="10" className="empty-row">
+                                                No sales history records match the specified filters.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredSales
+                                            .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                                            .map((s, i) => {
+                                                const isSelected = selectedSaleIds.has(s.sales_id);
+                                                return (
+                                                    <tr key={s.sales_id} style={{ backgroundColor: isSelected ? "#f0f9ff" : "transparent" }}>
+                                                        <td style={{ textAlign: "center" }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                onChange={() => toggleSelectOne(s.sales_id)}
+                                                                style={{ cursor: "pointer", width: "16px", height: "16px" }}
+                                                            />
+                                                        </td>
                                                         <td style={{ color: "#9ca3af", fontSize: 12 }}>
                                                             {(currentPage - 1) * pageSize + i + 1}
                                                         </td>
@@ -383,69 +539,73 @@ export default function PartyReport({ parties, onSwitchToSales }) {
                                                         <td><strong>{s.product_name}</strong></td>
                                                         <td>{s.vehicle_number || "—"}</td>
                                                         <td style={{ textAlign: "right" }}><strong>{fmtTons(s.quantity_tons)} MT</strong></td>
-                                                        <td style={{ textAlign: "right" }}><strong>{(s.quantity_tons * 4.2).toFixed(2)} Brass</strong></td>
+                                                        <td style={{ textAlign: "right" }}><strong>{tonToBrass(s.quantity_tons, tonsPerBrass).toFixed(2)} Brass</strong></td>
                                                         <td>{s.site || "—"}</td>
                                                         <td style={{ textAlign: "right" }}>{s.price ? `₹${formatInr(s.price)}` : "—"}</td>
                                                         <td style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                                                             title={s.remarks}>{s.remarks || "—"}</td>
                                                     </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
-                                    <Pagination
-                                        currentPage={currentPage}
-                                        totalItems={partyData.sales.length}
-                                        pageSize={pageSize}
-                                        onPageChange={setCurrentPage}
-                                        onPageSizeChange={setPageSize}
-                                        pageSizeOptions={[5, 10, 20, 50]}
-                                    />
-                                </div>
-                            )}
+                                                );
+                                            })
+                                    )}
+                                </tbody>
+                            </table>
+                            <Pagination
+                                currentPage={currentPage}
+                                totalItems={filteredSales.length}
+                                pageSize={pageSize}
+                                onPageChange={setCurrentPage}
+                                onPageSizeChange={handlePageSizeChange}
+                            />
                         </div>
-                    </>
-                )}
-            </div>
+                    </div>
+                </>
+            )}
+
+            {/* Print Approval Request Modal */}
             {showApprovalModal && (
                 <div style={{
                     position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
                     backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
-                    justifyContent: "center", alignItems: "center", zIndex: 2000
+                    justifyContent: "center", alignItems: "center", zIndex: 1000
                 }}>
                     <div style={{
                         background: "white", padding: "2rem", borderRadius: "12px",
                         width: "100%", maxWidth: "450px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
                     }}>
-                        <h3 style={{ margin: "0 0 1rem 0", color: "#1e1b4b" }}>Approval Required</h3>
-                        <p style={{ color: "#475569", fontSize: "0.95rem", marginBottom: "1rem" }}>
-                            You need manager approval to print or export reports. Would you like to request approval for this report?
+                        <h3 style={{ margin: "0 0 1rem 0", color: "#1e1b4b" }}>💬 Request Print Approval</h3>
+                        <p style={{ fontSize: "0.9rem", color: "#64748b", marginBottom: "1rem" }}>
+                            As a Clerk, exporting or printing party statements requires Manager approval. Please enter a reason for this request.
                         </p>
-                        <div style={{
-                            marginBottom: "1.5rem", padding: "0.75rem",
-                            background: "#f1f5f9", borderRadius: "8px",
-                            fontSize: "0.9rem", color: "#334155", borderLeft: "4px solid #3b82f6"
-                        }}>
-                            <strong>Request Details:</strong>
-                            <div style={{ marginTop: "0.25rem" }}>{pendingRequest?.label}</div>
+                        <div style={{ marginBottom: "1.5rem" }}>
+                            <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>
+                                Reason for Request *
+                            </label>
+                            <textarea
+                                rows="3"
+                                style={{
+                                    width: "100%", padding: "0.75rem", borderRadius: "8px",
+                                    border: "1px solid #cbd5e1", fontSize: "0.9rem", outline: "none"
+                                }}
+                                placeholder="e.g., Party requested annual statement of account..."
+                                value={approvalReason}
+                                onChange={(e) => setApprovalReason(e.target.value)}
+                            />
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
                             <button
-                                className="primary-btn"
-                                onClick={handleRequestApproval}
-                                disabled={submittingRequest}
-                            >
-                                {submittingRequest ? "Submitting..." : "Submit Request"}
-                            </button>
-                            <button
-                                className="primary-btn"
-                                style={{ backgroundColor: "#9ca3af", color: "white", border: "none" }}
-                                onClick={() => {
-                                    setShowApprovalModal(false);
-                                    setPendingRequest(null);
-                                }}
-                                disabled={submittingRequest}
+                                style={{ padding: "0.6rem 1.2rem", borderRadius: "6px", border: "1px solid #cbd5e1", background: "white", color: "#475569", fontWeight: 600, cursor: "pointer" }}
+                                onClick={() => setShowApprovalModal(false)}
+                                disabled={isSubmittingApproval}
                             >
                                 Cancel
+                            </button>
+                            <button
+                                style={{ padding: "0.6rem 1.2rem", borderRadius: "6px", border: "none", background: "#2563eb", color: "white", fontWeight: 600, cursor: "pointer" }}
+                                onClick={submitApprovalRequest}
+                                disabled={isSubmittingApproval}
+                            >
+                                {isSubmittingApproval ? "Submitting..." : "Submit Request"}
                             </button>
                         </div>
                     </div>

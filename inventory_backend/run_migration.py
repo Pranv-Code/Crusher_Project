@@ -97,15 +97,46 @@ def run():
             stmt = stmt.strip()
             if not stmt or stmt.upper().startswith("USE "):
                 continue
-            try:
-                cursor.execute(stmt)
-            except Exception as e:
-                if "already exists" not in str(e) and "Duplicate" not in str(e):
-                    print(f"Settings migration warning: {e}")
         conn.commit()
         print("Settings migrations applied successfully.")
     except Exception as e:
         print(f"Error running settings migrations: {e}")
+
+    print("Running Goods_Returns migration...")
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Goods_Returns (
+                return_id INT AUTO_INCREMENT PRIMARY KEY,
+                return_date DATE NOT NULL,
+                sale_id INT NULL,
+                party_id INT NOT NULL,
+                product_id INT NULL,
+                vehicle_number VARCHAR(50) NULL,
+                original_quantity_tons DECIMAL(12,4) NULL,
+                returned_quantity_tons DECIMAL(12,4) NOT NULL,
+                unit VARCHAR(20) DEFAULT 'tons',
+                condition_type ENUM('GOOD', 'DAMAGED') NOT NULL DEFAULT 'GOOD',
+                reason TEXT NULL,
+                created_by INT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+                FOREIGN KEY (sale_id) REFERENCES Sales(sales_id) ON DELETE SET NULL,
+                FOREIGN KEY (party_id) REFERENCES Party(party_id) ON DELETE CASCADE,
+                FOREIGN KEY (product_id) REFERENCES Product(product_id) ON DELETE SET NULL,
+                FOREIGN KEY (created_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+                INDEX idx_return_date (return_date),
+                INDEX idx_party_id (party_id),
+                INDEX idx_product_id (product_id),
+                INDEX idx_sale_id (sale_id),
+                INDEX idx_condition (condition_type)
+            );
+        """)
+        conn.commit()
+        print("Goods_Returns table checked/created successfully.")
+    except Exception as e:
+        print(f"Error creating Goods_Returns table: {e}")
+
 
 
     # Hash default passwords

@@ -364,11 +364,11 @@ def add_sale():
         
         if inv_mode == "COMMON_POOL":
             pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
-            if pool_stock < float(qty):
-                return jsonify({"message": "Insufficient Stock in Common Pool"}), 400
+            if (pool_stock + 0.0001) < float(qty):
+                return jsonify({"message": f"Insufficient Stock in Common Pool (Available: {pool_stock:.2f} MT, Requested: {float(qty):.2f} MT)"}), 400
         else:
-            if float(product["quantity_tons"]) < float(qty):
-                return jsonify({"message": "Insufficient Stock"}), 400
+            if (float(product["quantity_tons"]) + 0.0001) < float(qty):
+                return jsonify({"message": f"Insufficient Stock (Available: {float(product['quantity_tons']):.2f} MT, Requested: {float(qty):.2f} MT)"}), 400
 
         # Check Party
         cursor.execute("SELECT party_name FROM Party WHERE party_id=%s", (data["party_id"],))
@@ -590,12 +590,13 @@ def add_sales_bulk():
 
             # Validate Stock
             if inv_mode == "COMMON_POOL":
-                if local_pool_stock < float(qty):
-                    errors.append(f"{row_label}: Insufficient Stock in Common Pool")
+                if (local_pool_stock + 0.0001) < float(qty):
+                    errors.append(f"{row_label}: Insufficient Stock in Common Pool (Available: {local_pool_stock:.2f} MT, Requested: {float(qty):.2f} MT)")
                     continue
             else:
-                if local_stock.get(p_id, 0.0) < float(qty):
-                    errors.append(f"{row_label}: Insufficient Stock for product")
+                avail = local_stock.get(p_id, 0.0)
+                if (avail + 0.0001) < float(qty):
+                    errors.append(f"{row_label}: Insufficient Stock for product (Available: {avail:.2f} MT, Requested: {float(qty):.2f} MT)")
                     continue
 
             # Perform Insertions & Updates
@@ -782,8 +783,8 @@ def update_sale(id):
         if inv_mode == "COMMON_POOL":
             if product and product["status"].lower() != "active":
                 conn.rollback(); return jsonify({"message": "Product is Inactive"}), 400
-            if pool_stock < float(new_qty):
-                conn.rollback(); return jsonify({"message": "Insufficient Stock in Common Pool"}), 400
+            if (pool_stock + 0.0001) < float(new_qty):
+                conn.rollback(); return jsonify({"message": f"Insufficient Stock in Common Pool (Available: {pool_stock:.2f} MT, Requested: {float(new_qty):.2f} MT)"}), 400
             set_system_setting("common_pool_stock", str(pool_stock - float(new_qty)), user_id=user_id, cursor=cursor)
             data["product_id"] = p_id if product else None
         else:

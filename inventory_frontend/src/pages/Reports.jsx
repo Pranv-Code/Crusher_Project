@@ -199,6 +199,7 @@ export default function Reports() {
                     )}
                     {activeTab === "production" && (
                         <ProductionReport
+                            production={productions}
                             productions={productions}
                             products={products}
                         />

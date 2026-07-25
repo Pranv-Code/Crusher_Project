@@ -75,7 +75,7 @@ function Production() {
             return;
         }
 
-        const isDup = production.some(p => {
+        const isDup = (productions || []).some(p => {
             const sameProd = settings.inventory_mode === "COMMON_POOL" 
                 ? (String(p.product_id || "") === String(newProduction.product_id || ""))
                 : String(p.product_id) === String(newProduction.product_id);

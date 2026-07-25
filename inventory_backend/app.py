@@ -16,6 +16,7 @@ from routes.user_routes import user_bp
 from routes.approval_routes import approval_bp
 from routes.settings_routes import settings_bp
 from routes.audit_routes import audit_bp
+from routes.goods_return_routes import goods_return_bp
 
 import os
 
@@ -85,6 +86,7 @@ app.register_blueprint(user_bp)
 app.register_blueprint(approval_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(audit_bp)
+app.register_blueprint(goods_return_bp)
 
 
 

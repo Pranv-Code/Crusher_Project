@@ -6,6 +6,7 @@ import Products from "./pages/Products";
 import Production from "./pages/Production";
 import Vehicles from "./pages/Vehicles";
 import Sales from "./pages/Sales";
+import GoodsReturns from "./pages/GoodsReturns";
 import Reports from "./pages/Reports";
 import Parties from "./pages/Parties";
 import RawMaterial from "./pages/RawMaterial";
@@ -47,6 +48,14 @@ function AppRoutes() {
                 element={
                     <ProtectedRoute allowedRoles={["Manager", "Clerk"]}>
                         <Sales />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/goods-returns"
+                element={
+                    <ProtectedRoute allowedRoles={["Manager", "Clerk"]}>
+                        <GoodsReturns />
                     </ProtectedRoute>
                 }
             />

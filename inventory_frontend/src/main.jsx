@@ -11,6 +11,13 @@ document.addEventListener("wheel", function (e) {
   }
 });
 
+// Disable arrow keys (ArrowUp, ArrowDown) on all number inputs globally
+document.addEventListener("keydown", function (e) {
+  if ((e.key === "ArrowUp" || e.key === "ArrowDown") && document.activeElement && document.activeElement.type === "number") {
+    e.preventDefault();
+  }
+}, { capture: true });
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <App />

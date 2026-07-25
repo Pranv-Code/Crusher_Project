@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import Layout from "../layouts/Layout";
 import { getVehicleSales } from "../services/vehicleSaleApi";
 import Pagination from "../components/common/Pagination";
-import { formatDate, formatTime, formatInr } from "../utils/formatUtils";
+import { formatDate, formatTime, formatInr, tonToBrass } from "../utils/formatUtils";
+import { getSettings } from "../services/settingsApi";
 
 // ─── Dual-unit quantity cell ──────────────────────────────────────────────────
 const QtyCell = ({ displayQty, displayUnit, convertedQty, convertedUnit }) => (
@@ -22,185 +23,203 @@ function VehicleSales() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [filterVehicle, setFilterVehicle] = useState("");
+    const [tonsPerBrass, setTonsPerBrass] = useState(4.2);
 
     // --- Pagination States ---
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
-    // Reset pagination when data or search or filters change
     useEffect(() => {
-        setCurrentPage(1);
-    }, [data.length, search, filterVehicle]);
-
-    useEffect(() => {
-        getVehicleSales()
-            .then((res) => setData(res.data))
-            .catch((err) => console.error("Error loading vehicle sales:", err))
-            .finally(() => setLoading(false));
-
-        const interval = setInterval(() => {
-            const token = sessionStorage.getItem("token") || localStorage.getItem("token");
-            if (!token) return;
-            getVehicleSales()
-                .then((res) => setData(res.data))
-                .catch((err) => console.error("Error refreshing vehicle sales in background:", err));
-        }, 5000);
-
-        return () => clearInterval(interval);
+        getSettings()
+            .then(res => {
+                if (res.data && res.data.tons_per_brass) {
+                    setTonsPerBrass(parseFloat(res.data.tons_per_brass) || 4.2);
+                }
+            })
+            .catch(() => {});
     }, []);
 
-    // Unique vehicle numbers for filter dropdown
-    const vehicleNumbers = [...new Set(data.map((r) => r.vehicle_number))].sort();
+    // Reset pagination when data or search or filters change
+    const handlePageSizeChange = (newSize) => {
+        setPageSize(newSize);
+        setCurrentPage(1);
+    };
 
-    // Filter by search and vehicle
+    useEffect(() => {
+        fetchSales();
+    }, []);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, filterVehicle]);
+
+    const fetchSales = async () => {
+        setLoading(true);
+        try {
+            const res = await getVehicleSales();
+            setData(res.data || []);
+        } catch (err) {
+            console.error("Failed to load vehicle sales:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Filter by search query (vehicle number or party name)
     const filtered = data.filter((row) => {
-        const term = search.toLowerCase();
         const matchesSearch =
-            !term ||
-            row.party_name?.toLowerCase().includes(term) ||
-            row.product_name?.toLowerCase().includes(term) ||
-            row.site?.toLowerCase().includes(term) ||
-            row.remarks?.toLowerCase().includes(term) ||
-            row.vehicle_owner?.toLowerCase().includes(term) ||
-            row.vehicle_number?.toLowerCase().includes(term);
+            !search.trim() ||
+            (row.vehicle_number &&
+                row.vehicle_number.toLowerCase().includes(search.toLowerCase())) ||
+            (row.party_name &&
+                row.party_name.toLowerCase().includes(search.toLowerCase()));
+
         const matchesVehicle =
             !filterVehicle || row.vehicle_number === filterVehicle;
+
         return matchesSearch && matchesVehicle;
     });
 
+    // Unique vehicle list for filter dropdown
+    const uniqueVehicles = Array.from(
+        new Set(data.map((r) => r.vehicle_number).filter(Boolean))
+    );
+
     // Totals
     const totalTons = filtered.reduce(
-        (sum, r) => sum + parseFloat(r.quantity_tons || 0),
+        (acc, r) => acc + (parseFloat(r.quantity_tons) || 0),
         0
     );
 
     return (
         <Layout>
-            {/* ── Page Header ── */}
-            <div className="page-header">
-                <h1>Vehicle Sales</h1>
-                <span style={{ fontSize: "0.9em", color: "var(--text-muted, #888)" }}>
-                    {filtered.length} entr{filtered.length === 1 ? "y" : "ies"}&nbsp;|&nbsp;
-                    Total: <strong>{totalTons.toFixed(2)} tons</strong>
-                </span>
+            <div className="page-header" style={{ marginBottom: "1.5rem" }}>
+                <h2>Vehicle Sales Report</h2>
+                <p style={{ color: "var(--text-muted, #888)", marginTop: "0.25rem" }}>
+                    View all sales entries mapped by vehicle
+                </p>
             </div>
 
-            {/* ── Filters ── */}
+            {/* Filter controls */}
             <div
                 style={{
                     display: "flex",
-                    gap: "0.75rem",
+                    gap: "1rem",
+                    marginBottom: "1.5rem",
                     flexWrap: "wrap",
-                    marginBottom: "1rem",
+                    alignItems: "center",
                 }}
             >
                 <input
-                    className="search-box"
-                    style={{ flex: "1", minWidth: "200px" }}
-                    placeholder="Search party, product, site, owner, remarks…"
+                    type="text"
+                    placeholder="Search vehicle or party..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                />
-                <select
                     style={{
-                        padding: "0.5rem 0.75rem",
-                        borderRadius: "6px",
+                        padding: "0.6rem 1rem",
+                        borderRadius: "8px",
                         border: "1px solid var(--border-color, #ccc)",
-                        background: "var(--input-bg, #fff)",
-                        color: "var(--text-color, #333)",
-                        minWidth: "160px",
+                        fontSize: "0.9rem",
+                        minWidth: "240px",
+                        outline: "none",
                     }}
+                />
+
+                <select
                     value={filterVehicle}
                     onChange={(e) => setFilterVehicle(e.target.value)}
+                    style={{
+                        padding: "0.6rem 1rem",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border-color, #ccc)",
+                        fontSize: "0.9rem",
+                        outline: "none",
+                    }}
                 >
                     <option value="">All Vehicles</option>
-                    {vehicleNumbers.map((vn) => (
-                        <option key={vn} value={vn}>{vn}</option>
+                    {uniqueVehicles.map((v) => (
+                        <option key={v} value={v}>
+                            {v}
+                        </option>
                     ))}
                 </select>
+
+                {(search || filterVehicle) && (
+                    <button
+                        onClick={() => {
+                            setSearch("");
+                            setFilterVehicle("");
+                        }}
+                        style={{
+                            padding: "0.6rem 1rem",
+                            borderRadius: "8px",
+                            border: "1px solid var(--border-color, #ccc)",
+                            background: "var(--surface-color, #fff)",
+                            fontSize: "0.9rem",
+                            cursor: "pointer",
+                        }}
+                    >
+                        Clear Filters
+                    </button>
+                )}
             </div>
 
-            {/* ── Table ── */}
+            {/* Main Sales Table */}
             <div className="table-container">
                 {loading ? (
-                    <p style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted,#888)" }}>
-                        Loading…
+                    <p style={{ padding: "2rem", textAlign: "center" }}>Loading...</p>
+                ) : filtered.length === 0 ? (
+                    <p style={{ padding: "2rem", textAlign: "center", color: "#888" }}>
+                        No vehicle sales entries found.
                     </p>
                 ) : (
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Sale Date</th>
-                                <th>Vehicle</th>
-                                <th>Owner</th>
-                                <th>Party</th>
-                                <th>Product</th>
-                                <th>Quantity</th>
-                                <th>Site</th>
-                                <th>Price (₹)</th>
-                                <th>Loading</th>
-                                <th>Unloading</th>
-                                <th>Remarks</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.length === 0 ? (
+                    <>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead>
                                 <tr>
-                                    <td
-                                        colSpan="12"
-                                        style={{
-                                            textAlign: "center",
-                                            padding: "2rem",
-                                            color: "var(--text-muted, #888)",
-                                        }}
-                                    >
-                                        No vehicle sale entries found.
-                                    </td>
+                                    <th>#</th>
+                                    <th>Date</th>
+                                    <th>Vehicle No</th>
+                                    <th>Vehicle Owner</th>
+                                    <th>Party</th>
+                                    <th>Product</th>
+                                    <th>Quantity</th>
+                                    <th>Site</th>
+                                    <th>Loading Time</th>
+                                    <th>Unloading Time</th>
+                                    <th>Price (₹)</th>
                                 </tr>
-                            ) : (
-                                filtered
+                            </thead>
+                            <tbody>
+                                {filtered
                                     .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                                    .map((row, idx) => (
-                                        <tr key={row.vehicle_sale_id}>
-                                            <td style={{ color: "var(--text-muted,#888)", fontSize: "0.85em" }}>
-                                                {(currentPage - 1) * pageSize + idx + 1}
-                                            </td>
+                                    .map((row, i) => (
+                                        <tr key={row.sales_id}>
+                                            <td>{(currentPage - 1) * pageSize + i + 1}</td>
                                             <td>{formatDate(row.sales_date)}</td>
-                                            <td><strong>{row.vehicle_number}</strong></td>
+                                            <td>
+                                                <strong style={{ fontFamily: "monospace" }}>
+                                                    {row.vehicle_number || "—"}
+                                                </strong>
+                                            </td>
                                             <td>{row.vehicle_owner || "—"}</td>
                                             <td>{row.party_name}</td>
                                             <td>{row.product_name}</td>
                                             <td>
                                                 <QtyCell
                                                     displayQty={row.display_quantity}
-                                                    displayUnit={row.unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                    displayUnit={row.display_unit}
                                                     convertedQty={row.converted_quantity}
-                                                    convertedUnit={row.converted_unit.toLowerCase()==="tons"?"MT":"Brass"}
+                                                    convertedUnit={row.converted_unit}
                                                 />
                                             </td>
                                             <td>{row.site || "—"}</td>
-                                            <td>{row.price ? `₹${formatInr(row.price)}` : "—"}</td>
                                             <td>{formatTime(row.loading_time)}</td>
                                             <td>{formatTime(row.unloading_time)}</td>
-                                            <td
-                                                style={{
-                                                    maxWidth: "180px",
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                    whiteSpace: "nowrap",
-                                                }}
-                                                title={row.remarks || ""}
-                                            >
-                                                {row.remarks || "—"}
-                                            </td>
+                                            <td>{row.price ? `₹${formatInr(row.price)}` : "—"}</td>
                                         </tr>
-                                    ))
-                            )}
-                        </tbody>
-
-                        {/* ── Footer totals ── */}
-                        {filtered.length > 0 && (
+                                    ))}
+                            </tbody>
                             <tfoot>
                                 <tr style={{ fontWeight: 600, borderTop: "2px solid var(--border-color,#ccc)" }}>
                                     <td colSpan="6" style={{ textAlign: "right", paddingRight: "1rem" }}>
@@ -211,25 +230,24 @@ function VehicleSales() {
                                             <span>{totalTons.toFixed(2)} tons</span>
                                             <br />
                                             <span style={{ fontSize: "0.75em", color: "var(--text-muted,#888)" }}>
-                                                ≈ {(totalTons * 4.2).toFixed(2)} brass
+                                                ≈ {tonToBrass(totalTons, tonsPerBrass).toFixed(2)} brass
                                             </span>
                                         </div>
                                     </td>
                                     <td colSpan="5" />
                                 </tr>
                             </tfoot>
-                        )}
-                    </table>
-                )}
-                {!loading && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalItems={filtered.length}
-                        pageSize={pageSize}
-                        onPageChange={setCurrentPage}
-                        onPageSizeChange={setPageSize}
-                        pageSizeOptions={[5, 10, 20, 50]}
-                    />
+                        </table>
+
+                        {/* Shared Reusable Pagination Component */}
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={filtered.length}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            onPageSizeChange={handlePageSizeChange}
+                        />
+                    </>
                 )}
             </div>
         </Layout>

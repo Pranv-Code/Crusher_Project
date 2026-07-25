@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getApprovals, getMyPendingApprovals } from "../services/approvalApi";
+import { getSettings, updateSettings } from "../services/settingsApi";
 import "../css/navbar.css";
 
 function Navbar() {
@@ -10,6 +11,8 @@ function Navbar() {
     const [showModal, setShowModal] = useState(false);
     const [tons, setTons] = useState("");
     const [brass, setBrass] = useState("");
+    const [tonsPerBrass, setTonsPerBrass] = useState(4.2);
+    const [savingFactor, setSavingFactor] = useState(false);
     const [pendingCount, setPendingCount] = useState(0);
 
     const handleLogout = () => {
@@ -17,7 +20,76 @@ function Navbar() {
         navigate("/login");
     };
 
-    const today = new Date().toLocaleDateString();
+    const [currentDateTime, setCurrentDateTime] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentDateTime(new Date());
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const fetchConversionFactor = async () => {
+        try {
+            const res = await getSettings();
+            if (res.data && res.data.tons_per_brass) {
+                setTonsPerBrass(parseFloat(res.data.tons_per_brass) || 4.2);
+            }
+        } catch (e) {
+            console.error("Failed to load unit conversion factor:", e);
+        }
+    };
+
+    useEffect(() => {
+        fetchConversionFactor();
+    }, []);
+
+    const handleSaveFactor = async () => {
+        const factorNum = parseFloat(tonsPerBrass);
+        if (isNaN(factorNum) || factorNum <= 0) {
+            alert("Please enter a valid positive conversion factor (e.g. 4.2).");
+            return;
+        }
+
+        setSavingFactor(true);
+        try {
+            await updateSettings({ tons_per_brass: factorNum });
+            alert(`Unit conversion factor updated successfully! (1 Brass = ${factorNum} Tons)`);
+            if (brass) {
+                setTons((parseFloat(brass) * factorNum).toFixed(2));
+            } else if (tons) {
+                setBrass((parseFloat(tons) / factorNum).toFixed(2));
+            }
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to update conversion factor.");
+        } finally {
+            setSavingFactor(false);
+        }
+    };
+
+    const handleTonsChange = (e) => {
+        const val = e.target.value;
+        setTons(val);
+        if (val === "" || isNaN(val)) {
+            setBrass("");
+        } else {
+            const factor = parseFloat(tonsPerBrass) || 4.2;
+            const calculated = parseFloat(val) / factor;
+            setBrass(calculated.toFixed(2));
+        }
+    };
+
+    const handleBrassChange = (e) => {
+        const val = e.target.value;
+        setBrass(val);
+        if (val === "" || isNaN(val)) {
+            setTons("");
+        } else {
+            const factor = parseFloat(tonsPerBrass) || 4.2;
+            const calculated = parseFloat(val) * factor;
+            setTons(calculated.toFixed(2));
+        }
+    };
 
     const checkOldEntries = (entries) => {
         if (!isManager || !user) return;
@@ -31,75 +103,57 @@ function Navbar() {
         });
 
         if (hasOld) {
-            const storageKey = `alerted_old_approvals_${user.user_id}`;
-            const hasAlerted = sessionStorage.getItem(storageKey);
-            if (!hasAlerted) {
-                alert("⚠️ Warning: You have pending approval requests that are more than a day old!");
-                sessionStorage.setItem(storageKey, "true");
-            }
-        }
-    };
-
-    const updatePendingCount = async () => {
-        if (!user) return;
-        try {
-            if (isManager) {
-                const res = await getApprovals();
-                setPendingCount(res.data.length);
-                checkOldEntries(res.data);
-            } else if (isClerk) {
-                const res = await getMyPendingApprovals();
-                // Filter only 'pending' status requests for the clerk badge count
-                const pending = res.data.filter(req => req.status === "pending");
-                setPendingCount(pending.length);
-            }
-        } catch (err) {
-            console.error("Failed to fetch pending count for navbar:", err);
+            alert("⚠️ WARNING: You have pending requests older than 24 hours! Please review them immediately.");
         }
     };
 
     useEffect(() => {
-        if (user) {
-            updatePendingCount();
+        let isMounted = true;
+        
+        const fetchPendingCount = async () => {
+            if (!user) return;
+            try {
+                if (isManager) {
+                    const res = await getApprovals("pending");
+                    if (isMounted && res.data) {
+                        setPendingCount(res.data.length);
+                        checkOldEntries(res.data);
+                    }
+                } else if (isClerk) {
+                    const res = await getMyPendingApprovals();
+                    if (isMounted && res.data) {
+                        const pendingList = res.data.filter(item => item.status === "pending");
+                        setPendingCount(pendingList.length);
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching pending approvals count:", err);
+            }
+        };
 
-            const interval = setInterval(() => {
-                updatePendingCount();
-            }, 5000);
-
-            return () => clearInterval(interval);
-        } else {
-            setPendingCount(0);
-        }
+        fetchPendingCount();
+        const interval = setInterval(fetchPendingCount, 10000);
+        
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
     }, [user, isManager, isClerk]);
 
-    const handleTonsChange = (e) => {
-        const val = e.target.value;
-        setTons(val);
-        if (val === "") {
-            setBrass("");
-        } else {
-            const calculated = parseFloat(val) * 4.2;
-            setBrass(isNaN(calculated) ? "" : calculated.toFixed(2));
-        }
-    };
-
-    const handleBrassChange = (e) => {
-        const val = e.target.value;
-        setBrass(val);
-        if (val === "") {
-            setTons("");
-        } else {
-            const calculated = parseFloat(val) / 4.2;
-            setTons(isNaN(calculated) ? "" : calculated.toFixed(4));
-        }
-    };
-
     return (
-        <header className="navbar">
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                <div className="nav-logo">
-                    <h2>WHITE CLOUD</h2>
-                    <p>GLOBAL SOLUTIONS</p>
+        <header className="navbar-container">
+            <div className="navbar-brand" style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
+                <img 
+                    src="/logo.png" 
+                    alt="Vishwajeet Enterprises Logo" 
+                    className="navbar-logo"
+                    onError={(e) => {
+                        e.target.style.display = 'none';
+                    }} 
+                />
+                <div>
+                    <h2 className="navbar-title">VISHWAJEET ENTERPRISES</h2>
+                    <span className="navbar-subtitle">Inventory &amp; Production Portal</span>
                 </div>
             </div>
 
@@ -136,7 +190,7 @@ function Navbar() {
                                 width: "18px",
                                 height: "18px",
                                 display: "flex",
-                                justifyContent: "center",
+                                justifyCenter: "center",
                                 alignItems: "center",
                                 fontSize: "0.75rem",
                                 fontWeight: "bold",
@@ -164,11 +218,35 @@ function Navbar() {
                         gap: "6px",
                         transition: "all 0.2s"
                     }}
-                    onClick={() => setShowModal(true)}
+                    onClick={() => {
+                        fetchConversionFactor();
+                        setShowModal(true);
+                    }}
                 >
                     🔄 Unit Converter
                 </button>
-                <span>{today}</span>
+
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "6px 12px",
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "6px",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: "#334155"
+                }}>
+                    <span>🕒</span>
+                    <span>
+                        {currentDateTime.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                    </span>
+                    <span style={{ color: "#cbd5e1" }}>|</span>
+                    <span style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
+                        {currentDateTime.toLocaleTimeString()}
+                    </span>
+                </div>
 
                 {user && (
                     <button
@@ -190,51 +268,108 @@ function Navbar() {
                 }}>
                     <div style={{
                         background: "white", padding: "2rem", borderRadius: "12px",
-                        width: "100%", maxWidth: "400px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+                        width: "100%", maxWidth: "420px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
                         color: "#0f172a"
                     }}>
-                        <h3 style={{ margin: "0 0 1.5rem 0", color: "#1e1b4b", display: "flex", alignItems: "center", gap: "8px" }}>
-                            🔄 Unit Converter
+                        <h3 style={{ margin: "0 0 1rem 0", color: "#1e1b4b", display: "flex", alignItems: "center", gap: "8px" }}>
+                            🔄 Unit Converter &amp; Calculator
                         </h3>
+
+                        {/* Conversion Factor Settings Section for Managers */}
+                        <div style={{
+                            backgroundColor: "#f0f9ff",
+                            border: "1px solid #bae6fd",
+                            borderRadius: "8px",
+                            padding: "10px 12px",
+                            marginBottom: "1.2rem",
+                            fontSize: "0.85rem"
+                        }}>
+                            <div style={{ fontWeight: "700", color: "#0369a1", marginBottom: "4px" }}>
+                                📐 Conversion Rule: 1 Brass = {tonsPerBrass} Tons
+                            </div>
+
+                            {isManager ? (
+                                <div style={{ marginTop: "6px" }}>
+                                    <label style={{ display: "block", fontSize: "0.75rem", color: "#0369a1", marginBottom: "4px" }}>
+                                        Change Tons Value (Tons in 1 Brass):
+                                    </label>
+                                    <div style={{ display: "flex", gap: "6px" }}>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={tonsPerBrass}
+                                            onChange={(e) => setTonsPerBrass(e.target.value)}
+                                            style={{
+                                                flex: 1,
+                                                padding: "4px 8px",
+                                                borderRadius: "6px",
+                                                border: "1px solid #7dd3fc",
+                                                fontSize: "0.85rem"
+                                            }}
+                                        />
+                                        <button
+                                            onClick={handleSaveFactor}
+                                            disabled={savingFactor}
+                                            style={{
+                                                backgroundColor: "#0284c7",
+                                                color: "white",
+                                                border: "none",
+                                                borderRadius: "6px",
+                                                padding: "4px 10px",
+                                                fontSize: "0.8rem",
+                                                fontWeight: "600",
+                                                cursor: "pointer"
+                                            }}
+                                        >
+                                            {savingFactor ? "Saving..." : "Save Factor"}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ fontSize: "0.75rem", color: "#0284c7" }}>
+                                    Manager can configure this conversion factor in settings.
+                                </div>
+                            )}
+                        </div>
                         
-                        <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem", marginBottom: "1.5rem" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
                             <div>
-                                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9em", fontWeight: 500, color: "#475569" }}>
-                                    Tons
-                                </label>
-                                <input
-                                    type="number"
-                                    step="any"
-                                    style={{
-                                        width: "100%", padding: "0.75rem", borderRadius: "8px",
-                                        border: "1px solid #d1d5db", fontSize: "1rem", boxSizing: "border-box",
-                                        color: "#000", background: "#f8fafc"
-                                    }}
-                                    placeholder="Enter tons"
-                                    value={tons}
-                                    onChange={handleTonsChange}
-                                />
-                            </div>
-
-                            <div style={{ textAlign: "center", fontSize: "1.2rem", color: "#94a3b8", fontWeight: "bold" }}>
-                                ⇅
-                            </div>
-
-                            <div>
-                                <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.9em", fontWeight: 500, color: "#475569" }}>
+                                <label style={{ display: "block", marginBottom: "0.4rem", fontSize: "0.85em", fontWeight: 600, color: "#475569" }}>
                                     Brass
                                 </label>
                                 <input
                                     type="number"
                                     step="any"
                                     style={{
-                                        width: "100%", padding: "0.75rem", borderRadius: "8px",
+                                        width: "100%", padding: "0.65rem", borderRadius: "8px",
                                         border: "1px solid #d1d5db", fontSize: "1rem", boxSizing: "border-box",
                                         color: "#000", background: "#f8fafc"
                                     }}
-                                    placeholder="Enter brass"
+                                    placeholder="Enter brass quantity"
                                     value={brass}
                                     onChange={handleBrassChange}
+                                />
+                            </div>
+
+                            <div style={{ textAlign: "center", fontSize: "1.1rem", color: "#94a3b8", fontWeight: "bold" }}>
+                                ⇅ (1 Brass = {tonsPerBrass} Tons)
+                            </div>
+
+                            <div>
+                                <label style={{ display: "block", marginBottom: "0.4rem", fontSize: "0.85em", fontWeight: 600, color: "#475569" }}>
+                                    Tons (MT)
+                                </label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    style={{
+                                        width: "100%", padding: "0.65rem", borderRadius: "8px",
+                                        border: "1px solid #d1d5db", fontSize: "1rem", boxSizing: "border-box",
+                                        color: "#000", background: "#f8fafc"
+                                    }}
+                                    placeholder="Enter metric tons"
+                                    value={tons}
+                                    onChange={handleTonsChange}
                                 />
                             </div>
                         </div>
