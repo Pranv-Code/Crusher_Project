@@ -71,7 +71,6 @@ def register_user():
 
     except Exception as e:
         conn.rollback()
-        import traceback; traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
@@ -130,7 +129,6 @@ def login_user():
         }), 200
 
     except Exception as e:
-        import traceback; traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()

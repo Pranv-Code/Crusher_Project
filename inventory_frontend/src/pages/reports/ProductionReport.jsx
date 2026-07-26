@@ -294,7 +294,7 @@ export default function ProductionReport({ production = [], productions = [], pr
                         className={`toggle-charts-btn ${showCharts ? "active" : ""}`}
                         onClick={() => setShowCharts(!showCharts)}
                     >
-                        {showCharts ? "📊 Hide Analytics" : "📈 Show Analytics"}
+                        {showCharts ? "📊 Hide Graph" : "📈 Show Graph"}
                     </button>
                 </div>
                 <div className="action-bar-right">

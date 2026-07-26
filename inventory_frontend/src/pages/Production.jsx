@@ -89,7 +89,6 @@ function Production() {
             return;
         }
 
-        console.log("Sending to backend:", newProduction);
         try {
             await addProduction(newProduction);
             await fetchProduction(true);

@@ -91,8 +91,10 @@ const getPendingSince = (salesDate, loadingTime) => {
     }
 };
 
+const getTodayDateStr = () => new Date().toISOString().split("T")[0];
+
 const emptyNewSale = {
-    sales_date: "",
+    sales_date: getTodayDateStr(),
     party_id: "",
     product_id: "",
     vehicle_number: "",
@@ -178,7 +180,7 @@ const Sales = () => {
 
     // --- Bulk Sales Entry State ---
     const [bulkCommon, setBulkCommon] = useState({
-        sales_date: "",
+        sales_date: getTodayDateStr(),
         party_id: "",
         site: "",
     });
@@ -292,17 +294,25 @@ const Sales = () => {
 
     const handleAddSalesBulk = async () => {
         try {
-            if (!bulkCommon.sales_date || !bulkCommon.party_id) {
-                alert("Sales date and Party are required in common section.");
-                return;
-            }
             if (bulkRows.length === 0) {
                 alert("Please add at least one row.");
                 return;
             }
-            // Basic validation
+
+            // Check if any row lacks a party_id or sales_date
             for (let i = 0; i < bulkRows.length; i++) {
                 const r = bulkRows[i];
+                const rParty = r.party_id || bulkCommon.party_id;
+                const rDate = r.sales_date || bulkCommon.sales_date;
+
+                if (!rDate) {
+                    alert(`Sales Date is required (please select in Common Information section above or for Row ${i + 1}).`);
+                    return;
+                }
+                if (!rParty) {
+                    alert(`Party is required (please select Party in Common Information section above or for Row ${i + 1}).`);
+                    return;
+                }
                 if (!r.vehicle_number || !r.quantity || !r.unit) {
                     alert(`Row ${i + 1} is missing required fields (Vehicle, Quantity, or Unit).`);
                     return;
@@ -318,21 +328,27 @@ const Sales = () => {
             }
 
             const payload = {
-                sales_date: bulkCommon.sales_date,
-                party_id: parseInt(bulkCommon.party_id),
-                site: capitalizeWords(bulkCommon.site),
+                common: {
+                    sales_date: bulkCommon.sales_date || null,
+                    party_id: bulkCommon.party_id ? parseInt(bulkCommon.party_id) : null,
+                    site: capitalizeWords(bulkCommon.site || "")
+                },
                 rows: bulkRows.map(r => ({
+                    party_id: r.party_id ? parseInt(r.party_id) : (bulkCommon.party_id ? parseInt(bulkCommon.party_id) : null),
+                    sales_date: r.sales_date || bulkCommon.sales_date || null,
                     product_id: r.product_id ? parseInt(r.product_id) : null,
                     vehicle_number: r.vehicle_number,
                     quantity: parseFloat(r.quantity),
                     unit: r.unit,
                     loading_time: r.loading_time || null,
-                    price: r.price ? parseFloat(r.price) : 0
+                    price: r.price ? parseFloat(r.price) : 0,
+                    site: r.site ? capitalizeWords(r.site) : (bulkCommon.site ? capitalizeWords(bulkCommon.site) : "")
                 }))
             };
 
             const res = await addSalesBulk(payload);
-            let msg = `Successfully created ${res.data.created_count} sales entries.`;
+            const count = res.data.created_count || res.data.created || bulkRows.length;
+            let msg = `Successfully created ${count} sales entries.`;
             if (res.data.errors && res.data.errors.length > 0) {
                 msg += `\n\nWarnings/Errors:\n` + res.data.errors.join("\n");
             }
@@ -343,7 +359,7 @@ const Sales = () => {
             await fetchActiveProducts(true);
             setShowAddForm(false);
             setBulkRows([{ product_id: "", vehicle_number: "", quantity: "", unit: "tons", loading_time: "", price: "" }]);
-            setBulkCommon({ sales_date: "", party_id: "", site: "" });
+            setBulkCommon({ sales_date: getTodayDateStr(), party_id: "", site: "" });
 
         } catch (err) {
             const msg = err.response?.data?.message || err.message || "Failed to create bulk sales.";
@@ -353,16 +369,21 @@ const Sales = () => {
 
     const handleEdit = (sale) => {
         setEditingId(sale.sales_id);
+        const qtyVal = (sale.display_quantity !== undefined && sale.display_quantity !== null)
+            ? sale.display_quantity
+            : (sale.quantity_tons !== undefined && sale.quantity_tons !== null ? sale.quantity_tons : (sale.quantity || ""));
+
         setEditData({
-            sales_date: sale.sales_date,
-            party_id: sale.party_id,
-            product_id: sale.product_id,
-            vehicle_number: sale.vehicle_number,
-            quantity: sale.quantity,
-            unit: sale.unit,
+            sales_date: sale.sales_date || "",
+            party_id: sale.party_id || "",
+            product_id: sale.product_id || "",
+            vehicle_number: sale.vehicle_number || "",
+            quantity: qtyVal !== undefined && qtyVal !== null ? String(qtyVal) : "",
+            unit: sale.unit || "tons",
             site: sale.site || "",
             price: sale.price || "",
             loading_time: sale.loading_time || "",
+            unloading_time: sale.unloading_time || "",
             remarks: sale.remarks || ""
         });
     };
@@ -742,46 +763,68 @@ const Sales = () => {
                         </>
                     ) : (
                         <div>
-                            <h3 style={{ margin: "0 0 1rem 0" }}>Common Information</h3>
-                            <div className="form-grid" style={{ marginBottom: "1.5rem" }}>
-                                <div className="form-group">
-                                    <label>Sale Date *</label>
-                                    <input
-                                        type="date"
-                                        value={bulkCommon.sales_date}
-                                        onChange={(e) =>
-                                            setBulkCommon({ ...bulkCommon, sales_date: e.target.value })
-                                        }
-                                    />
+                            <div style={{
+                                background: "#f8fafc",
+                                border: "1px solid #cbd5e1",
+                                borderRadius: "10px",
+                                padding: "1.25rem",
+                                marginBottom: "1.5rem"
+                            }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                                    <h3 style={{ margin: 0, color: "#0f172a", fontSize: "1.1rem" }}>📌 Common Information (Applies to all entries)</h3>
+                                    <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 500 }}>
+                                        Default values for all bulk rows below
+                                    </span>
                                 </div>
-                                <div className="form-group">
-                                    <label>Party *</label>
-                                    <select
-                                        value={bulkCommon.party_id}
-                                        onChange={(e) =>
-                                            setBulkCommon({ ...bulkCommon, party_id: e.target.value })
-                                        }
-                                    >
-                                        <option value="">Select Party</option>
-                                        {parties
-                                            .filter(p => p.status === "Active")
-                                            .map((p) => (
-                                                <option key={p.party_id} value={p.party_id}>
-                                                    {p.party_name}
-                                                </option>
-                                            ))}
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label>Delivery Site</label>
-                                    <input
-                                        type="text"
-                                        value={bulkCommon.site}
-                                        placeholder="Common site name"
-                                        onChange={(e) =>
-                                            setBulkCommon({ ...bulkCommon, site: e.target.value })
-                                        }
-                                    />
+                                <div className="form-grid">
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>Sale Date <span style={{ color: "#ef4444" }}>*</span></label>
+                                        <input
+                                            type="date"
+                                            value={bulkCommon.sales_date}
+                                            onChange={(e) =>
+                                                setBulkCommon({ ...bulkCommon, sales_date: e.target.value })
+                                            }
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>Party <span style={{ color: "#ef4444" }}>*</span></label>
+                                        <select
+                                            value={bulkCommon.party_id}
+                                            onChange={(e) =>
+                                                setBulkCommon({ ...bulkCommon, party_id: e.target.value })
+                                            }
+                                            style={{
+                                                borderColor: !bulkCommon.party_id ? "#f87171" : "#cbd5e1",
+                                                outline: !bulkCommon.party_id ? "1px solid #f87171" : "none"
+                                            }}
+                                        >
+                                            <option value="">-- Select Party (Required) --</option>
+                                            {parties
+                                                .filter(p => p.status === "Active")
+                                                .map((p) => (
+                                                    <option key={p.party_id} value={p.party_id}>
+                                                        {p.party_name}
+                                                    </option>
+                                                ))}
+                                        </select>
+                                        {!bulkCommon.party_id && (
+                                            <span style={{ fontSize: "0.75rem", color: "#ef4444", marginTop: "2px" }}>
+                                                Select Party for all bulk entries
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>Delivery Site</label>
+                                        <input
+                                            type="text"
+                                            value={bulkCommon.site}
+                                            placeholder="Common site name (Optional)"
+                                            onChange={(e) =>
+                                                setBulkCommon({ ...bulkCommon, site: e.target.value })
+                                            }
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -1272,6 +1315,15 @@ const Sales = () => {
                     value={editData.loading_time || ""}
                     onChange={(e) =>
                         setEditData({ ...editData, loading_time: e.target.value })
+                    }
+                />
+
+                <InputField
+                    label="Unloading Time"
+                    type="time"
+                    value={editData.unloading_time || ""}
+                    onChange={(e) =>
+                        setEditData({ ...editData, unloading_time: e.target.value })
                     }
                 />
 

@@ -3,6 +3,27 @@ import bcrypt
 from dotenv import load_dotenv
 import os
 
+import sys
+
+def get_sql_file_path(filename):
+    """Find absolute path for SQL migration file in dev or bundled package."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(base_dir, "..", "DB", filename),
+        os.path.join(base_dir, "DB", filename),
+        os.path.join(os.getcwd(), "DB", filename),
+        os.path.join(os.getcwd(), "Database_Setup", filename),
+        os.path.join(base_dir, "Database_Setup", filename),
+    ]
+    if hasattr(sys, "_MEIPASS"):
+        candidates.insert(0, os.path.join(sys._MEIPASS, "DB", filename))
+        candidates.insert(0, os.path.join(sys._MEIPASS, "Database_Setup", filename))
+    for p in candidates:
+        abs_p = os.path.abspath(p)
+        if os.path.exists(abs_p):
+            return abs_p
+    return filename
+
 load_dotenv(override=True)
 
 def run():
@@ -16,8 +37,12 @@ def run():
     )
     cursor = conn.cursor()
     
-    with open("DB/migration_auth.sql", "r") as f:
-        sql = f.read()
+    auth_sql_path = get_sql_file_path("migration_auth.sql")
+    if os.path.exists(auth_sql_path):
+        with open(auth_sql_path, "r", encoding="utf-8") as f:
+            sql = f.read()
+    else:
+        sql = ""
         
     # Split by semicolon for execution
     statements = sql.split(";")
@@ -25,8 +50,10 @@ def run():
         stmt = stmt.strip()
         if not stmt:
             continue
-        # Skip USE or ALTER queries from the SQL file, we will execute safe alters manually
-        if stmt.upper().startswith("USE ") or stmt.upper().startswith("ALTER TABLE"):
+        # Strip comments to check actual command prefix
+        clean_lines = [l.strip() for l in stmt.splitlines() if l.strip() and not l.strip().startswith("--")]
+        clean_stmt = " ".join(clean_lines).strip()
+        if clean_stmt.upper().startswith("USE ") or clean_stmt.upper().startswith("ALTER TABLE"):
             continue
         try:
             cursor.execute(stmt)
@@ -86,21 +113,146 @@ def run():
             if "Duplicate column name" not in str(e):
                 print(f"Party column {col} alter warning: {e}")
 
+    # Make product_id nullable for Production and Sales (Common Pool / Empty DB support)
+    try:
+        cursor.execute("ALTER TABLE Production MODIFY COLUMN product_id INT NULL;")
+    except Exception as e:
+        print(f"Production product_id alter warning: {e}")
+
+    try:
+        cursor.execute("ALTER TABLE Sales MODIFY COLUMN product_id INT NULL;")
+    except Exception as e:
+        print(f"Sales product_id alter warning: {e}")
+
+    try:
+        cursor.execute("ALTER TABLE Sales MODIFY COLUMN unloading_status ENUM('pending', 'completed', 'pending_approval', 'pending_unloading', 'unloaded') DEFAULT 'pending';")
+    except Exception as e:
+        print(f"Sales unloading_status alter warning: {e}")
+
     conn.commit()
     print("Alters successfully applied.")
 
     print("Running settings migrations...")
     try:
-        with open("DB/migration_settings.sql", "r") as f:
-            settings_sql = f.read()
+        settings_sql_path = get_sql_file_path("migration_settings.sql")
+        if os.path.exists(settings_sql_path):
+            with open(settings_sql_path, "r", encoding="utf-8") as f:
+                settings_sql = f.read()
+        else:
+            settings_sql = ""
         for stmt in settings_sql.split(";"):
             stmt = stmt.strip()
             if not stmt or stmt.upper().startswith("USE "):
                 continue
+            try:
+                cursor.execute(stmt)
+            except Exception as e:
+                if "already exists" not in str(e) and "Duplicate" not in str(e):
+                    print(f"Settings migration warning: {e}")
         conn.commit()
         print("Settings migrations applied successfully.")
     except Exception as e:
         print(f"Error running settings migrations: {e}")
+
+    print("Checking and extending Activity_Logs table...")
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Activity_Logs (
+                log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NULL,
+                username VARCHAR(100) NULL,
+                role VARCHAR(50) NULL,
+                user_role VARCHAR(50) NULL,
+                action VARCHAR(100) NULL,
+                action_type VARCHAR(50) NULL,
+                module VARCHAR(50) NULL,
+                entity_type VARCHAR(50) NULL,
+                entity_id VARCHAR(100) NULL,
+                description TEXT NULL,
+                details TEXT NULL,
+                ip_address VARCHAR(45) NULL,
+                user_agent TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE SET NULL,
+                INDEX idx_user (user_id),
+                INDEX idx_action (action_type),
+                INDEX idx_module (module),
+                INDEX idx_created (created_at)
+            );
+        """)
+        conn.commit()
+        
+        # Add missing columns safely if table already existed
+        act_cols = [
+            ("username", "VARCHAR(100) NULL"),
+            ("role", "VARCHAR(50) NULL"),
+            ("user_role", "VARCHAR(50) NULL"),
+            ("action", "VARCHAR(100) NULL"),
+            ("action_type", "VARCHAR(50) NULL"),
+            ("module", "VARCHAR(50) NULL"),
+            ("entity_type", "VARCHAR(50) NULL"),
+            ("entity_id", "VARCHAR(100) NULL"),
+            ("description", "TEXT NULL"),
+            ("details", "TEXT NULL"),
+            ("ip_address", "VARCHAR(45) NULL"),
+            ("user_agent", "TEXT NULL")
+        ]
+        for col, dtype in act_cols:
+            try:
+                cursor.execute(f"ALTER TABLE Activity_Logs ADD COLUMN {col} {dtype};")
+            except Exception as e:
+                if "Duplicate column name" not in str(e):
+                    pass
+        conn.commit()
+        print("Activity_Logs schema verified.")
+    except Exception as e:
+        print(f"Error ensuring Activity_Logs schema: {e}")
+
+    print("Checking and extending Approval_Requests table...")
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Approval_Requests (
+                request_id INT AUTO_INCREMENT PRIMARY KEY,
+                requester_id INT NOT NULL,
+                request_type ENUM('vehicle', 'sales_unloading', 'user_registration', 'sales_edit', 'sales_delete', 'production_edit', 'production_delete', 'party', 'report_print') NOT NULL,
+                reference_id VARCHAR(100) NULL,
+                reference_data JSON NULL,
+                status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+                remark TEXT NULL,
+                reviewed_by INT NULL,
+                reviewed_at TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (requester_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (reviewed_by) REFERENCES Users(user_id) ON DELETE SET NULL,
+                INDEX idx_status (status),
+                INDEX idx_requester (requester_id),
+                INDEX idx_type (request_type)
+            );
+        """)
+        conn.commit()
+
+        # Safely modify reference_id type to VARCHAR(100)
+        try:
+            cursor.execute("ALTER TABLE Approval_Requests MODIFY COLUMN reference_id VARCHAR(100) NULL;")
+        except Exception as e:
+            print(f"Approval_Requests reference_id alter warning: {e}")
+
+        # Safely modify request_type ENUM
+        try:
+            cursor.execute("ALTER TABLE Approval_Requests MODIFY COLUMN request_type ENUM('vehicle', 'sales_unloading', 'user_registration', 'sales_edit', 'sales_delete', 'production_edit', 'production_delete', 'party', 'report_print') NOT NULL;")
+        except Exception as e:
+            print(f"Approval_Requests request_type modify warning: {e}")
+
+        # Safely add remark column
+        try:
+            cursor.execute("ALTER TABLE Approval_Requests ADD COLUMN remark TEXT NULL;")
+        except Exception as e:
+            if "Duplicate column name" not in str(e):
+                pass
+        conn.commit()
+        print("Approval_Requests schema verified.")
+    except Exception as e:
+        print(f"Error ensuring Approval_Requests schema: {e}")
 
     print("Running Goods_Returns migration...")
     try:
@@ -137,8 +289,6 @@ def run():
     except Exception as e:
         print(f"Error creating Goods_Returns table: {e}")
 
-
-
     # Hash default passwords
     manager_pw = bcrypt.hashpw(b"admin123", bcrypt.gensalt()).decode()
     clerk_pw = bcrypt.hashpw(b"clerk123", bcrypt.gensalt()).decode()
@@ -163,6 +313,13 @@ def run():
         
     cursor.close()
     conn.close()
+
+def ensure_database_schema():
+    """Helper for app.py startup to silently ensure tables exist."""
+    try:
+        run()
+    except Exception as e:
+        print(f"[WARNING] Database schema auto-check encountered an error: {e}")
 
 if __name__ == "__main__":
     run()

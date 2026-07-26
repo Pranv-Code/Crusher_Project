@@ -153,7 +153,7 @@ function RawMaterial() {
             return;
         }
 
-        const isDup = activities.some(a =>
+        const isDup = vehicleActivities.some(a =>
             a.activity_date === newActivity.activity_date &&
             a.vehicle_number === newActivity.vehicle_number &&
             Math.abs(parseFloat(a.total_weight || 0) - parseFloat(newActivity.total_weight || 0)) < 0.01 &&

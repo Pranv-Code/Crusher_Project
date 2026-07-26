@@ -287,7 +287,19 @@ export const generatePartyInvoicePdf = (partyData, dateFrom, dateTo, companyDeta
     doc.setFontSize(7.5);
     doc.setTextColor(15, 23, 42);
 
-    const invNo = `VE/${String(party.party_id || '1').padStart(4, '0')}/${new Date().getFullYear().toString().substr(-2)}-${(new Date().getFullYear() + 1).toString().substr(-2)}`;
+    // Helper to calculate Indian Financial Year (April - March)
+    const getFinancialYear = (d = new Date()) => {
+        const date = new Date(d);
+        const yr = date.getFullYear();
+        const start = (date.getMonth() + 1) >= 4 ? yr : yr - 1;
+        const end = start + 1;
+        return `${start.toString().slice(-2)}-${end.toString().slice(-2)}`;
+    };
+
+    const fyStr = getFinancialYear(dateTo || new Date());
+    const partyCode = String(party.party_id || '1').padStart(3, '0');
+    const tsToken = Date.now().toString().slice(-5);
+    const invNo = companyDetails.invoice_number || `VE/${fyStr}/P${partyCode}-${tsToken}`;
     const invDate = dateTo ? formatDate(dateTo) : formatDate(new Date());
     const periodStr = (dateFrom || dateTo) ? `${fmtFilterDate(dateFrom)} to ${fmtFilterDate(dateTo)}` : "All Time";
 
@@ -372,7 +384,7 @@ export const generatePartyInvoicePdf = (partyData, dateFrom, dateTo, companyDeta
         head: [tableColumns],
         body: tableRows,
         theme: "grid",
-        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8, fontStyle: "bold" },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8, fontStyle: "bold", halign: "center" },
         bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
         columnStyles: {
             0: { cellWidth: 12, halign: "center" },

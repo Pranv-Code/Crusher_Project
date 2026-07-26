@@ -60,6 +60,8 @@ export default function PartyReport({ parties, products }) {
     const [showApprovalModal, setShowApprovalModal] = useState(false);
     const [approvalReason, setApprovalReason] = useState("");
     const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
+    // Tracks whether the pending approval modal is for a PDF report or an Invoice
+    const [pendingApprovalFormat, setPendingApprovalFormat] = useState("pdf");
 
     const handlePageSizeChange = (newSize) => {
         setPageSize(newSize);
@@ -186,6 +188,7 @@ export default function PartyReport({ parties, products }) {
         if (isManager) {
             generatePartyReportPdf({ ...partyData, sales: exportSales }, tonsPerBrass);
         } else {
+            setPendingApprovalFormat("pdf");
             setShowApprovalModal(true);
         }
     };
@@ -197,12 +200,20 @@ export default function PartyReport({ parties, products }) {
             alert("No sales entries selected for Invoice PDF.");
             return;
         }
-        generatePartyInvoicePdf({ ...partyData, sales: exportSales }, dateFrom, dateTo, companyDetails);
+
+        if (isManager) {
+            // Manager can download invoice directly
+            generatePartyInvoicePdf({ ...partyData, sales: exportSales }, dateFrom, dateTo, companyDetails);
+        } else {
+            // Clerk must request approval
+            setPendingApprovalFormat("invoice");
+            setShowApprovalModal(true);
+        }
     };
 
     const submitApprovalRequest = async () => {
         if (!approvalReason.trim()) {
-            alert("Please provide a reason for the print approval request.");
+            alert("Please provide a reason for the approval request.");
             return;
         }
 
@@ -211,19 +222,28 @@ export default function PartyReport({ parties, products }) {
         try {
             await requestReportPrint({
                 report_type: "Party Sales Report",
+                format: pendingApprovalFormat,
+                label: pendingApprovalFormat === "invoice"
+                    ? `Party Invoice PDF - ${partyData?.party?.party_name}`
+                    : `Party Sales Report PDF - ${partyData?.party?.party_name}`,
                 parameters: {
                     party_id: selectedPartyId,
                     party_name: partyData?.party?.party_name,
-                    records_count: exportSales.length
+                    records_count: exportSales.length,
+                    date_from: dateFrom || null,
+                    date_to: dateTo || null,
+                    selected_ids: exportSales.map(s => s.sales_id),
                 },
                 reason: approvalReason.trim()
             });
 
-            alert("Print request submitted successfully! A Manager will review your request.");
+            const label = pendingApprovalFormat === "invoice" ? "Invoice" : "Print";
+            alert(`${label} request submitted successfully! A Manager will review your request.`);
             setShowApprovalModal(false);
             setApprovalReason("");
+            setPendingApprovalFormat("pdf");
         } catch (err) {
-            alert(err.response?.data?.message || "Failed to submit print request.");
+            alert(err.response?.data?.message || "Failed to submit approval request.");
         } finally {
             setIsSubmittingApproval(false);
         }
@@ -320,7 +340,7 @@ export default function PartyReport({ parties, products }) {
                             className={`toggle-charts-btn ${showCharts ? "active" : ""}`}
                             onClick={() => setShowCharts(!showCharts)}
                         >
-                            {showCharts ? "📊 Hide Analytics" : "📈 Show Analytics"}
+                            {showCharts ? "📊 Hide Graph" : "📈 Show Graph"}
                         </button>
                     )}
                 </div>
@@ -340,10 +360,13 @@ export default function PartyReport({ parties, products }) {
                         <button
                             className="export-btn excel"
                             onClick={handleGenerateInvoicePdf}
-                            style={{ backgroundColor: "#16a34a" }}
-                            title="Generate Non-GST Invoice PDF"
+                            style={{ backgroundColor: isClerk ? "#d97706" : "#16a34a" }}
+                            title={isClerk ? "Request Manager approval to generate Invoice" : "Generate Non-GST Invoice PDF"}
                         >
-                            📄 Invoice PDF {selectedSaleIds.size > 0 ? `(${selectedSaleIds.size})` : ""}
+                            {isClerk
+                                ? `💬 Request Invoice Approval${selectedSaleIds.size > 0 ? ` (${selectedSaleIds.size})` : ""}`
+                                : `📄 Invoice PDF${selectedSaleIds.size > 0 ? ` (${selectedSaleIds.size})` : ""}`
+                            }
                         </button>
                     </div>
                 )}
@@ -573,9 +596,14 @@ export default function PartyReport({ parties, products }) {
                         background: "white", padding: "2rem", borderRadius: "12px",
                         width: "100%", maxWidth: "450px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
                     }}>
-                        <h3 style={{ margin: "0 0 1rem 0", color: "#1e1b4b" }}>💬 Request Print Approval</h3>
+                        <h3 style={{ margin: "0 0 1rem 0", color: "#1e1b4b" }}>
+                            {pendingApprovalFormat === "invoice" ? "💬 Request Invoice Approval" : "💬 Request Print Approval"}
+                        </h3>
                         <p style={{ fontSize: "0.9rem", color: "#64748b", marginBottom: "1rem" }}>
-                            As a Clerk, exporting or printing party statements requires Manager approval. Please enter a reason for this request.
+                            {pendingApprovalFormat === "invoice"
+                                ? "As a Clerk, generating invoices requires Manager approval. Please enter a reason for this request."
+                                : "As a Clerk, exporting or printing party statements requires Manager approval. Please enter a reason for this request."
+                            }
                         </p>
                         <div style={{ marginBottom: "1.5rem" }}>
                             <label style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.85rem", fontWeight: 600, color: "#475569" }}>
