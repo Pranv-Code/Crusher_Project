@@ -5,6 +5,8 @@ import Pagination from "../components/common/Pagination";
 import { formatDate, formatTime, formatInr, tonToBrass } from "../utils/formatUtils";
 import { getSettings } from "../services/settingsApi";
 
+import SearchableSelect from "../components/common/SearchableSelect";
+
 // ─── Dual-unit quantity cell ──────────────────────────────────────────────────
 const QtyCell = ({ displayQty, displayUnit, convertedQty, convertedUnit }) => (
     <div style={{ lineHeight: "1.4" }}>
@@ -125,24 +127,15 @@ function VehicleSales() {
                     }}
                 />
 
-                <select
-                    value={filterVehicle}
-                    onChange={(e) => setFilterVehicle(e.target.value)}
-                    style={{
-                        padding: "0.6rem 1rem",
-                        borderRadius: "8px",
-                        border: "1px solid var(--border-color, #ccc)",
-                        fontSize: "0.9rem",
-                        outline: "none",
-                    }}
-                >
-                    <option value="">All Vehicles</option>
-                    {uniqueVehicles.map((v) => (
-                        <option key={v} value={v}>
-                            {v}
-                        </option>
-                    ))}
-                </select>
+                <div style={{ minWidth: "220px" }}>
+                    <SearchableSelect
+                        name="filter_vehicle"
+                        value={filterVehicle}
+                        onChange={(e) => setFilterVehicle(e.target.value)}
+                        options={[{ value: "", label: "All Vehicles" }, ...uniqueVehicles.map(v => ({ value: v, label: v }))]}
+                        placeholder="Search vehicle..."
+                    />
+                </div>
 
                 {(search || filterVehicle) && (
                     <button

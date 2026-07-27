@@ -129,6 +129,17 @@ def run():
     except Exception as e:
         print(f"Sales unloading_status alter warning: {e}")
 
+    # Enforce ON DELETE RESTRICT for Product references
+    try:
+        cursor.execute("ALTER TABLE Production ADD CONSTRAINT fk_production_product FOREIGN KEY (product_id) REFERENCES Product(product_id) ON UPDATE CASCADE ON DELETE RESTRICT;")
+    except Exception:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE Sales ADD CONSTRAINT fk_sales_product FOREIGN KEY (product_id) REFERENCES Product(product_id) ON UPDATE CASCADE ON DELETE RESTRICT;")
+    except Exception:
+        pass
+
     conn.commit()
     print("Alters successfully applied.")
 

@@ -13,6 +13,7 @@ import {
 import Button from "../components/common/Button";
 import InputField from "../components/common/InputField";
 import SelectField from "../components/common/SelectField";
+import SearchableSelect from "../components/common/SearchableSelect";
 import PageHeader from "../components/common/PageHeader";
 import EmptyState from "../components/common/EmptyState";
 import SearchBar from "../components/common/SearchBar";
@@ -22,7 +23,7 @@ import ActionButtons from "../components/table/ActionButtons";
 
 import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
-import { formatDate, formatTime, formatDurationHM } from "../utils/formatUtils";
+import { formatDate, formatTime, formatDurationHM, smartCapitalize } from "../utils/formatUtils";
 
 // Helper utilities for date & weight calculation
 const formatTimeToHM = (timeStr) => {
@@ -58,10 +59,7 @@ const calculateTurnaround = (loadingStart, unloadingEnd) => {
 };
 
 function RawMaterial() {
-    const capitalizeWords = (str) => {
-        if (!str) return "";
-        return str.replace(/\b\w/g, (char) => char.toUpperCase());
-    };
+    const capitalizeWords = smartCapitalize;
 
     const { isManager } = useAuth();
     const {
@@ -353,7 +351,7 @@ function RawMaterial() {
                             }
                         />
 
-                        <SelectField
+                        <SearchableSelect
                             label="Vehicle"
                             name="vehicle_number"
                             value={newActivity.vehicle_number}
@@ -367,8 +365,9 @@ function RawMaterial() {
                                 .filter(v => v.status === "Active")
                                 .map((v) => ({
                                     value: v.vehicle_number,
-                                    label: v.vehicle_number,
+                                    label: v.owner ? `${v.vehicle_number} (${v.owner})` : v.vehicle_number,
                                 }))}
+                            placeholder="Search or enter vehicle..."
                         />
 
                         <InputField
@@ -520,7 +519,7 @@ function RawMaterial() {
                     }
                 />
 
-                <SelectField
+                <SearchableSelect
                     label="Vehicle"
                     name="edit_vehicle_number"
                     value={editData.vehicle_number || ""}
@@ -534,8 +533,9 @@ function RawMaterial() {
                         .filter(v => v.status === "Active")
                         .map((v) => ({
                             value: v.vehicle_number,
-                            label: v.vehicle_number,
+                            label: v.owner ? `${v.vehicle_number} (${v.owner})` : v.vehicle_number,
                         }))}
+                    placeholder="Search or enter vehicle..."
                 />
 
                 <InputField

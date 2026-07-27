@@ -67,10 +67,15 @@ def get_party(id):
     return jsonify({"message": "Party not found"}), 404
 
 
-def capitalize_words(s):
-    if not s:
+def format_party_name(s):
+    if not s or not isinstance(s, str):
         return ""
-    return " ".join(word.capitalize() for word in s.strip().split())
+    s_clean = s.strip()
+    if not s_clean:
+        return ""
+    return s_clean[0].upper() + s_clean[1:]
+
+capitalize_words = format_party_name
 
 
 def add_party():
@@ -203,30 +208,37 @@ def update_party(id):
 def delete_party(id):
 
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
     try:
+        # Check if party exists
+        cursor.execute("SELECT party_name FROM Party WHERE party_id=%s", (id,))
+        party = cursor.fetchone()
+        if not party:
+            return jsonify({"message": "Party not found"}), 404
 
-        cursor.execute("""
-            DELETE FROM Party
-            WHERE party_id=%s
-        """, (id,))
+        party_name = party["party_name"]
 
+        # Check references in Sales
+        cursor.execute("SELECT COUNT(*) AS cnt FROM Sales WHERE party_id=%s", (id,))
+        sales_cnt = cursor.fetchone()["cnt"]
+
+        if sales_cnt > 0:
+            return jsonify({
+                "message": f"Cannot delete party '{party_name}'. It is associated with {sales_cnt} sales transaction(s). Please set its status to 'Inactive' instead."
+            }), 400
+
+        cursor.execute("DELETE FROM Party WHERE party_id=%s", (id,))
         conn.commit()
 
         return jsonify({
-            "message": "Party Deleted Successfully"
+            "message": f"Party '{party_name}' Deleted Successfully"
         })
 
     except Exception as e:
-
         conn.rollback()
-
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
     finally:
-
         cursor.close()
         conn.close()

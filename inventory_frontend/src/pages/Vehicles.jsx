@@ -131,11 +131,13 @@ function Vehicles() {
     const confirmDelete = async () => {
         setShowConfirm(false);
         try {
-            await deleteVehicle(deleteTargetNumber);
+            const res = await deleteVehicle(deleteTargetNumber);
+            alert(res.data?.message || "Vehicle Deleted Successfully");
             await fetchVehicles(true);
             await fetchActiveVehicles(true);
         } catch (err) {
             console.error(err);
+            alert(err.response?.data?.message || err.response?.data?.error || "Failed to delete vehicle.");
         } finally {
             setDeleteTargetNumber(null);
         }

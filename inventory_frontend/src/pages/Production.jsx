@@ -8,7 +8,7 @@ import {
     deleteProduction
 } from "../services/productionApi";
 import { getSettings } from "../services/settingsApi";
-import { formatDate, formatInr } from "../utils/formatUtils";
+import { formatDate, formatInr, tonToBrass } from "../utils/formatUtils";
 
 // Reusable Component Imports
 import Button from "../components/common/Button";
@@ -70,22 +70,13 @@ function Production() {
             return;
         }
 
-        if (parseFloat(newProduction.quantity_tons) <= 0 || parseFloat(newProduction.production_cost) <= 0) {
-            alert("Quantity and Production Cost must be greater than zero.");
+        if (!newProduction.production_date) {
+            alert("Please select a Production Date.");
             return;
         }
 
-        const isDup = (productions || []).some(p => {
-            const sameProd = settings.inventory_mode === "COMMON_POOL" 
-                ? (String(p.product_id || "") === String(newProduction.product_id || ""))
-                : String(p.product_id) === String(newProduction.product_id);
-            const sameQty = Math.abs(parseFloat(p.quantity_tons || 0) - parseFloat(newProduction.quantity_tons || 0)) < 0.01;
-            const sameUnit = String(p.unit || "").toLowerCase() === String(newProduction.unit || "").toLowerCase();
-            return sameProd && sameQty && sameUnit;
-        });
-
-        if (isDup) {
-            alert("Duplicate Entry Detected: A production record with the exact same product, unit, and quantity already exists.");
+        if (parseFloat(newProduction.quantity_tons) <= 0 || parseFloat(newProduction.production_cost) <= 0) {
+            alert("Quantity and Production Cost must be greater than zero.");
             return;
         }
 
@@ -110,13 +101,15 @@ function Production() {
 
     const handleEdit = (production) => {
         setEditingId(production.production_id);
-        const qty = parseFloat(production.quantity_tons) || 0;
+        const isBrass = production.unit?.toLowerCase() === "brass";
+        const enteredQty = production.display_quantity ?? production.entered_quantity ?? (isBrass ? tonToBrass(production.quantity_tons, settings.tons_per_brass || 4.2) : production.quantity_tons);
+        const qty = parseFloat(enteredQty) || 0;
         const tot = parseFloat(production.production_cost) || 0;
         const cpu = production.cost_per_unit || (qty > 0 && tot > 0 ? (tot / qty).toFixed(2) : "");
         setEditData({
             production_date: production.production_date,
             product_id: production.product_id,
-            quantity_tons: production.quantity_tons,
+            quantity_tons: enteredQty,
             unit: production.unit,
             cost_per_unit: cpu,
             production_cost: production.production_cost,
@@ -184,11 +177,20 @@ function Production() {
     const columns = [
         { key: "production_date", label: "Production Date", render: (row) => formatDate(row.production_date) },
         { key: "product_name", label: "Product Name", render: (row) => (row.product_name === "Common Pool" || !row.product_name) ? "Quarry Material" : row.product_name },
-        { key: "quantity_tons", label: "Quantity" },
-        { key: "unit",
-        label: "Units",
-        render: (row) =>
-            row.unit?.toLowerCase() === "tons" ? "MT" : "Brass"},
+        { 
+            key: "display_quantity", 
+            label: "Quantity", 
+            render: (row) => {
+                const isBrass = row.unit?.toLowerCase() === "brass";
+                const displayQty = row.display_quantity ?? row.entered_quantity ?? (isBrass ? tonToBrass(row.quantity_tons, settings.tons_per_brass || 4.2) : row.quantity_tons);
+                return Number(displayQty || 0).toFixed(2);
+            } 
+        },
+        { 
+            key: "unit",
+            label: "Units",
+            render: (row) => row.unit?.toLowerCase() === "tons" ? "MT" : "Brass"
+        },
         { key: "cost_per_unit", label: "Cost / Unit (₹)", render: (row) => row.cost_per_unit ? `₹${formatInr(row.cost_per_unit)}` : (row.production_cost && row.quantity_tons ? `₹${formatInr((parseFloat(row.production_cost)/parseFloat(row.quantity_tons)).toFixed(2))}` : "—") },
         { key: "production_cost", label: "Total Cost (₹)", render: (row) => row.production_cost ? `₹${formatInr(row.production_cost)}` : "—" },
     ];

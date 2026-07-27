@@ -1,4 +1,7 @@
 flask
-flask-cors 
-mysql-connector-python 
+flask-cors
+mysql-connector-python
 python-dotenv
+pystray
+pillow
+waitress

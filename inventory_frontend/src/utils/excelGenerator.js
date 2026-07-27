@@ -43,25 +43,25 @@ export async function exportToFormattedExcel(options = {}) {
 
     let currentRowIdx = 1;
 
-    // 1. Title Banner
+    // 1. Title Banner (Light Blue)
     if (title) {
         worksheet.mergeCells(currentRowIdx, 1, currentRowIdx, numCols);
         const titleCell = worksheet.getCell(currentRowIdx, 1);
         titleCell.value = title.toUpperCase();
-        titleCell.font = { name: "Calibri", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
-        titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } }; // Deep Navy
+        titleCell.font = { name: "Calibri", size: 16, bold: true, color: { argb: "FF1E3A8A" } };
+        titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } }; // Soft Light Blue
         titleCell.alignment = { horizontal: "center", vertical: "middle" };
         worksheet.getRow(currentRowIdx).height = 34;
         currentRowIdx++;
     }
 
-    // 2. Subtitle / Filters Banner
+    // 2. Subtitle / Filters Banner (Light Blue Accent)
     if (subtitle) {
         worksheet.mergeCells(currentRowIdx, 1, currentRowIdx, numCols);
         const subCell = worksheet.getCell(currentRowIdx, 1);
         subCell.value = subtitle;
-        subCell.font = { name: "Calibri", size: 10, italic: true, color: { argb: "FFF8FAFC" } };
-        subCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } }; // Blue accent
+        subCell.font = { name: "Calibri", size: 10, italic: true, bold: true, color: { argb: "FF1E40AF" } };
+        subCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } }; // Very Light Blue
         subCell.alignment = { horizontal: "center", vertical: "middle" };
         worksheet.getRow(currentRowIdx).height = 22;
         currentRowIdx++;
@@ -75,20 +75,20 @@ export async function exportToFormattedExcel(options = {}) {
 
     const headerRowIdx = currentRowIdx;
 
-    // 4. Table Header Row
+    // 4. Table Header Row (Grey)
     const headerRow = worksheet.getRow(headerRowIdx);
     headerRow.height = 26;
     headers.forEach((h, colIdx) => {
         const cell = headerRow.getCell(colIdx + 1);
         cell.value = h;
         cell.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E293B" } }; // Dark Slate
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF64748B" } }; // Grey Header
         cell.alignment = { horizontal: "center", vertical: "middle" };
         cell.border = {
-            top: { style: "medium", color: { argb: "FF0F172A" } },
-            left: { style: "thin", color: { argb: "FF475569" } },
-            bottom: { style: "medium", color: { argb: "FF0F172A" } },
-            right: { style: "thin", color: { argb: "FF475569" } },
+            top: { style: "medium", color: { argb: "FF334155" } },
+            left: { style: "thin", color: { argb: "FF94A3B8" } },
+            bottom: { style: "medium", color: { argb: "FF334155" } },
+            right: { style: "thin", color: { argb: "FF94A3B8" } },
         };
     });
 
@@ -101,19 +101,12 @@ export async function exportToFormattedExcel(options = {}) {
         const isRateOrPerUnit = lower.includes("/ unit") || lower.includes("/unit") || lower.includes("per unit") || lower.includes("cost/unit") || lower.includes("rate");
         const isCurrency = (lower.includes("price") || lower.includes("cost") || lower.includes("amount") || lower.includes("₹")) && !isRateOrPerUnit;
         const isQuantity = lower.includes("quantity") || lower.includes("weight") || lower.includes("mt") || lower.includes("tons") || lower.includes("(t)");
-        const isNumeric = isCurrency || isQuantity || isRateOrPerUnit;
-        
-        const isCenter = lower.includes("date") || lower.includes("time") || lower.includes("unit") || lower.includes("vehicle") || lower.includes("status");
-
-        let align = "left";
-        if (isNumeric) align = "right";
-        else if (isCenter) align = "center";
 
         let numFmt = undefined;
         if (isCurrency || isRateOrPerUnit) numFmt = '"₹"#,##0.00';
         else if (isQuantity) numFmt = '#,##0.00';
 
-        return { align, isNumeric, isSummable: isCurrency || isQuantity, numFmt };
+        return { align: "right", isNumeric: isCurrency || isQuantity || isRateOrPerUnit, isSummable: isCurrency || isQuantity, numFmt };
     };
 
     // Track column widths
@@ -123,7 +116,7 @@ export async function exportToFormattedExcel(options = {}) {
     const colTotals = headers.map(() => 0);
     const colHasNumeric = headers.map(() => false);
 
-    // 5. Data Rows
+    // 5. Data Rows (Right aligned)
     rows.forEach((rowData, rIndex) => {
         const row = worksheet.getRow(currentRowIdx);
         row.height = 21;
@@ -153,10 +146,10 @@ export async function exportToFormattedExcel(options = {}) {
 
             cell.value = val !== undefined && val !== null ? val : "";
 
-            // Format & Alignment
+            // Format & Alignment (All right aligned)
             cell.alignment = {
                 vertical: "middle",
-                horizontal: spec.align,
+                horizontal: "right",
             };
 
             if (typeof val === "number" && spec.numFmt) {
@@ -213,7 +206,7 @@ export async function exportToFormattedExcel(options = {}) {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } }; // Accent soft blue
             cell.alignment = {
                 vertical: "middle",
-                horizontal: colIdx === 0 ? "left" : spec.align,
+                horizontal: "right",
             };
 
             if (typeof cell.value === "number" && spec.numFmt) {

@@ -55,6 +55,11 @@ def main():
         "config",
         "db",
         "run_migration",
+        "pystray",
+        "PIL",
+        "PIL.Image",
+        "PIL.ImageDraw",
+        "waitress",
     ]
 
     for root, dirs, files in os.walk(BACKEND_DIR):
@@ -70,6 +75,7 @@ def main():
     pyinstaller_cmd = [
         f'"{VENV_PYINSTALLER}"',
         "--noconfirm",
+        "--noconsole",
         "--onedir",
         "--name CrusherServer",
         f'--add-data "{add_data_dist}"',
@@ -154,9 +160,13 @@ HOW TO RUN THE SERVER ON A COMPUTER:
 
 3. START THE SERVER:
    - Double-click 'CrusherServer.exe' (inside this folder).
-   - A command window will open showing the local and network URLs:
-     Local Access:    http://localhost:5000
-     Network Access: http://192.168.x.x:5000
+   - The application starts quietly in the Windows System Tray (near the clock).
+   - Right-click the Crusher tray icon for options:
+     * Open Dashboard
+     * Server Status
+     * View Logs (opens logs/server.log)
+     * Restart Server
+     * Exit
 
 4. ACCESS FROM OTHER OFFICE PCS:
    - Make sure all office PCs are connected to the same Wi-Fi / LAN.

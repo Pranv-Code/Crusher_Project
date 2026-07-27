@@ -2,6 +2,8 @@
     display: flex;
     min-height: 100vh;
     background: #FDFBF7; /* Comforting Warm Ivory */
+    overflow-x: hidden;
+    max-width: 100vw;
 }
 
 .main-content {
@@ -12,12 +14,14 @@
     min-height: 100vh;
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     background: #FDFBF7;
+    overflow-x: hidden;
+    max-width: calc(100vw - 185px);
 }
 
 .page-content {
     flex: 1;
     padding: 30px;
-    /* background: #FDFBF7; */
-    /* background: linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 50%, #eff6ff 100%); */
     background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+    overflow-x: hidden;
+    max-width: 100%;
 }

@@ -104,7 +104,10 @@ export const InventoryProvider = ({ children }) => {
         if (vehiclesLoaded && !force) return;
         try {
             const res = await getVehicles();
-            setVehicles(res.data);
+            const rawVehicles = Array.isArray(res.data) ? res.data : [];
+            // Reverse so that the first created vehicle goes to the last position
+            const sortedVehicles = [...rawVehicles].reverse();
+            setVehicles(sortedVehicles);
             setVehiclesLoaded(true);
         } catch (err) {
             console.error("Error fetching vehicles:", err);

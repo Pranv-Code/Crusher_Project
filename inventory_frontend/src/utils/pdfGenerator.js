@@ -59,11 +59,12 @@ export const generateSalesReportPdf = (filteredData, filters, returnsBySaleId = 
 
     drawReportHeader(doc, `Sales Report`, filterText);
 
-    const tableColumns = ["#", "Date", "Party", "Product", "Vehicle", "Gross (MT)", "Returned (MT)", "Net (MT)", "Site", "Price (Rs.)", "Remarks"];
+    const tableColumns = ["#", "Date", "Party", "Product", "Vehicle", "Gross (MT)", "Returned (MT)", "Net (MT)", "Site", "Price/Unit (Rs.)", "Total Price (Rs.)", "Remarks"];
     const tableRows = filteredData.map((s, i) => {
         const saleRets = returnsBySaleId[s.sales_id] || [];
         const retTons = saleRets.reduce((sum, r) => sum + parseFloat(r.returned_quantity_tons || 0), 0);
         const netTons = Math.max(0, s.quantity_tons - retTons);
+        const lineTotal = netTons * (s.price || 0);
 
         return [
             i + 1,
@@ -75,7 +76,8 @@ export const generateSalesReportPdf = (filteredData, filters, returnsBySaleId = 
             retTons > 0 ? `-${fmtNum(retTons)}` : "—",
             fmtNum(netTons),
             s.site || "—",
-            s.price ? `Rs. ${formatInr(s.price)}` : "—",
+            s.price ? formatInr(s.price) : "—",
+            s.price ? formatInr(lineTotal) : "—",
             s.remarks || "—"
         ];
     });
@@ -85,16 +87,9 @@ export const generateSalesReportPdf = (filteredData, filters, returnsBySaleId = 
         head: [tableColumns],
         body: tableRows,
         theme: "striped",
-        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8, fontStyle: "bold" },
-        bodyStyles: { fontSize: 8 },
-        columnStyles: {
-            0: { cellWidth: 8, halign: "center" },
-            1: { cellWidth: 18 },
-            5: { halign: "right" },
-            6: { halign: "right" },
-            7: { halign: "right" },
-            9: { halign: "right" }
-        },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8, fontStyle: "bold", halign: "center" },
+        bodyStyles: { fontSize: 8, halign: "right" },
+        styles: { halign: "right" },
         margin: { top: 28, bottom: 16 }
     });
 
@@ -116,7 +111,7 @@ export const generateProductionReportPdf = (filteredData, filters, tonsPerBrass 
         p.product_name,
         fmtNum(p.quantity_tons),
         fmtNum(tonToBrass(p.quantity_tons, tonsPerBrass)),
-        p.production_cost ? `Rs. ${formatInr(p.production_cost)}` : "—"
+        p.production_cost ? formatInr(p.production_cost) : "—"
     ]);
 
     autoTable(doc, {
@@ -124,11 +119,13 @@ export const generateProductionReportPdf = (filteredData, filters, tonsPerBrass 
         head: [tableColumns],
         body: tableRows,
         theme: "striped",
-        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
-        bodyStyles: { fontSize: 8.5 },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold", halign: "center" },
+        bodyStyles: { fontSize: 8.5, halign: "right" },
+        styles: { halign: "right" },
         columnStyles: {
-            0: { cellWidth: 10, halign: "center" },
-            1: { cellWidth: 25 },
+            0: { cellWidth: 10, halign: "right" },
+            1: { cellWidth: 25, halign: "right" },
+            2: { halign: "right" },
             3: { halign: "right" },
             4: { halign: "right" },
             5: { halign: "right" }
@@ -148,34 +145,32 @@ export const generatePartyReportPdf = (partyData, tonsPerBrass = 4.2) => {
 
     drawReportHeader(doc, `Party Sales Report`, filterText);
 
-    const tableColumns = ["#", "Date", "Product", "Vehicle", "Vehicle Owner", "Qty (MT)", "Qty (Brass)", "Site", "Price (Rs.)", "Remarks"];
-    const tableRows = partyData.sales.map((s, i) => [
-        i + 1,
-        formatDate(s.sales_date),
-        s.product_name,
-        s.vehicle_number || "—",
-        s.vehicle_owner || "—",
-        fmtNum(s.quantity_tons),
-        fmtNum(tonToBrass(s.quantity_tons, tonsPerBrass)),
-        s.site || "—",
-        s.price ? `Rs. ${formatInr(s.price)}` : "—",
-        s.remarks || "—"
-    ]);
+    const tableColumns = ["#", "Date", "Product", "Vehicle", "Vehicle Owner", "Qty (MT)", "Qty (Brass)", "Site", "Price/Unit (Rs.)", "Total Price (Rs.)", "Remarks"];
+    const tableRows = partyData.sales.map((s, i) => {
+        const lineTotal = (s.quantity_tons || 0) * (s.price || 0);
+        return [
+            i + 1,
+            formatDate(s.sales_date),
+            s.product_name,
+            s.vehicle_number || "—",
+            s.vehicle_owner || "—",
+            fmtNum(s.quantity_tons),
+            fmtNum(tonToBrass(s.quantity_tons, tonsPerBrass)),
+            s.site || "—",
+            s.price ? formatInr(s.price) : "—",
+            s.price ? formatInr(lineTotal) : "—",
+            s.remarks || "—"
+        ];
+    });
 
     autoTable(doc, {
         startY: 28,
         head: [tableColumns],
         body: tableRows,
         theme: "striped",
-        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8, fontStyle: "bold" },
-        bodyStyles: { fontSize: 8 },
-        columnStyles: {
-            0: { cellWidth: 8, halign: "center" },
-            1: { cellWidth: 20 },
-            5: { halign: "right" },
-            6: { halign: "right" },
-            8: { halign: "right" }
-        },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8, fontStyle: "bold", halign: "center" },
+        bodyStyles: { fontSize: 8, halign: "right" },
+        styles: { halign: "right" },
         margin: { top: 28, bottom: 16 }
     });
 
@@ -455,14 +450,19 @@ export const generateRawMaterialReportPdf = (filteredData, filters, tonsPerBrass
         head: [tableColumns],
         body: tableRows,
         theme: "striped",
-        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold" },
-        bodyStyles: { fontSize: 8.5 },
+        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5, fontStyle: "bold", halign: "center" },
+        bodyStyles: { fontSize: 8.5, halign: "right" },
+        styles: { halign: "right" },
         columnStyles: {
-            0: { cellWidth: 10, halign: "center" },
-            1: { cellWidth: 25 },
+            0: { cellWidth: 10, halign: "right" },
+            1: { cellWidth: 25, halign: "right" },
+            2: { halign: "right" },
+            3: { halign: "right" },
+            4: { halign: "right" },
             5: { halign: "right" },
             6: { halign: "right" },
-            7: { halign: "right" }
+            7: { halign: "right" },
+            8: { halign: "right" }
         },
         margin: { top: 28, bottom: 16 }
     });

@@ -197,3 +197,52 @@ export const brassToTon = (brass, factor = 4.2) => {
     if (isNaN(b) || isNaN(f) || f <= 0) return 0;
     return b * f;
 };
+
+/**
+ * Smartly capitalizes names & site titles:
+ * - Capitalizes the first letter of words (e.g. "site name" -> "Site Name")
+ * - Preserves ALL-CAPS acronyms typed by user (e.g. "RDSCPL" -> "RDSCPL", "NHAI" -> "NHAI")
+ * - Preserves user-forced lowercase connectors (e.g. "and" in "R and R Pvt Ltd")
+ * @param {string} str 
+ * @returns {string}
+ */
+export const smartCapitalize = (str) => {
+    if (!str || typeof str !== "string") return "";
+
+    const minorWords = new Set(["and", "of", "the", "for", "in", "on", "at", "by", "with", "&"]);
+    const words = str.trim().split(/\s+/);
+    if (!words.length || words[0] === "") return "";
+
+    return words
+        .map((word, idx) => {
+            if (!word) return "";
+            // If user typed ALL CAPS (length > 1) like "RDSCPL", "NHAI", "L&T", preserve it!
+            if (word.length > 1 && word === word.toUpperCase() && /[A-Z]/.test(word)) {
+                return word;
+            }
+            // If user typed a minor connector word in lowercase (e.g. "and" in "R and R Pvt Ltd") and it's not the first word
+            if (idx > 0 && minorWords.has(word.toLowerCase()) && word === word.toLowerCase()) {
+                return word;
+            }
+            // If word is all lowercase, capitalize first letter: "site" -> "Site", "pvt" -> "Pvt"
+            if (word === word.toLowerCase()) {
+                return word.charAt(0).toUpperCase() + word.slice(1);
+            }
+            // Otherwise (mixed case typed by user like "Rdscpl", "McDonell"), preserve user's casing
+            return word;
+        })
+        .join(" ");
+};
+
+/**
+ * Formats Party Name:
+ * Capitalizes only the very first letter of the party name, and keeps everything else exactly as entered.
+ * @param {string} str 
+ * @returns {string}
+ */
+export const formatPartyName = (str) => {
+    if (!str || typeof str !== "string") return "";
+    const trimmed = str.trim();
+    if (!trimmed) return "";
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+};

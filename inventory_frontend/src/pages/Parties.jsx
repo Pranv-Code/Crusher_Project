@@ -22,11 +22,10 @@ import ActionButtons from "../components/table/ActionButtons";
 import ConfirmModal from "../components/modal/ConfirmModal";
 import EditModal from "../components/modal/EditModal";
 
+import { formatPartyName } from "../utils/formatUtils";
+
 function Parties() {
-    const capitalizeWords = (str) => {
-        if (!str) return "";
-        return str.replace(/\b\w/g, (char) => char.toUpperCase());
-    };
+    const capitalizeWords = formatPartyName;
 
     const { parties, fetchParties } = useInventory();
     const { isManager, isClerk } = useAuth();
@@ -174,7 +173,10 @@ function Parties() {
                             type="text"
                             value={newParty.party_name}
                             onChange={(e) =>
-                                setNewParty({ ...newParty, party_name: capitalizeWords(e.target.value) })
+                                setNewParty({ ...newParty, party_name: e.target.value })
+                            }
+                            onBlur={(e) =>
+                                setNewParty({ ...newParty, party_name: formatPartyName(e.target.value) })
                             }
                         />
                         <InputField
@@ -251,7 +253,10 @@ function Parties() {
                     type="text"
                     value={editData.party_name}
                     onChange={(e) =>
-                        setEditData({ ...editData, party_name: capitalizeWords(e.target.value) })
+                        setEditData({ ...editData, party_name: e.target.value })
+                    }
+                    onBlur={(e) =>
+                        setEditData({ ...editData, party_name: formatPartyName(e.target.value) })
                     }
                 />
                 <InputField

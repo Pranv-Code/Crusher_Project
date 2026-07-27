@@ -11,6 +11,7 @@ import { generateRawMaterialReportPdf } from "../../utils/pdfGenerator";
 import { requestReportPrint } from "../../services/approvalApi";
 import { formatDate, formatTime, formatDurationHM, tonToBrass } from "../../utils/formatUtils";
 import { getSettings } from "../../services/settingsApi";
+import SearchableSelect from "../../components/common/SearchableSelect";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777", "#d97706", "#059669"];
 
@@ -334,12 +335,13 @@ export default function RawMaterialReport({ activities, vehicles }) {
                 </div>
                 <div className="filter-group">
                     <label>Vehicle</label>
-                    <select value={vehicleFilter} onChange={e => setVehicleFilter(e.target.value)}>
-                        <option value="">All Vehicles</option>
-                        {vehicles.map(v => (
-                            <option key={v.vehicle_number} value={v.vehicle_number}>{v.vehicle_number}</option>
-                        ))}
-                    </select>
+                    <SearchableSelect
+                        name="vehicle_filter"
+                        value={vehicleFilter}
+                        onChange={e => setVehicleFilter(e.target.value)}
+                        options={[{ value: "", label: "All Vehicles" }, ...(Array.isArray(vehicles) ? vehicles.map(v => ({ value: v.vehicle_number, label: v.owner ? `${v.vehicle_number} (${v.owner})` : v.vehicle_number })) : [])]}
+                        placeholder="Search vehicle..."
+                    />
                 </div>
                 <button className="filter-reset-btn" onClick={resetFilters}>✕ Reset</button>
             </div>

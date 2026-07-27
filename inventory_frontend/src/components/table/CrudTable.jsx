@@ -30,6 +30,7 @@ function CrudTable({
         if (column.align === "right") return true;
         if (column.align === "left" || column.align === "center") return false;
         const lower = (column.label || column.key || "").toLowerCase();
+        if (lower.includes("s.no") || lower.includes("sr") || lower === "#" || lower.includes("id")) return false;
         return (
             lower.includes("quantity") ||
             lower.includes("weight") ||
@@ -76,36 +77,39 @@ function CrudTable({
                     </thead>
 
                     <tbody>
-                        {paginatedData.map((row) => (
-                            <tr key={row[keyField]}>
-                                {columns.map((column) => {
-                                    const isNum = isNumericCol(column);
-                                    const align = column.align || (isNum ? "right" : "left");
-                                    const val = row[column.key];
-                                    return (
-                                        <td key={column.key} style={{ textAlign: align }}>
-                                            {column.render
-                                                ? column.render(row)
-                                                : column.key === "status"
-                                                    ? (
-                                                        <span className={`badge badge-${row[column.key]?.toLowerCase()}`}>
-                                                            {val}
-                                                        </span>
-                                                    )
-                                                    : (isNum && val !== null && val !== undefined && val !== "" && !isNaN(val))
-                                                        ? Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                                        : val}
-                                        </td>
-                                    );
-                                })}
+                        {paginatedData.map((row, index) => {
+                            const globalIndex = (currentPage - 1) * pageSize + index + 1;
+                            return (
+                                <tr key={row[keyField]}>
+                                    {columns.map((column) => {
+                                        const isNum = isNumericCol(column);
+                                        const align = column.align || (isNum ? "right" : "left");
+                                        const val = row[column.key];
+                                        return (
+                                            <td key={column.key} style={{ textAlign: align }}>
+                                                {column.render
+                                                    ? column.render(row, index, globalIndex)
+                                                    : column.key === "status"
+                                                        ? (
+                                                            <span className={`badge badge-${row[column.key]?.toLowerCase()}`}>
+                                                                {val}
+                                                            </span>
+                                                        )
+                                                        : (isNum && val !== null && val !== undefined && val !== "" && !isNaN(val))
+                                                            ? Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                                            : val}
+                                            </td>
+                                        );
+                                    })}
 
-                                {renderActions && (
-                                    <td className="actions-cell">
-                                        {renderActions(row)}
-                                    </td>
-                                )}
-                            </tr>
-                        ))}
+                                    {renderActions && (
+                                        <td className="actions-cell">
+                                            {renderActions(row)}
+                                        </td>
+                                    )}
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

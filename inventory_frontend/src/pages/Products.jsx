@@ -55,18 +55,26 @@ function Products() {
     // ---------------- Add Product ----------------
 
     const handleAddProduct = async () => {
-        if (
-            newProduct.product_name.trim() === "" ||
-            newProduct.quantity_tons === "" ||
-            !newProduct.unit
-        ) {
-            alert("Please fill all fields and select a unit.");
+        const isQuarryMode = settings.inventory_mode === "COMMON_POOL";
+
+        if (newProduct.product_name.trim() === "") {
+            alert("Please enter product name.");
             return;
         }
 
-        if (parseFloat(newProduct.quantity_tons) < 0) {
-            alert("Quantity cannot be negative.");
-            return;
+        if (!isQuarryMode) {
+            if (
+                newProduct.quantity_tons === "" ||
+                !newProduct.unit
+            ) {
+                alert("Please fill all fields and select a unit.");
+                return;
+            }
+
+            if (parseFloat(newProduct.quantity_tons) < 0) {
+                alert("Quantity cannot be negative.");
+                return;
+            }
         }
 
         const isDuplicate = products.some(
@@ -78,7 +86,11 @@ function Products() {
         }
 
         try {
-            await addProduct(newProduct);
+            const payload = isQuarryMode
+                ? { product_name: newProduct.product_name.trim(), quantity_tons: 0, unit: "Tons" }
+                : { ...newProduct, product_name: newProduct.product_name.trim() };
+
+            await addProduct(payload);
             await fetchProducts(true);
             await fetchActiveProducts(true);
             setNewProduct({
@@ -144,11 +156,13 @@ function Products() {
     const confirmDelete = async () => {
         setShowConfirm(false);
         try {
-            await deleteProduct(deleteTargetId);
+            const res = await deleteProduct(deleteTargetId);
+            alert(res.data?.message || "Product Deleted Successfully");
             await fetchProducts(true);
             await fetchActiveProducts(true);
         } catch (err) {
             console.error(err);
+            alert(err.response?.data?.message || err.response?.data?.error || "Failed to delete product.");
         } finally {
             setDeleteTargetId(null);
         }
@@ -177,7 +191,7 @@ function Products() {
     );
 
     const columns = [
-        { key: "product_id", label: "ID" },
+        { key: "s_no", label: "S.No", render: (_, __, globalIndex) => globalIndex },
         { key: "product_name", label: "Product Name" },
         { key: "quantity_tons", label: "Quantity", render: renderQuantity },
         { key: "status", label: "Status" },
@@ -243,32 +257,36 @@ function Products() {
                             }
                         />
 
-                        <InputField
-                            label="Quantity"
-                            name="quantity_tons"
-                            type="number"
-                            placeholder="Enter quantity"
-                            value={newProduct.quantity_tons}
-                            onChange={(e) =>
-                                setNewProduct({
-                                    ...newProduct,
-                                    quantity_tons: e.target.value,
-                                })
-                            }
-                        />
+                        {settings.inventory_mode !== "COMMON_POOL" && (
+                            <>
+                                <InputField
+                                    label="Quantity"
+                                    name="quantity_tons"
+                                    type="number"
+                                    placeholder="Enter quantity"
+                                    value={newProduct.quantity_tons}
+                                    onChange={(e) =>
+                                        setNewProduct({
+                                            ...newProduct,
+                                            quantity_tons: e.target.value,
+                                        })
+                                    }
+                                />
 
-                        <SelectField
-                            label="Unit"
-                            name="unit"
-                            value={newProduct.unit}
-                            onChange={(e) =>
-                                setNewProduct({
-                                    ...newProduct,
-                                    unit: e.target.value,
-                                })
-                            }
-                            options={unitOptions}
-                        />
+                                <SelectField
+                                    label="Unit"
+                                    name="unit"
+                                    value={newProduct.unit}
+                                    onChange={(e) =>
+                                        setNewProduct({
+                                            ...newProduct,
+                                            unit: e.target.value,
+                                        })
+                                    }
+                                    options={unitOptions}
+                                />
+                            </>
+                        )}
                     </div>
 
                     <Button variant="success" onClick={handleAddProduct}>

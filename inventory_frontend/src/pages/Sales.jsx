@@ -19,9 +19,10 @@ import {
 import Button from "../components/common/Button";
 import InputField from "../components/common/InputField";
 import SelectField from "../components/common/SelectField";
+import SearchableSelect from "../components/common/SearchableSelect";
 import EditModal from "../components/modal/EditModal";
 import Pagination from "../components/common/Pagination";
-import { formatDate, formatTime, formatInr, tonToBrass } from "../utils/formatUtils";
+import { formatDate, formatTime, formatInr, tonToBrass, smartCapitalize } from "../utils/formatUtils";
 import { getSettings } from "../services/settingsApi";
 
 // ─── Helper: format a quantity cell with dual-unit display ───────────────────
@@ -107,10 +108,7 @@ const emptyNewSale = {
 };
 
 const Sales = () => {
-    const capitalizeWords = (str) => {
-        if (!str) return "";
-        return str.replace(/\b\w/g, (char) => char.toUpperCase());
-    };
+    const capitalizeWords = smartCapitalize;
 
     // --- Context Hook ---
     const {
@@ -131,6 +129,9 @@ const Sales = () => {
 
     // --- State Declarations ---
     const [search, setSearch] = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [monthFilter, setMonthFilter] = useState("");
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [entryMode, setEntryMode] = useState("single"); // "single" or "bulk"
@@ -150,6 +151,7 @@ const Sales = () => {
     const [tonsPerBrass, setTonsPerBrass] = useState(4.2);
 
     useEffect(() => {
+        fetchVehicles(true);
         getSettings()
             .then(res => {
                 if (res.data && res.data.tons_per_brass) {
@@ -226,17 +228,33 @@ const Sales = () => {
     }, [goodsReturns]);
 
     // --- Client Side Filtering ---
-    const filteredSales = sales.filter((sale) =>
-        sale.party_name?.toLowerCase().includes(search.toLowerCase()) ||
-        sale.vehicle_number?.toLowerCase().includes(search.toLowerCase()) ||
-        sale.product_name?.toLowerCase().includes(search.toLowerCase())
-    );
+    const filteredSales = sales.filter((sale) => {
+        const matchesSearch =
+            !search ||
+            sale.party_name?.toLowerCase().includes(search.toLowerCase()) ||
+            sale.vehicle_number?.toLowerCase().includes(search.toLowerCase()) ||
+            sale.product_name?.toLowerCase().includes(search.toLowerCase());
 
-    const filteredPendingSales = pendingSales.filter((sale) =>
-        sale.party_name?.toLowerCase().includes(search.toLowerCase()) ||
-        sale.vehicle_number?.toLowerCase().includes(search.toLowerCase()) ||
-        sale.product_name?.toLowerCase().includes(search.toLowerCase())
-    );
+        const matchesDateFrom = !dateFrom || (sale.sales_date && sale.sales_date >= dateFrom);
+        const matchesDateTo = !dateTo || (sale.sales_date && sale.sales_date <= dateTo);
+        const matchesMonth = !monthFilter || (sale.sales_date && String(sale.sales_date).startsWith(monthFilter));
+
+        return matchesSearch && matchesDateFrom && matchesDateTo && matchesMonth;
+    });
+
+    const filteredPendingSales = pendingSales.filter((sale) => {
+        const matchesSearch =
+            !search ||
+            sale.party_name?.toLowerCase().includes(search.toLowerCase()) ||
+            sale.vehicle_number?.toLowerCase().includes(search.toLowerCase()) ||
+            sale.product_name?.toLowerCase().includes(search.toLowerCase());
+
+        const matchesDateFrom = !dateFrom || (sale.sales_date && sale.sales_date >= dateFrom);
+        const matchesDateTo = !dateTo || (sale.sales_date && sale.sales_date <= dateTo);
+        const matchesMonth = !monthFilter || (sale.sales_date && String(sale.sales_date).startsWith(monthFilter));
+
+        return matchesSearch && matchesDateFrom && matchesDateTo && matchesMonth;
+    });
 
     // --- Action Handlers ---
     const handleAddSale = async () => {
@@ -552,6 +570,80 @@ const Sales = () => {
                 )}
             </div>
 
+            {/* ─── Prominent Sales Filter Toolbar ─── */}
+            <div
+                style={{
+                    marginBottom: "1.5rem",
+                    display: "flex",
+                    gap: "1rem",
+                    alignItems: "flex-end",
+                    flexWrap: "wrap",
+                    backgroundColor: "var(--card-bg, #ffffff)",
+                    padding: "1rem 1.25rem",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-color, #e2e8f0)",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+                }}
+            >
+                <div style={{ flex: "1 1 240px" }}>
+                    <InputField
+                        label="Search Sales"
+                        placeholder="Search by party, vehicle, or product..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
+                <div style={{ flex: "0 1 160px" }}>
+                    <InputField
+                        label="From Date"
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => {
+                            setDateFrom(e.target.value);
+                            setMonthFilter("");
+                        }}
+                    />
+                </div>
+                <div style={{ flex: "0 1 160px" }}>
+                    <InputField
+                        label="To Date"
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => {
+                            setDateTo(e.target.value);
+                            setMonthFilter("");
+                        }}
+                    />
+                </div>
+                <div style={{ flex: "0 1 160px" }}>
+                    <InputField
+                        label="Filter Month"
+                        type="month"
+                        value={monthFilter}
+                        onChange={(e) => {
+                            setMonthFilter(e.target.value);
+                            setDateFrom("");
+                            setDateTo("");
+                        }}
+                    />
+                </div>
+                {(search || dateFrom || dateTo || monthFilter) && (
+                    <div style={{ marginBottom: "2px" }}>
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                setSearch("");
+                                setDateFrom("");
+                                setDateTo("");
+                                setMonthFilter("");
+                            }}
+                        >
+                            ✕ Reset Filters
+                        </Button>
+                    </div>
+                )}
+            </div>
+
             {/* Add Sale Form Drawer/Card */}
             {showAddForm && (
                 <div className="form-card" style={{ marginBottom: "2rem" }}>
@@ -650,26 +742,23 @@ const Sales = () => {
                                 </div>
 
                                 {/* Vehicle */}
-                                <div className="form-group">
-                                    <label>Vehicle Number *</label>
-                                    <select
-                                        value={newSale.vehicle_number}
-                                        onChange={(e) =>
-                                            setNewSale({ ...newSale, vehicle_number: e.target.value })
-                                        }
-                                    >
-                                        <option value="">Select Vehicle</option>
-                                        {vehicles
-                                            .filter(v => v.status === "Active")
-                                            .map((v) => (
-                                                <option key={v.vehicle_number} value={v.vehicle_number}>
-                                                    {v.owner
-                                                        ? `${v.vehicle_number} — ${v.owner}`
-                                                        : v.vehicle_number}
-                                                </option>
-                                            ))}
-                                    </select>
-                                </div>
+                                <SearchableSelect
+                                    label="Vehicle Number *"
+                                    name="vehicle_number"
+                                    value={newSale.vehicle_number}
+                                    onChange={(e) =>
+                                        setNewSale({ ...newSale, vehicle_number: e.target.value })
+                                    }
+                                    options={vehicles
+                                        .filter(v => v.status === "Active")
+                                        .map((v) => ({
+                                            value: v.vehicle_number,
+                                            label: v.owner
+                                                ? `${v.vehicle_number} — ${v.owner}`
+                                                : v.vehicle_number,
+                                        }))}
+                                    placeholder="Search or enter vehicle..."
+                                />
 
                                 {/* Unit */}
                                 <div className="form-group">
@@ -699,45 +788,70 @@ const Sales = () => {
                                     />
                                 </div>
 
-                                {/* Site */}
-                                <div className="form-group">
-                                    <label>Delivery Site</label>
-                                    <input
-                                        type="text"
-                                        value={newSale.site}
-                                        placeholder="Location / Site name"
-                                        onChange={(e) =>
-                                            setNewSale({ ...newSale, site: e.target.value })
-                                        }
-                                    />
-                                </div>
+                                
 
-                                {/* Price */}
-                                <div className="form-group">
-                                    <label>Price (₹)</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={newSale.price}
-                                        onChange={(e) =>
-                                            setNewSale({ ...newSale, price: e.target.value })
-                                        }
-                                    />
-                                </div>
+                                {/* Price & Automatically Calculated Total Side-by-Side */}
+                                <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                                    <div className="form-group">
+                                        <label>Price/Unit (₹)</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={newSale.price}
+                                            onChange={(e) =>
+                                                setNewSale({ ...newSale, price: e.target.value })
+                                            }
+                                        />
+                                    </div>
 
-                                {/* Loading Time */}
-                                <div className="form-group">
-                                    <label>Loading Time</label>
-                                    <input
-                                        type="time"
-                                        value={newSale.loading_time}
-                                        onChange={(e) =>
-                                            setNewSale({ ...newSale, loading_time: e.target.value })
-                                        }
-                                    />
+                                    <div className="form-group">
+                                        <label>Total Amount (₹) <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: "normal" }}>(Auto Calculated)</span></label>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            disabled
+                                            value={
+                                                newSale.quantity && newSale.price
+                                                    ? `₹${formatInr(parseFloat(newSale.quantity) * parseFloat(newSale.price))}`
+                                                    : "₹0.00"
+                                            }
+                                            style={{
+                                                backgroundColor: "#f8fafc",
+                                                fontWeight: "700",
+                                                color: "#1e293b",
+                                                border: "1px solid #cbd5e1"
+                                            }}
+                                        />
+                                    </div>
                                 </div>
+{/* Delivery Site & Loading Time Side-by-Side */}
+                                <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                                    <div className="form-group">
+                                        <label>Delivery Site</label>
+                                        <input
+                                            type="text"
+                                            value={newSale.site}
+                                            placeholder="Location / Site name"
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const formatted = val ? val.charAt(0).toUpperCase() + val.slice(1) : "";
+                                                setNewSale({ ...newSale, site: formatted });
+                                            }}
+                                        />
+                                    </div>
 
+                                    <div className="form-group">
+                                        <label>Loading Time</label>
+                                        <input
+                                            type="time"
+                                            value={newSale.loading_time}
+                                            onChange={(e) =>
+                                                setNewSale({ ...newSale, loading_time: e.target.value })
+                                            }
+                                        />
+                                    </div>
+                                </div>
                                 {/* Remarks */}
                                 <div className="form-group" style={{ gridColumn: "1 / -1" }}>
                                     <label>Remarks</label>
@@ -847,19 +961,17 @@ const Sales = () => {
                                         {bulkRows.map((row, idx) => (
                                             <tr key={idx} style={{ borderBottom: "1px solid #e2e8f0" }}>
                                                 <td style={{ padding: "8px" }}>{idx + 1}</td>
-                                                <td style={{ padding: "8px" }}>
-                                                    <select
+                                                <td style={{ padding: "8px", minWidth: "180px" }}>
+                                                    <SearchableSelect
+                                                        name="vehicle_number"
                                                         value={row.vehicle_number}
                                                         onChange={(e) => handleBulkRowChange(idx, "vehicle_number", e.target.value)}
-                                                        style={{ width: "100%", padding: "6px" }}
-                                                    >
-                                                        <option value="">Select Vehicle</option>
-                                                        {vehicles.filter(v => v.status === "Active").map(v => (
-                                                            <option key={v.vehicle_number} value={v.vehicle_number}>
-                                                                {v.vehicle_number} {v.owner ? `(${v.owner})` : ""}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                        options={vehicles.filter(v => v.status === "Active").map(v => ({
+                                                            value: v.vehicle_number,
+                                                            label: v.owner ? `${v.vehicle_number} (${v.owner})` : v.vehicle_number
+                                                        }))}
+                                                        placeholder="Search vehicle..."
+                                                    />
                                                 </td>
                                                 <td style={{ padding: "8px" }}>
                                                     <select
@@ -940,14 +1052,7 @@ const Sales = () => {
                 </div>
             )}
 
-            {/* Filter Search Bar */}
-            <div style={{ marginBottom: "1.5rem", display: "flex", gap: "1rem" }}>
-                <InputField
-                    placeholder="Search by party, vehicle, or product..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
-            </div>
+
 
             {/* ─── Pending Unloading Table ─── */}
             <div className="table-container" style={{ marginBottom: "2rem" }}>
@@ -1087,6 +1192,8 @@ const Sales = () => {
                 />
             </div>
 
+
+
             {/* ─── Sales History (Completed) Table ─── */}
             <div className="table-container">
                 <h2 style={{ padding: "1rem 1rem 0.5rem 1rem", margin: 0, fontSize: "1.25rem", color: "#374151" }}>Sales History (Completed)</h2>
@@ -1096,10 +1203,11 @@ const Sales = () => {
                             <th style={{ whiteSpace: "nowrap" }}>Date</th>
                             <th>Party</th>
                             <th>Product</th>
-                            <th>Vehicle</th>
                             <th>Quantity</th>
+                            <th style={{ textAlign: "right", whiteSpace: "nowrap" }}>Price/Unit (₹)</th>
+                            <th style={{ textAlign: "right", whiteSpace: "nowrap" }}>Total Price (₹)</th>
                             <th>Site</th>
-                            <th style={{ textAlign: "right", whiteSpace: "nowrap" }}>Price (₹)</th>
+                            <th>Vehicle</th>
                             <th>Loading</th>
                             <th>Unloading</th>
                             <th>Remarks</th>
@@ -1109,7 +1217,7 @@ const Sales = () => {
                     <tbody>
                         {filteredSales.length === 0 ? (
                             <tr>
-                                <td colSpan="11" style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
+                                <td colSpan="12" style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
                                     No Completed Sales Found
                                 </td>
                             </tr>
@@ -1119,6 +1227,7 @@ const Sales = () => {
                                 .map((sale) => {
                                     const saleReturns = returnsBySaleId[sale.sales_id] || [];
                                     const totalRetTons = saleReturns.reduce((sum, r) => sum + parseFloat(r.returned_quantity_tons || 0), 0);
+                                    const lineTotal = parseFloat(sale.display_quantity || 0) * parseFloat(sale.price || 0);
 
                                     return (
                                         <React.Fragment key={sale.sales_id}>
@@ -1126,12 +1235,6 @@ const Sales = () => {
                                                 <td style={{ whiteSpace: "nowrap" }}>{formatDate(sale.sales_date)}</td>
                                                 <td>{sale.party_name}</td>
                                                 <td>{sale.product_name}</td>
-                                                <td>
-                                                    <VehicleCell
-                                                        vehicleNumber={sale.vehicle_number}
-                                                        owner={sale.vehicle_owner}
-                                                    />
-                                                </td>
                                                 <td>
                                                     <QtyCell
                                                         displayQty={sale.display_quantity}
@@ -1141,8 +1244,19 @@ const Sales = () => {
                                                         returnedTons={totalRetTons}
                                                     />
                                                 </td>
+                                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                                                    {sale.price ? `₹${formatInr(sale.price)} / ${sale.unit?.toLowerCase() === "tons" ? "MT" : "Brass"}` : "—"}
+                                                </td>
+                                                <td style={{ textAlign: "right", whiteSpace: "nowrap", fontWeight: "700", color: "#1e293b" }}>
+                                                    {sale.price ? `₹${formatInr(lineTotal)}` : "—"}
+                                                </td>
                                                 <td>{sale.site || "—"}</td>
-                                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{sale.price ? `₹${formatInr(sale.price)}` : "—"}</td>
+                                                <td>
+                                                    <VehicleCell
+                                                        vehicleNumber={sale.vehicle_number}
+                                                        owner={sale.vehicle_owner}
+                                                    />
+                                                </td>
                                                 <td>{formatTime(sale.loading_time)}</td>
                                                 <td>{formatTime(sale.unloading_time)}</td>
                                                 <td>{sale.remarks || "—"}</td>
@@ -1168,7 +1282,7 @@ const Sales = () => {
                                             {/* Returned Entries Sub-rows in RED */}
                                             {saleReturns.map((ret) => (
                                                 <tr key={`ret-comp-${ret.return_id}`} style={{ backgroundColor: "#fff5f5" }}>
-                                                    <td colSpan="11" style={{ padding: "6px 16px", borderBottom: "1px dashed #fca5a5" }}>
+                                                    <td colSpan="12" style={{ padding: "6px 16px", borderBottom: "1px dashed #fca5a5" }}>
                                                         <div style={{ display: "flex", alignItems: "center", gap: "12px", color: "#b91c1c", fontSize: "0.85rem" }}>
                                                             <span>↩ <strong>Goods Return #{ret.return_id}</strong> ({formatDate(ret.return_date)}):</span>
                                                             <span style={{ fontWeight: "800", fontSize: "0.95rem", color: "#dc2626" }}>

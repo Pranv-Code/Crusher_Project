@@ -1,6 +1,6 @@
 from flask import jsonify, request
 from db import get_connection
-from utils.unit_converter import unit_convertor
+from utils.unit_converter import unit_convertor, ton_to_brass
 from services.activity_log_service import log_activity
 
 
@@ -9,9 +9,6 @@ def view_production():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # cursor.execute("SELECT * FROM Production")
-
-    # production = cursor.fetchall()
     cursor.execute("""
         SELECT 
         p.production_id,
@@ -32,10 +29,25 @@ def view_production():
     for prd in production:
         if prd["production_date"]:
             prd["production_date"] = prd["production_date"].strftime("%Y-%m-%d")
-        qty = float(prd.get("quantity_tons") or 0)
+        qty_tons = float(prd.get("quantity_tons") or 0)
         total_cost = float(prd.get("production_cost") or 0)
-        if (prd.get("cost_per_unit") is None or float(prd.get("cost_per_unit") or 0) == 0) and qty > 0:
-            prd["cost_per_unit"] = round(total_cost / qty, 2)
+        unit = (prd.get("unit") or "tons").lower()
+
+        if unit == "brass":
+            qty_brass = ton_to_brass(qty_tons, cursor=cursor)
+            prd["display_quantity"] = qty_brass
+            prd["entered_quantity"] = qty_brass
+            prd["converted_quantity"] = qty_tons
+            prd["converted_unit"] = "tons"
+        else:
+            qty_brass = ton_to_brass(qty_tons, cursor=cursor)
+            prd["display_quantity"] = qty_tons
+            prd["entered_quantity"] = qty_tons
+            prd["converted_quantity"] = qty_brass
+            prd["converted_unit"] = "brass"
+
+        if (prd.get("cost_per_unit") is None or float(prd.get("cost_per_unit") or 0) == 0) and qty_tons > 0:
+            prd["cost_per_unit"] = round(total_cost / qty_tons, 2)
     cursor.close()
     conn.close()
 
@@ -90,20 +102,6 @@ def add_production():
         if not cost_per_unit and float(qty) > 0 and total_cost > 0:
             cost_per_unit = round(total_cost / float(qty), 2)
 
-        # Duplicate Entry Check
-        if product_id:
-            cursor.execute("""
-                SELECT production_id FROM Production 
-                WHERE production_date = %s AND product_id = %s AND unit = %s AND ABS(quantity_tons - %s) < 0.001
-            """, (data["production_date"], product_id, data["unit"], qty))
-        else:
-            cursor.execute("""
-                SELECT production_id FROM Production 
-                WHERE production_date = %s AND product_id IS NULL AND unit = %s AND ABS(quantity_tons - %s) < 0.001
-            """, (data["production_date"], data["unit"], qty))
-        
-        if cursor.fetchone():
-            return jsonify({"message": "Duplicate Entry Detected: A production record with the exact same date, product, unit, and quantity already exists."}), 400
 
         # Insert Production
         cursor.execute("""

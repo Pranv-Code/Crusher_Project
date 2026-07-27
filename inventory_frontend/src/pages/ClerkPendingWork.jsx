@@ -20,15 +20,12 @@ import {
     generatePartyInvoicePdf,
     generateRawMaterialReportPdf
 } from "../utils/pdfGenerator";
-import { formatDate, formatTime, formatInr, formatDurationHM, tonToBrass } from "../utils/formatUtils";
+import { formatDate, formatTime, formatInr, formatDurationHM, tonToBrass, smartCapitalize } from "../utils/formatUtils";
 import ApprovalChangeDetails from "../components/common/ApprovalChangeDetails";
 
 export default function ClerkPendingWork() {
     const [selectedRequest, setSelectedRequest] = useState(null);
-    const capitalizeWords = (str) => {
-        if (!str) return "";
-        return str.replace(/\b\w/g, (char) => char.toUpperCase());
-    };
+    const capitalizeWords = smartCapitalize;
 
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -77,7 +74,7 @@ export default function ClerkPendingWork() {
                     setTonsPerBrass(parseFloat(res.data.tons_per_brass) || 4.2);
                 }
             })
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     const handleDownloadReport = async (item, format) => {
@@ -94,28 +91,28 @@ export default function ClerkPendingWork() {
                 const filtered = salesData.filter((s) => {
                     if (selectedSet && !selectedSet.has(String(s.sales_id))) return false;
                     if (f.date_from && s.sales_date < f.date_from) return false;
-                    if (f.date_to   && s.sales_date > f.date_to)   return false;
-                    if (f.month     && s.sales_date?.slice(0,7) !== f.month) return false;
-                    if (f.party     && String(s.party_id) !== f.party) return false;
-                    if (f.vehicle   && s.vehicle_number !== f.vehicle) return false;
+                    if (f.date_to && s.sales_date > f.date_to) return false;
+                    if (f.month && s.sales_date?.slice(0, 7) !== f.month) return false;
+                    if (f.party && String(s.party_id) !== f.party) return false;
+                    if (f.vehicle && s.vehicle_number !== f.vehicle) return false;
                     return true;
                 });
 
                 if (format === "excel") {
                     const subtitle = `Filter: ${f.date_from || "Start"} to ${f.date_to || "End"}${selectedSet ? ` | Selected (${selectedSet.size} entries)` : ` | Month: ${f.month || "All"}`}`;
                     const rows = filtered.map(s => ({
-                        "Date":           formatDate(s.sales_date),
-                        "Party":          s.party_name,
-                        "Product":        s.product_name,
-                        "Vehicle":        s.vehicle_number || "",
-                        "Vehicle Owner":  s.vehicle_owner || "",
-                        "Quantity (MT)":  Number((Number(s.quantity_tons || 0)).toFixed(2)),
+                        "Date": formatDate(s.sales_date),
+                        "Party": s.party_name,
+                        "Product": s.product_name,
+                        "Vehicle": s.vehicle_number || "",
+                        "Vehicle Owner": s.vehicle_owner || "",
+                        "Quantity (MT)": Number((Number(s.quantity_tons || 0)).toFixed(2)),
                         "Quantity (Brass)": Number(tonToBrass(s.quantity_tons || 0, tonsPerBrass).toFixed(2)),
-                        "Site":           s.site || "",
-                        "Price (₹)":      Number(s.price || 0),
-                        "Loading Time":   formatTime(s.loading_time),
+                        "Site": s.site || "",
+                        "Price (₹)": Number(s.price || 0),
+                        "Loading Time": formatTime(s.loading_time),
                         "Unloading Time": formatTime(s.unloading_time),
-                        "Remarks":        s.remarks || "",
+                        "Remarks": s.remarks || "",
                     }));
                     await exportToFormattedExcel({
                         title: `Sales Report`,
@@ -137,9 +134,9 @@ export default function ClerkPendingWork() {
                 const filtered = prodData.filter((r) => {
                     if (selectedSet && !selectedSet.has(String(r.production_id))) return false;
                     if (f.date_from && r.production_date < f.date_from) return false;
-                    if (f.date_to   && r.production_date > f.date_to)   return false;
-                    if (f.month     && r.production_date?.slice(0,7) !== f.month) return false;
-                    if (f.product   && String(r.product_id) !== f.product) return false;
+                    if (f.date_to && r.production_date > f.date_to) return false;
+                    if (f.month && r.production_date?.slice(0, 7) !== f.month) return false;
+                    if (f.product && String(r.product_id) !== f.product) return false;
                     return true;
                 });
 
@@ -149,9 +146,9 @@ export default function ClerkPendingWork() {
                     const rows = filtered.map(r => {
                         const tons = parseFloat(r.quantity_tons || 0);
                         return {
-                            "Date":            formatDate(r.production_date),
-                            "Product":         r.product_name,
-                            "Quantity (MT)":   Number(tons.toFixed(2)),
+                            "Date": formatDate(r.production_date),
+                            "Product": r.product_name,
+                            "Quantity (MT)": Number(tons.toFixed(2)),
                             "Quantity (Brass)": Number(tonToBrass(tons, tonsPerBrass).toFixed(2)),
                             "Cost / Unit (₹)": r.cost_per_unit ? Number(Number(r.cost_per_unit).toFixed(2)) : "",
                             "Total Production Cost (₹)": r.production_cost ? Number(r.production_cost) : "",
@@ -182,22 +179,22 @@ export default function ClerkPendingWork() {
                     const partyName = partyData.party.party_name;
                     const subtitle = `Party Statement: ${partyName}${partyData.party.gst_no ? ` | GSTIN: ${partyData.party.gst_no}` : ""}${selectedSet ? ` | Selected (${selectedSet.size} entries)` : ""}`;
                     const rows = (partyData.sales || []).map(s => ({
-                        "Date":           formatDate(s.sales_date),
-                        "Product":        s.product_name,
-                        "Vehicle":        s.vehicle_number || "",
-                        "Vehicle Owner":  s.vehicle_owner || "",
-                        "Quantity (MT)":  Number((Number(s.quantity_tons || 0)).toFixed(2)),
+                        "Date": formatDate(s.sales_date),
+                        "Product": s.product_name,
+                        "Vehicle": s.vehicle_number || "",
+                        "Vehicle Owner": s.vehicle_owner || "",
+                        "Quantity (MT)": Number((Number(s.quantity_tons || 0)).toFixed(2)),
                         "Quantity (Brass)": Number(tonToBrass(s.quantity_tons || 0, tonsPerBrass).toFixed(2)),
-                        "Site":           s.site || "",
-                        "Price (₹)":      Number(s.price || 0),
-                        "Remarks":        s.remarks || "",
+                        "Site": s.site || "",
+                        "Price (₹)": Number(s.price || 0),
+                        "Remarks": s.remarks || "",
                     }));
                     await exportToFormattedExcel({
                         title: `PARTY STATEMENT - ${partyName}`,
                         subtitle,
                         sheetName: "Party Statement",
                         rows,
-                        fileName: `party_${partyName.replace(/\s/g,"_")}_report.xlsx`
+                        fileName: `party_${partyName.replace(/\s/g, "_")}_report.xlsx`
                     });
                 } else if (format === "invoice") {
                     const settingsRes = await getSettings();
@@ -214,12 +211,12 @@ export default function ClerkPendingWork() {
                 const filtered = actData.filter((a) => {
                     if (selectedSet && !selectedSet.has(String(a.activity_id))) return false;
                     if (f.dateFrom && a.activity_date < f.dateFrom) return false;
-                    if (f.dateTo   && a.activity_date > f.dateTo)   return false;
-                    if (f.monthFilter && a.activity_date?.slice(0,7) !== f.monthFilter) return false;
+                    if (f.dateTo && a.activity_date > f.dateTo) return false;
+                    if (f.monthFilter && a.activity_date?.slice(0, 7) !== f.monthFilter) return false;
                     if (f.vehicleFilter && a.vehicle_number !== f.vehicleFilter) return false;
                     if (f.searchQuery) {
                         const q = f.searchQuery.toLowerCase();
-                        const match = 
+                        const match =
                             a.vehicle_number?.toLowerCase().includes(q) ||
                             a.driver_name?.toLowerCase().includes(q) ||
                             a.remarks?.toLowerCase().includes(q) ||
@@ -232,17 +229,17 @@ export default function ClerkPendingWork() {
                 if (format === "excel") {
                     const subtitle = `Vehicle: ${f.vehicleFilter || "All"} | Date: ${f.dateFrom || "Start"} to ${f.dateTo || "End"}${selectedSet ? ` | Selected (${selectedSet.size} entries)` : ""}`;
                     const rows = filtered.map(r => ({
-                        "Date":                formatDate(r.activity_date),
-                        "Vehicle":             r.vehicle_number,
-                        "Site":                r.site || "",
-                        "Arrival Time":        formatTime(r.arrival_time),
-                        "Loading Start":       formatTime(r.loading_start_time),
-                        "Unloading End":       formatTime(r.unloading_end_time),
+                        "Date": formatDate(r.activity_date),
+                        "Vehicle": r.vehicle_number,
+                        "Site": r.site || "",
+                        "Arrival Time": formatTime(r.arrival_time),
+                        "Loading Start": formatTime(r.loading_start_time),
+                        "Unloading End": formatTime(r.unloading_end_time),
                         "Turnaround Time (hr/min)": formatDurationHM(r.turnaround_time),
-                        "Gross Weight (MT)":   Number((Number(r.total_weight || 0)).toFixed(2)),
+                        "Gross Weight (MT)": Number((Number(r.total_weight || 0)).toFixed(2)),
                         "Vehicle Weight (MT)": Number((Number(r.vehicle_weight || 0)).toFixed(2)),
-                        "Net Weight (MT)":     Number((Number(r.net_weight || 0)).toFixed(2)),
-                        "Net Weight (Brass)":  Number(tonToBrass(r.net_weight || 0, tonsPerBrass).toFixed(2)),
+                        "Net Weight (MT)": Number((Number(r.net_weight || 0)).toFixed(2)),
+                        "Net Weight (Brass)": Number(tonToBrass(r.net_weight || 0, tonsPerBrass).toFixed(2)),
                     }));
                     await exportToFormattedExcel({
                         title: `Raw Material Report`,
@@ -331,7 +328,7 @@ export default function ClerkPendingWork() {
         rejected: requests.filter(r => r.status === "rejected").length,
     };
 
-    const approvedReportRequests = requests.filter(r => 
+    const approvedReportRequests = requests.filter(r =>
         r.status === "approved" && (r.request_type === "PRINT_REPORT" || r.request_type === "report_print")
     );
     const approvedReportCount = approvedReportRequests.length;

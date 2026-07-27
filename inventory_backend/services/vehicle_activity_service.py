@@ -2,10 +2,26 @@ from flask import jsonify, request
 from db import get_connection
 from services.activity_log_service import log_activity
 
-def capitalize_words(s):
-    if not s:
+def smart_capitalize(s):
+    if not s or not isinstance(s, str):
         return ""
-    return " ".join(word.capitalize() for word in s.strip().split())
+    words = s.strip().split()
+    if not words:
+        return ""
+    minor_words = {"and", "of", "the", "for", "in", "on", "at", "by", "with", "&"}
+    res = []
+    for i, word in enumerate(words):
+        if len(word) > 1 and word.isupper():
+            res.append(word)
+        elif i > 0 and word.lower() in minor_words and word.islower():
+            res.append(word)
+        elif word.islower():
+            res.append(word[0].upper() + word[1:])
+        else:
+            res.append(word)
+    return " ".join(res)
+
+capitalize_words = smart_capitalize
 
 
 def add_vehicle_activity():

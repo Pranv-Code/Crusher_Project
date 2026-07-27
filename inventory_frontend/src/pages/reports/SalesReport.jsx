@@ -13,6 +13,7 @@ import { getGoodsReturns } from "../../services/goodsReturnApi";
 import { getSettings } from "../../services/settingsApi";
 
 import Toast from "../../components/common/Toast";
+import SearchableSelect from "../../components/common/SearchableSelect";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777", "#d97706", "#059669"];
 
@@ -340,7 +341,8 @@ export default function SalesReport({ sales, parties, vehicles, products = [], o
                 "Net Qty (MT)": Number(netTonsRow.toFixed(2)),
                 "Net Qty (Brass)": Number(tonToBrass(netTonsRow, tonsPerBrass).toFixed(2)),
                 "Site": s.site || "",
-                "Price (₹)": Number(s.price || 0),
+                "Price/Unit (₹)": Number(s.price || 0),
+                "Total Price (₹)": Number((netTonsRow * Number(s.price || 0)).toFixed(2)),
                 "Loading Time": formatTime(s.loading_time),
                 "Unloading Time": formatTime(s.unloading_time),
                 "Remarks": s.remarks || "",
@@ -468,10 +470,13 @@ export default function SalesReport({ sales, parties, vehicles, products = [], o
                 </div>
                 <div className="filter-group">
                     <label>Vehicle</label>
-                    <select value={vehicleFilter} onChange={e => setVehicleFilter(e.target.value)}>
-                        <option value="">All Vehicles</option>
-                        {Array.isArray(vehicles) && vehicles.map(v => <option key={v.vehicle_number} value={v.vehicle_number}>{v.vehicle_number}</option>)}
-                    </select>
+                    <SearchableSelect
+                        name="vehicle_filter"
+                        value={vehicleFilter}
+                        onChange={e => setVehicleFilter(e.target.value)}
+                        options={[{ value: "", label: "All Vehicles" }, ...(Array.isArray(vehicles) ? vehicles.map(v => ({ value: v.vehicle_number, label: v.owner ? `${v.vehicle_number} (${v.owner})` : v.vehicle_number })) : [])]}
+                        placeholder="Search vehicle..."
+                    />
                 </div>
                 <button className="filter-reset-btn" onClick={resetFilters}>✕ Reset</button>
             </div>
