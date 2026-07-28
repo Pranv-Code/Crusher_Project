@@ -512,7 +512,7 @@ export default function GoodsReturns() {
                                         <option value="">-- Direct Return (No Sale Link) --</option>
                                         {recentSales.map(s => (
                                             <option key={s.sales_id} value={s.sales_id}>
-                                                Sale #{s.sales_id} | {formatDate(s.sales_date)} | {s.party_name} | {s.quantity_tons} MT ({s.vehicle_number})
+                                                Sale #{s.sales_id}{s.chalan_no ? ` [Chalan: ${s.chalan_no}]` : ""} | {formatDate(s.sales_date)} | {s.party_name} | {s.quantity_tons} MT ({s.vehicle_number})
                                             </option>
                                         ))}
                                     </select>

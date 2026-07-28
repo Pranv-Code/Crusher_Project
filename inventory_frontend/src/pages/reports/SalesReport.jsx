@@ -146,6 +146,7 @@ export default function SalesReport({ sales, parties, vehicles, products = [], o
                     s.party_name?.toLowerCase().includes(q) ||
                     s.product_name?.toLowerCase().includes(q) ||
                     s.vehicle_number?.toLowerCase().includes(q) ||
+                    s.chalan_no?.toLowerCase().includes(q) ||
                     s.site?.toLowerCase().includes(q) ||
                     s.remarks?.toLowerCase().includes(q);
                 if (!match) return false;
@@ -332,6 +333,7 @@ export default function SalesReport({ sales, parties, vehicles, products = [], o
             dataToExport.push({
                 "Sale ID": s.sales_id,
                 "Date": formatDate(s.sales_date),
+                "Chalan No.": s.chalan_no || "",
                 "Party": s.party_name,
                 "Product": s.product_name,
                 "Vehicle": s.vehicle_number || "",
@@ -586,6 +588,7 @@ export default function SalesReport({ sales, parties, vehicles, products = [], o
                                 </th>
                                 <th>#</th>
                                 <th style={{ whiteSpace: "nowrap" }}>Date</th>
+                                <th style={{ whiteSpace: "nowrap" }}>Chalan No.</th>
                                 <th>Party Name</th>
                                 <th>Product</th>
                                 <th>Vehicle</th>
@@ -600,7 +603,7 @@ export default function SalesReport({ sales, parties, vehicles, products = [], o
                         <tbody>
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan="12" className="empty-row">
+                                    <td colSpan="13" className="empty-row">
                                         No sales records found matching the specified filters.
                                     </td>
                                 </tr>
@@ -625,6 +628,9 @@ export default function SalesReport({ sales, parties, vehicles, products = [], o
                                                     </td>
                                                     <td>{(currentPage - 1) * pageSize + i + 1}</td>
                                                     <td style={{ whiteSpace: "nowrap" }}>{formatDate(s.sales_date)}</td>
+                                                    <td style={{ whiteSpace: "nowrap" }}>
+                                                        <strong style={{ color: "#2563eb" }}>{s.chalan_no || "—"}</strong>
+                                                    </td>
                                                     <td style={{ fontWeight: 600 }}>{s.party_name}</td>
                                                     <td>
                                                         <span className="product-badge">{s.product_name}</span>
@@ -656,7 +662,7 @@ export default function SalesReport({ sales, parties, vehicles, products = [], o
                                                 {/* Goods Return sub-rows in RED */}
                                                 {saleRets.map(ret => (
                                                     <tr key={`report-ret-${ret.return_id}`} style={{ backgroundColor: "#fff5f5" }}>
-                                                        <td colSpan="12" style={{ padding: "6px 16px", borderBottom: "1px dashed #fca5a5" }}>
+                                                        <td colSpan="13" style={{ padding: "6px 16px", borderBottom: "1px dashed #fca5a5" }}>
                                                             <div style={{ display: "flex", alignItems: "center", gap: "12px", color: "#b91c1c", fontSize: "0.85rem" }}>
                                                                 <span>↩ <strong>Goods Return #{ret.return_id}</strong> ({formatDate(ret.return_date)}):</span>
                                                                 <span style={{ fontWeight: "800", fontSize: "0.95rem", color: "#dc2626" }}>

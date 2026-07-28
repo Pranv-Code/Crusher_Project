@@ -59,7 +59,7 @@ export const generateSalesReportPdf = (filteredData, filters, returnsBySaleId = 
 
     drawReportHeader(doc, `Sales Report`, filterText);
 
-    const tableColumns = ["#", "Date", "Party", "Product", "Vehicle", "Gross (MT)", "Returned (MT)", "Net (MT)", "Site", "Price/Unit (Rs.)", "Total Price (Rs.)", "Remarks"];
+    const tableColumns = ["#", "Date", "Chalan No.", "Party", "Product", "Vehicle", "Gross (MT)", "Returned (MT)", "Net (MT)", "Site", "Price/Unit (Rs.)", "Total Price (Rs.)", "Remarks"];
     const tableRows = filteredData.map((s, i) => {
         const saleRets = returnsBySaleId[s.sales_id] || [];
         const retTons = saleRets.reduce((sum, r) => sum + parseFloat(r.returned_quantity_tons || 0), 0);
@@ -69,6 +69,7 @@ export const generateSalesReportPdf = (filteredData, filters, returnsBySaleId = 
         return [
             i + 1,
             formatDate(s.sales_date),
+            s.chalan_no || "—",
             s.party_name,
             s.product_name,
             s.vehicle_number || "—",
@@ -145,12 +146,13 @@ export const generatePartyReportPdf = (partyData, tonsPerBrass = 4.2) => {
 
     drawReportHeader(doc, `Party Sales Report`, filterText);
 
-    const tableColumns = ["#", "Date", "Product", "Vehicle", "Vehicle Owner", "Qty (MT)", "Qty (Brass)", "Site", "Price/Unit (Rs.)", "Total Price (Rs.)", "Remarks"];
+    const tableColumns = ["#", "Date", "Chalan No.", "Product", "Vehicle", "Vehicle Owner", "Qty (MT)", "Qty (Brass)", "Site", "Price/Unit (Rs.)", "Total Price (Rs.)", "Remarks"];
     const tableRows = partyData.sales.map((s, i) => {
         const lineTotal = (s.quantity_tons || 0) * (s.price || 0);
         return [
             i + 1,
             formatDate(s.sales_date),
+            s.chalan_no || "—",
             s.product_name,
             s.vehicle_number || "—",
             s.vehicle_owner || "—",

@@ -81,7 +81,10 @@ def get_vehicles():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    cursor.execute("SELECT * FROM Vehicle")
+    cursor.execute("""
+        SELECT * FROM Vehicle 
+        ORDER BY COALESCE(requested_at, approved_at, '1970-01-01 00:00:00') DESC, vehicle_number DESC
+    """)
 
     vehicles = cursor.fetchall()
 
@@ -145,31 +148,47 @@ def update_vehicle(vehicle_number):
 def delete_vehicle(vehicle_number):
 
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
     try:
+        # Check if vehicle exists
+        cursor.execute("SELECT vehicle_number FROM Vehicle WHERE vehicle_number=%s", (vehicle_number,))
+        v = cursor.fetchone()
+        if not v:
+            return jsonify({"message": "Vehicle not found"}), 404
 
-        cursor.execute("""
-            DELETE FROM Vehicle
-            WHERE vehicle_number=%s
-        """, (vehicle_number,))
+        # Check references in Sales
+        cursor.execute("SELECT COUNT(*) AS cnt FROM Sales WHERE vehicle_number=%s", (vehicle_number,))
+        sales_cnt = cursor.fetchone()["cnt"]
 
+        # Check references in Vehicle_Activity (Raw Material)
+        cursor.execute("SELECT COUNT(*) AS cnt FROM Vehicle_Activity WHERE vehicle_number=%s", (vehicle_number,))
+        act_cnt = cursor.fetchone()["cnt"]
+
+        if sales_cnt > 0 or act_cnt > 0:
+            reasons = []
+            if sales_cnt > 0:
+                reasons.append(f"{sales_cnt} sales record(s)")
+            if act_cnt > 0:
+                reasons.append(f"{act_cnt} raw material trip(s)")
+            reason_str = " and ".join(reasons)
+
+            return jsonify({
+                "message": f"Cannot delete vehicle '{vehicle_number}'. It is associated with {reason_str}. Please set its status to 'Inactive' instead."
+            }), 400
+
+        cursor.execute("DELETE FROM Vehicle WHERE vehicle_number=%s", (vehicle_number,))
         conn.commit()
 
         return jsonify({
-            "message": "Vehicle Deleted Successfully"
+            "message": f"Vehicle '{vehicle_number}' Deleted Successfully"
         })
 
     except Exception as e:
-
         conn.rollback()
-
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
     finally:
-
         cursor.close()
         conn.close()
 

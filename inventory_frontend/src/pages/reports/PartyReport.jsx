@@ -112,10 +112,11 @@ export default function PartyReport({ parties, products }) {
                 const q = searchQuery.toLowerCase();
                 const matchProduct = s.product_name?.toLowerCase().includes(q);
                 const matchVehicle = s.vehicle_number?.toLowerCase().includes(q);
+                const matchChalan = s.chalan_no?.toLowerCase().includes(q);
                 const matchSite = s.site?.toLowerCase().includes(q);
                 const matchDate = s.sales_date?.toLowerCase().includes(q);
                 const matchRemarks = s.remarks?.toLowerCase().includes(q);
-                if (!matchProduct && !matchVehicle && !matchSite && !matchDate && !matchRemarks) return false;
+                if (!matchProduct && !matchVehicle && !matchChalan && !matchSite && !matchDate && !matchRemarks) return false;
             }
             return true;
         });
@@ -262,6 +263,7 @@ export default function PartyReport({ parties, products }) {
 
         const rows = exportSales.map(s => ({
             "Date": formatDate(s.sales_date),
+            "Chalan No.": s.chalan_no || "",
             "Product": s.product_name,
             "Vehicle": s.vehicle_number || "",
             "Vehicle Owner": s.vehicle_owner || "",
@@ -524,6 +526,7 @@ export default function PartyReport({ parties, products }) {
                                         </th>
                                         <th>#</th>
                                         <th>Date</th>
+                                        <th>Chalan No.</th>
                                         <th>Product Name</th>
                                         <th>Vehicle</th>
                                         <th style={{ textAlign: "right" }}>Qty (MT)</th>
@@ -536,7 +539,7 @@ export default function PartyReport({ parties, products }) {
                                 <tbody>
                                     {filteredSales.length === 0 ? (
                                         <tr>
-                                            <td colSpan="10" className="empty-row">
+                                            <td colSpan="11" className="empty-row">
                                                 No sales history records match the specified filters.
                                             </td>
                                         </tr>
@@ -559,6 +562,7 @@ export default function PartyReport({ parties, products }) {
                                                             {(currentPage - 1) * pageSize + i + 1}
                                                         </td>
                                                         <td>{formatDate(s.sales_date)}</td>
+                                                        <td><strong style={{ color: "#2563eb" }}>{s.chalan_no || "—"}</strong></td>
                                                         <td><strong>{s.product_name}</strong></td>
                                                         <td>{s.vehicle_number || "—"}</td>
                                                         <td style={{ textAlign: "right" }}><strong>{fmtTons(s.quantity_tons)} MT</strong></td>

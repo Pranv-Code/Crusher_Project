@@ -47,8 +47,13 @@ def add_product():
 
     data = request.json
 
+    unit = data.get("unit") or "Tons"
+    raw_qty = data.get("quantity_tons")
+    if raw_qty is None or raw_qty == "":
+        raw_qty = 0
+
     try:
-        qty_val = float(data.get("quantity_tons", 0))
+        qty_val = float(raw_qty)
     except (ValueError, TypeError):
         return jsonify({"message": "Invalid quantity value"}), 400
 
@@ -56,8 +61,8 @@ def add_product():
         return jsonify({"message": "Quantity cannot be negative"}), 400
 
     qty = unit_convertor(
-        data["unit"],
-        data["quantity_tons"]
+        unit,
+        qty_val
     )
 
     product_name = data.get("product_name", "").strip()
@@ -138,21 +143,52 @@ def update_product(id):
 def delete_product(id):
 
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
 
-    cursor.execute(
-        "DELETE FROM Product WHERE product_id=%s",
-        (id,)
-    )
+    try:
+        # Check if product exists
+        cursor.execute("SELECT product_name FROM Product WHERE product_id=%s", (id,))
+        product = cursor.fetchone()
+        if not product:
+            return jsonify({"message": "Product not found"}), 404
 
-    conn.commit()
+        prod_name = product["product_name"]
 
-    cursor.close()
-    conn.close()
+        # Check references in Sales
+        cursor.execute("SELECT COUNT(*) AS cnt FROM Sales WHERE product_id=%s", (id,))
+        sales_cnt = cursor.fetchone()["cnt"]
 
-    return jsonify({
-        "message": "Product Deleted"
-    })
+        # Check references in Production
+        cursor.execute("SELECT COUNT(*) AS cnt FROM Production WHERE product_id=%s", (id,))
+        prod_cnt = cursor.fetchone()["cnt"]
+
+        if sales_cnt > 0 or prod_cnt > 0:
+            reasons = []
+            if sales_cnt > 0:
+                reasons.append(f"{sales_cnt} sales record(s)")
+            if prod_cnt > 0:
+                reasons.append(f"{prod_cnt} production record(s)")
+            reason_str = " and ".join(reasons)
+
+            return jsonify({
+                "message": f"Cannot delete product '{prod_name}'. It is associated with {reason_str}. Please set its status to 'Inactive' instead."
+            }), 400
+
+        # Safe to delete if not referenced in any records
+        cursor.execute("DELETE FROM Product WHERE product_id=%s", (id,))
+        conn.commit()
+
+        return jsonify({
+            "message": f"Product '{prod_name}' deleted successfully"
+        })
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
 def get_active_products():
 
     conn = get_connection()

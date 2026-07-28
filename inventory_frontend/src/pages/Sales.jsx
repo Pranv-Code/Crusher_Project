@@ -99,6 +99,7 @@ const emptyNewSale = {
     party_id: "",
     product_id: "",
     vehicle_number: "",
+    chalan_no: "",
     quantity: "",
     unit: "tons",
     site: "",
@@ -185,9 +186,10 @@ const Sales = () => {
         sales_date: getTodayDateStr(),
         party_id: "",
         site: "",
+        chalan_no: "",
     });
     const [bulkRows, setBulkRows] = useState([
-        { product_id: "", vehicle_number: "", quantity: "", unit: "tons", loading_time: "", price: "" }
+        { product_id: "", vehicle_number: "", chalan_no: "", quantity: "", unit: "tons", loading_time: "", price: "" }
     ]);
 
     // --- Unloading Modal State ---
@@ -356,6 +358,7 @@ const Sales = () => {
                     sales_date: r.sales_date || bulkCommon.sales_date || null,
                     product_id: r.product_id ? parseInt(r.product_id) : null,
                     vehicle_number: r.vehicle_number,
+                    chalan_no: r.chalan_no ? r.chalan_no : (bulkCommon.chalan_no || null),
                     quantity: parseFloat(r.quantity),
                     unit: r.unit,
                     loading_time: r.loading_time || null,
@@ -376,8 +379,8 @@ const Sales = () => {
             await fetchProducts(true);
             await fetchActiveProducts(true);
             setShowAddForm(false);
-            setBulkRows([{ product_id: "", vehicle_number: "", quantity: "", unit: "tons", loading_time: "", price: "" }]);
-            setBulkCommon({ sales_date: getTodayDateStr(), party_id: "", site: "" });
+            setBulkRows([{ product_id: "", vehicle_number: "", chalan_no: "", quantity: "", unit: "tons", loading_time: "", price: "" }]);
+            setBulkCommon({ sales_date: getTodayDateStr(), party_id: "", site: "", chalan_no: "" });
 
         } catch (err) {
             const msg = err.response?.data?.message || err.message || "Failed to create bulk sales.";
@@ -396,6 +399,7 @@ const Sales = () => {
             party_id: sale.party_id || "",
             product_id: sale.product_id || "",
             vehicle_number: sale.vehicle_number || "",
+            chalan_no: sale.chalan_no || "",
             quantity: qtyVal !== undefined && qtyVal !== null ? String(qtyVal) : "",
             unit: sale.unit || "tons",
             site: sale.site || "",
@@ -703,6 +707,19 @@ const Sales = () => {
                                     />
                                 </div>
 
+                                {/* Chalan No */}
+                                <div className="form-group">
+                                    <label>Chalan No.</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Chalan No."
+                                        value={newSale.chalan_no}
+                                        onChange={(e) =>
+                                            setNewSale({ ...newSale, chalan_no: e.target.value })
+                                        }
+                                    />
+                                </div>
+
                                 {/* Party */}
                                 <div className="form-group">
                                     <label>Party *</label>
@@ -939,6 +956,17 @@ const Sales = () => {
                                             }
                                         />
                                     </div>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>Chalan No.</label>
+                                        <input
+                                            type="text"
+                                            value={bulkCommon.chalan_no}
+                                            placeholder="Common Chalan No. (Optional)"
+                                            onChange={(e) =>
+                                                setBulkCommon({ ...bulkCommon, chalan_no: e.target.value })
+                                            }
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -950,6 +978,7 @@ const Sales = () => {
                                             <th style={{ padding: "8px" }}>#</th>
                                             <th style={{ padding: "8px" }}>Vehicle *</th>
                                             <th style={{ padding: "8px" }}>Product</th>
+                                            <th style={{ padding: "8px" }}>Chalan No.</th>
                                             <th style={{ padding: "8px" }}>Quantity *</th>
                                             <th style={{ padding: "8px" }}>Unit *</th>
                                             <th style={{ padding: "8px" }}>Price (₹)</th>
@@ -984,6 +1013,15 @@ const Sales = () => {
                                                             <option key={p.product_id} value={p.product_id}>{p.product_name}</option>
                                                         ))}
                                                     </select>
+                                                </td>
+                                                <td style={{ padding: "8px" }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Chalan No."
+                                                        value={row.chalan_no || ""}
+                                                        onChange={(e) => handleBulkRowChange(idx, "chalan_no", e.target.value)}
+                                                        style={{ width: "110px", padding: "6px" }}
+                                                    />
                                                 </td>
                                                 <td style={{ padding: "8px" }}>
                                                     <input
@@ -1061,6 +1099,7 @@ const Sales = () => {
                     <thead>
                         <tr>
                             <th style={{ whiteSpace: "nowrap" }}>Date</th>
+                            <th style={{ whiteSpace: "nowrap" }}>Chalan No.</th>
                             <th>Party</th>
                             <th>Site</th>
                             <th>Vehicle</th>
@@ -1075,7 +1114,7 @@ const Sales = () => {
                     <tbody>
                         {filteredPendingSales.length === 0 ? (
                             <tr>
-                                <td colSpan="10" style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
+                                <td colSpan="11" style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
                                     No Pending Unloading Entries Found
                                 </td>
                             </tr>
@@ -1090,6 +1129,9 @@ const Sales = () => {
                                         <React.Fragment key={sale.sales_id}>
                                             <tr>
                                                 <td style={{ whiteSpace: "nowrap" }}>{formatDate(sale.sales_date)}</td>
+                                                <td style={{ whiteSpace: "nowrap" }}>
+                                                    <strong style={{ color: "#2563eb" }}>{sale.chalan_no || "—"}</strong>
+                                                </td>
                                                 <td>{sale.party_name}</td>
                                                 <td>{sale.site || "—"}</td>
                                                 <td>
@@ -1152,7 +1194,7 @@ const Sales = () => {
                                             {/* Returned Entries Sub-rows in RED */}
                                             {saleReturns.map((ret) => (
                                                 <tr key={`ret-pend-${ret.return_id}`} style={{ backgroundColor: "#fff5f5" }}>
-                                                    <td colSpan="10" style={{ padding: "6px 16px", borderBottom: "1px dashed #fca5a5" }}>
+                                                    <td colSpan="11" style={{ padding: "6px 16px", borderBottom: "1px dashed #fca5a5" }}>
                                                         <div style={{ display: "flex", alignItems: "center", gap: "12px", color: "#b91c1c", fontSize: "0.85rem" }}>
                                                             <span>↩ <strong>Goods Return #{ret.return_id}</strong> ({formatDate(ret.return_date)}):</span>
                                                             <span style={{ fontWeight: "800", fontSize: "0.95rem", color: "#dc2626" }}>
@@ -1201,6 +1243,7 @@ const Sales = () => {
                     <thead>
                         <tr>
                             <th style={{ whiteSpace: "nowrap" }}>Date</th>
+                            <th style={{ whiteSpace: "nowrap" }}>Chalan No.</th>
                             <th>Party</th>
                             <th>Product</th>
                             <th>Quantity</th>
@@ -1217,7 +1260,7 @@ const Sales = () => {
                     <tbody>
                         {filteredSales.length === 0 ? (
                             <tr>
-                                <td colSpan="12" style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
+                                <td colSpan="13" style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
                                     No Completed Sales Found
                                 </td>
                             </tr>
@@ -1233,6 +1276,9 @@ const Sales = () => {
                                         <React.Fragment key={sale.sales_id}>
                                             <tr>
                                                 <td style={{ whiteSpace: "nowrap" }}>{formatDate(sale.sales_date)}</td>
+                                                <td style={{ whiteSpace: "nowrap" }}>
+                                                    <strong style={{ color: "#2563eb" }}>{sale.chalan_no || "—"}</strong>
+                                                </td>
                                                 <td>{sale.party_name}</td>
                                                 <td>{sale.product_name}</td>
                                                 <td>
@@ -1282,7 +1328,7 @@ const Sales = () => {
                                             {/* Returned Entries Sub-rows in RED */}
                                             {saleReturns.map((ret) => (
                                                 <tr key={`ret-comp-${ret.return_id}`} style={{ backgroundColor: "#fff5f5" }}>
-                                                    <td colSpan="12" style={{ padding: "6px 16px", borderBottom: "1px dashed #fca5a5" }}>
+                                                    <td colSpan="13" style={{ padding: "6px 16px", borderBottom: "1px dashed #fca5a5" }}>
                                                         <div style={{ display: "flex", alignItems: "center", gap: "12px", color: "#b91c1c", fontSize: "0.85rem" }}>
                                                             <span>↩ <strong>Goods Return #{ret.return_id}</strong> ({formatDate(ret.return_date)}):</span>
                                                             <span style={{ fontWeight: "800", fontSize: "0.95rem", color: "#dc2626" }}>
@@ -1335,6 +1381,15 @@ const Sales = () => {
                     value={editData.sales_date || ""}
                     onChange={(e) =>
                         setEditData({ ...editData, sales_date: e.target.value })
+                    }
+                />
+
+                <InputField
+                    label="Chalan No."
+                    type="text"
+                    value={editData.chalan_no || ""}
+                    onChange={(e) =>
+                        setEditData({ ...editData, chalan_no: e.target.value })
                     }
                 />
 

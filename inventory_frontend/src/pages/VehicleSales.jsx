@@ -74,7 +74,9 @@ function VehicleSales() {
             (row.vehicle_number &&
                 row.vehicle_number.toLowerCase().includes(search.toLowerCase())) ||
             (row.party_name &&
-                row.party_name.toLowerCase().includes(search.toLowerCase()));
+                row.party_name.toLowerCase().includes(search.toLowerCase())) ||
+            (row.chalan_no &&
+                row.chalan_no.toLowerCase().includes(search.toLowerCase()));
 
         const matchesVehicle =
             !filterVehicle || row.vehicle_number === filterVehicle;
@@ -172,6 +174,7 @@ function VehicleSales() {
                                 <tr>
                                     <th>#</th>
                                     <th style={{ whiteSpace: "nowrap" }}>Date</th>
+                                    <th style={{ whiteSpace: "nowrap" }}>Chalan No</th>
                                     <th>Vehicle No</th>
                                     <th>Vehicle Owner</th>
                                     <th>Party</th>
@@ -190,6 +193,9 @@ function VehicleSales() {
                                         <tr key={row.sales_id}>
                                             <td>{(currentPage - 1) * pageSize + i + 1}</td>
                                             <td style={{ whiteSpace: "nowrap" }}>{formatDate(row.sales_date)}</td>
+                                            <td style={{ whiteSpace: "nowrap" }}>
+                                                <strong style={{ color: "#2563eb" }}>{row.chalan_no || "—"}</strong>
+                                            </td>
                                             <td>
                                                 <strong style={{ fontFamily: "monospace" }}>
                                                     {row.vehicle_number || "—"}
