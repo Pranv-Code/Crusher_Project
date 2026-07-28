@@ -5,10 +5,14 @@ import Button from "../components/common/Button";
 import InputField from "../components/common/InputField";
 import SelectField from "../components/common/SelectField";
 import PageHeader from "../components/common/PageHeader";
-import EmptyState from "../components/common/EmptyState";
 import CrudTable from "../components/table/CrudTable";
+import { useInventory } from "../context/InventoryContext";
+import { addCrusher, updateCrusher, deleteCrusher } from "../services/crusherApi";
 
 export default function Settings() {
+    const { crushers, fetchCrushers } = useInventory();
+    const [newCrusherName, setNewCrusherName] = useState("");
+    const [addingCrusher, setAddingCrusher] = useState(false);
     const [settings, setSettings] = useState({
         inventory_mode: "COMMON_POOL",
         common_pool_stock: 0,
@@ -62,7 +66,48 @@ export default function Settings() {
 
     useEffect(() => {
         fetchSettingsData();
+        fetchCrushers();
     }, []);
+
+    const handleAddCrusherSubmit = async (e) => {
+        e.preventDefault();
+        if (!newCrusherName.trim()) {
+            alert("Please enter a Crusher Name.");
+            return;
+        }
+        setAddingCrusher(true);
+        try {
+            await addCrusher({ crusher_name: newCrusherName.trim(), status: "Active" });
+            setNewCrusherName("");
+            await fetchCrushers(true);
+            alert("Crusher added successfully!");
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to add crusher.");
+        } finally {
+            setAddingCrusher(false);
+        }
+    };
+
+    const handleToggleCrusherStatus = async (crusher) => {
+        const newStatus = crusher.status === "Active" ? "Inactive" : "Active";
+        try {
+            await updateCrusher(crusher.crusher_id, { crusher_name: crusher.crusher_name, status: newStatus });
+            await fetchCrushers(true);
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to update crusher status.");
+        }
+    };
+
+    const handleDeleteCrusherClick = async (crusher) => {
+        if (!window.confirm(`Are you sure you want to delete/deactivate crusher '${crusher.crusher_name}'?`)) return;
+        try {
+            const res = await deleteCrusher(crusher.crusher_id);
+            alert(res.data?.message || "Crusher deleted successfully.");
+            await fetchCrushers(true);
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to delete crusher.");
+        }
+    };
 
     const handleSaveSettings = async () => {
         if (!reason.trim()) {
@@ -320,6 +365,108 @@ export default function Settings() {
                 >
                     {updating ? "Saving..." : "Save Settings"}
                 </Button>
+            </div>
+
+            {/* Crusher Master Management */}
+            <div className="form-card" style={{ marginBottom: "2rem" }}>
+                <h3 style={{ marginBottom: "0.5rem", color: "var(--text-primary, #1e293b)" }}>
+                    🏗️ Crusher Master Management
+                </h3>
+                <p style={{ fontSize: "0.85rem", color: "#64748b", marginBottom: "1.5rem" }}>
+                    Manage crushers available for selection during Production entry.
+                </p>
+
+                <form onSubmit={handleAddCrusherSubmit} style={{ display: "flex", gap: "1rem", alignItems: "flex-end", marginBottom: "1.5rem", maxWidth: "500px" }}>
+                    <div style={{ flex: 1 }}>
+                        <InputField
+                            label="New Crusher Name *"
+                            name="new_crusher"
+                            type="text"
+                            placeholder="e.g. Crusher 3 / Plant B"
+                            value={newCrusherName}
+                            onChange={(e) => setNewCrusherName(e.target.value)}
+                            required
+                        />
+                    </div>
+                    <Button variant="primary" type="submit" disabled={addingCrusher}>
+                        {addingCrusher ? "Adding..." : "+ Add Crusher"}
+                    </Button>
+                </form>
+
+                <div style={{ overflowX: "auto" }}>
+                    <table className="report-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                            <tr style={{ background: "#f8fafc" }}>
+                                <th style={{ padding: "10px", textAlign: "left" }}>#</th>
+                                <th style={{ padding: "10px", textAlign: "left" }}>Crusher Name</th>
+                                <th style={{ padding: "10px", textAlign: "left" }}>Status</th>
+                                <th style={{ padding: "10px", textAlign: "center" }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {crushers.length === 0 ? (
+                                <tr>
+                                    <td colSpan="4" style={{ textAlign: "center", padding: "1.5rem", color: "#64748b" }}>
+                                        No crushers found. Add one above.
+                                    </td>
+                                </tr>
+                            ) : (
+                                crushers.map((c, i) => (
+                                    <tr key={c.crusher_id} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                                        <td style={{ padding: "10px" }}>{i + 1}</td>
+                                        <td style={{ padding: "10px", fontWeight: "600", color: "#1e293b" }}>{c.crusher_name}</td>
+                                        <td style={{ padding: "10px" }}>
+                                            <span style={{
+                                                backgroundColor: c.status === "Active" ? "#d1fae5" : "#fee2e2",
+                                                color: c.status === "Active" ? "#065f46" : "#991b1b",
+                                                padding: "3px 10px",
+                                                borderRadius: "12px",
+                                                fontSize: "0.8rem",
+                                                fontWeight: "bold"
+                                            }}>
+                                                {c.status}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: "10px", textAlign: "center" }}>
+                                            <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                                                <button
+                                                    onClick={() => handleToggleCrusherStatus(c)}
+                                                    style={{
+                                                        backgroundColor: c.status === "Active" ? "#fef3c7" : "#dcfce7",
+                                                        color: c.status === "Active" ? "#92400e" : "#166534",
+                                                        border: "none",
+                                                        padding: "4px 8px",
+                                                        borderRadius: "4px",
+                                                        cursor: "pointer",
+                                                        fontSize: "0.8rem",
+                                                        fontWeight: "600"
+                                                    }}
+                                                >
+                                                    {c.status === "Active" ? "Deactivate" : "Activate"}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteCrusherClick(c)}
+                                                    style={{
+                                                        backgroundColor: "#fee2e2",
+                                                        color: "#b91c1c",
+                                                        border: "none",
+                                                        padding: "4px 8px",
+                                                        borderRadius: "4px",
+                                                        cursor: "pointer",
+                                                        fontSize: "0.8rem",
+                                                        fontWeight: "600"
+                                                    }}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div className="table-container">

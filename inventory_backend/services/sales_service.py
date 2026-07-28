@@ -85,7 +85,8 @@ _SALES_SELECT = """
         s.unloading_time,
         s.unloading_date,
         s.unloading_status,
-        s.remarks
+        s.remarks,
+        s.chalan_no
     FROM Sales s
     LEFT JOIN Product p  ON s.product_id = p.product_id
     JOIN Party  pt  ON s.party_id   = pt.party_id
@@ -127,9 +128,9 @@ def get_sales():
         # days == 0 means all-time, no date filter
 
         if search:
-            conditions.append("(pt.party_name LIKE %s OR p.product_name LIKE %s OR s.vehicle_number LIKE %s OR CAST(s.sales_date AS CHAR) LIKE %s)")
+            conditions.append("(pt.party_name LIKE %s OR p.product_name LIKE %s OR s.vehicle_number LIKE %s OR s.chalan_no LIKE %s OR CAST(s.sales_date AS CHAR) LIKE %s)")
             like = f"%{search}%"
-            params.extend([like, like, like, like])
+            params.extend([like, like, like, like, like])
 
         where_clause = "WHERE " + " AND ".join(conditions)
 
@@ -413,9 +414,9 @@ def add_sale():
                 sales_date, party_id, product_id, vehicle_number,
                 quantity_tons, unit, site, price,
                 loading_time, unloading_time, unloading_date, unloading_status,
-                remarks
+                remarks, chalan_no
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,NULL,'pending',%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,NULL,'pending',%s,%s)
         """, (
             data["sales_date"],
             data["party_id"],
@@ -427,6 +428,7 @@ def add_sale():
             float(data.get("price", 0.0) or 0.0),
             data.get("loading_time") or None,
             data.get("remarks")    or None,
+            data.get("chalan_no")   or None,
         ))
 
         sales_id = cursor.lastrowid
@@ -621,6 +623,7 @@ def add_sales_bulk():
             row_party = row.get("party_id") or default_party_id
             row_date  = row.get("sales_date") or default_sales_date
             row_site  = capitalize_words(row.get("site", "")) if row.get("site") else default_site
+            row_chalan = row.get("chalan_no") or common.get("chalan_no") or None
 
             # Perform Insertions & Updates
             sql_insert = (
@@ -628,8 +631,8 @@ def add_sales_bulk():
                 "sales_date, party_id, product_id, vehicle_number, "
                 "quantity_tons, unit, site, price, "
                 "loading_time, unloading_time, unloading_date, unloading_status, "
-                "remarks) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,NULL,'pending',NULL)"
+                "remarks, chalan_no) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,NULL,'pending',%s,%s)"
             )
             cursor.execute(sql_insert, (
                 row_date,
@@ -641,6 +644,8 @@ def add_sales_bulk():
                 row_site,
                 price,
                 loading_time,
+                row.get("remarks") or None,
+                row_chalan,
             ))
 
             sales_id = cursor.lastrowid
@@ -827,7 +832,7 @@ def update_sale(id):
             "UPDATE Sales SET "
             "sales_date=%s, party_id=%s, product_id=%s, vehicle_number=%s, "
             "quantity_tons=%s, unit=%s, site=%s, price=%s, "
-            "loading_time=%s, unloading_time=%s, remarks=%s "
+            "loading_time=%s, unloading_time=%s, remarks=%s, chalan_no=%s "
             "WHERE sales_id=%s"
         )
         cursor.execute(sql_update_sale, (
@@ -836,6 +841,7 @@ def update_sale(id):
             data.get("loading_time") or None,
             unloading_time_val or None,
             data.get("remarks") or None,
+            data.get("chalan_no") or None,
             id,
         ))
 

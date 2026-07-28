@@ -38,7 +38,8 @@ def get_party_report(party_id):
                 s.price,
                 s.loading_time,
                 s.unloading_time,
-                s.remarks
+                s.remarks,
+                s.chalan_no
             FROM Sales s
             LEFT JOIN Product p  ON s.product_id  = p.product_id
             LEFT JOIN Vehicle v ON s.vehicle_number = v.vehicle_number

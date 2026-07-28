@@ -28,7 +28,8 @@ def get_vehicle_sales():
                 s.price,
                 s.loading_time,
                 s.unloading_time,
-                s.remarks
+                s.remarks,
+                s.chalan_no
             FROM VehicleSale vs
             JOIN Sales s
                 ON vs.sales_id = s.sales_id

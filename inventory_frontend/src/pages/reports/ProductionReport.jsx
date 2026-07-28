@@ -10,6 +10,7 @@ import { generateProductionReportPdf } from "../../utils/pdfGenerator";
 import { requestReportPrint } from "../../services/approvalApi";
 import { formatDate, formatInr, tonToBrass } from "../../utils/formatUtils";
 import { getSettings } from "../../services/settingsApi";
+import { useInventory } from "../../context/InventoryContext";
 
 const COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0891b2", "#db2777", "#d97706", "#059669"];
 
@@ -36,10 +37,12 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function ProductionReport({ production = [], productions = [], products = [] }) {
     const { isManager, isClerk } = useAuth();
 
+    const { crushers } = useInventory();
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const [monthFilter, setMonthFilter] = useState("");
     const [productFilter, setProductFilter] = useState("");
+    const [crusherFilter, setCrusherFilter] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [showCharts, setShowCharts] = useState(false);
 
@@ -88,6 +91,7 @@ export default function ProductionReport({ production = [], productions = [], pr
         setDateTo("");
         setMonthFilter("");
         setProductFilter("");
+        setCrusherFilter("");
         setSearchQuery("");
         setSelectedProductionIds(new Set());
         setCurrentPage(1);
@@ -105,17 +109,19 @@ export default function ProductionReport({ production = [], productions = [], pr
             }
 
             if (productFilter && String(r.product_id) !== productFilter) return false;
+            if (crusherFilter && r.crusher_name !== crusherFilter) return false;
 
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
                 const matchName = r.product_name?.toLowerCase().includes(q);
+                const matchCrusher = r.crusher_name?.toLowerCase().includes(q);
                 const matchDate = r.production_date?.toLowerCase().includes(q);
-                if (!matchName && !matchDate) return false;
+                if (!matchName && !matchCrusher && !matchDate) return false;
             }
 
             return true;
         });
-    }, [prodList, dateFrom, dateTo, monthFilter, productFilter, searchQuery]);
+    }, [prodList, dateFrom, dateTo, monthFilter, productFilter, crusherFilter, searchQuery]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -177,7 +183,7 @@ export default function ProductionReport({ production = [], productions = [], pr
             .sort((a, b) => b.value - a.value);
     }, [filtered]);
 
-    const currentFilters = { dateFrom, dateTo, month: monthFilter, product: productFilter };
+    const currentFilters = { dateFrom, dateTo, month: monthFilter, product: productFilter, crusher: crusherFilter };
 
     const handlePrintOrRequest = () => {
         const exportData = getExportData();
@@ -245,6 +251,7 @@ export default function ProductionReport({ production = [], productions = [], pr
             return {
                 "Date": formatDate(r.production_date),
                 "Product": r.product_name,
+                "Crusher Name": r.crusher_name || "",
                 "Quantity (MT)": Number(tons.toFixed(2)),
                 "Quantity (Brass)": Number(tonToBrass(tons, tonsPerBrass).toFixed(2)),
                 "Cost / Unit (₹)": r.cost_per_unit ? Number(Number(r.cost_per_unit).toFixed(2)) : "",
@@ -353,6 +360,15 @@ export default function ProductionReport({ production = [], productions = [], pr
                         ))}
                     </select>
                 </div>
+                <div className="filter-group">
+                    <label>Crusher</label>
+                    <select value={crusherFilter} onChange={e => setCrusherFilter(e.target.value)}>
+                        <option value="">All Crushers</option>
+                        {(crushers || []).map(c => (
+                            <option key={c.crusher_id} value={c.crusher_name}>{c.crusher_name}</option>
+                        ))}
+                    </select>
+                </div>
                 <button className="filter-reset-btn" onClick={resetFilters}>✕ Reset</button>
             </div>
 
@@ -427,6 +443,7 @@ export default function ProductionReport({ production = [], productions = [], pr
                                 <th>#</th>
                                 <th>Date</th>
                                 <th>Product Name</th>
+                                <th>Crusher Name</th>
                                 <th style={{ textAlign: "right" }}>Qty (MT)</th>
                                 <th style={{ textAlign: "right" }}>Qty (Brass)</th>
                                 <th style={{ textAlign: "right" }}>Cost / Unit (₹)</th>
@@ -436,7 +453,7 @@ export default function ProductionReport({ production = [], productions = [], pr
                         <tbody>
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan="8" className="empty-row">
+                                    <td colSpan="9" className="empty-row">
                                         No production records match the selected filters.
                                     </td>
                                 </tr>
@@ -463,6 +480,7 @@ export default function ProductionReport({ production = [], productions = [], pr
                                                 </td>
                                                 <td>{formatDate(r.production_date)}</td>
                                                 <td><strong>{r.product_name}</strong></td>
+                                                <td><strong style={{ color: "#2563eb" }}>{r.crusher_name || "—"}</strong></td>
                                                 <td style={{ textAlign: "right" }}><strong>{fmtTons(r.quantity_tons)} MT</strong></td>
                                                 <td style={{ textAlign: "right" }}><strong>{tonToBrass(r.quantity_tons, tonsPerBrass).toFixed(2)} Brass</strong></td>
                                                 <td style={{ textAlign: "right" }}>{cpu ? `₹${formatInr(cpu)}` : "—"}</td>

@@ -29,16 +29,20 @@ function Production() {
         fetchProduction,
         activeProducts,
         fetchActiveProducts,
-        fetchProducts
+        fetchProducts,
+        crushers,
+        fetchCrushers
     } = useInventory();
 
     const [showAddForm, setShowAddForm] = useState(false);
+    const [crusherFilter, setCrusherFilter] = useState("");
 
     const [newProduction, setNewProduction] = useState({
         production_date: "",
         product_id: "",
+        crusher_name: "",
         quantity_tons: "",
-        unit: "",
+        unit: "tons",
         cost_per_unit: "",
         production_cost: "",
     });
@@ -48,6 +52,7 @@ function Production() {
     const [editData, setEditData] = useState({
         production_date: "",
         product_id: "",
+        crusher_name: "",
         quantity_tons: "",
         unit: "",
         cost_per_unit: "",
@@ -109,6 +114,7 @@ function Production() {
         setEditData({
             production_date: production.production_date,
             product_id: production.product_id,
+            crusher_name: production.crusher_name || "",
             quantity_tons: enteredQty,
             unit: production.unit,
             cost_per_unit: cpu,
@@ -158,16 +164,19 @@ function Production() {
     useEffect(() => {
         fetchProduction();
         fetchActiveProducts();
+        fetchCrushers();
         getSettings()
             .then((res) => setSettings(res.data))
             .catch((err) => console.error("Failed to load settings in Production page:", err));
     }, []);
 
     // Configuration formatting structures
-    const productOptions = activeProducts.map((p) => ({
-        value: p.product_id,
-        label: p.product_name,
-    }));
+    const crusherOptions = crushers
+        .filter(c => c.status === "Active")
+        .map((c) => ({
+            value: c.crusher_name,
+            label: c.crusher_name,
+        }));
 
     const unitOptions = [
         { value: "tons", label: "MT" },
@@ -177,6 +186,7 @@ function Production() {
     const columns = [
         { key: "production_date", label: "Production Date", render: (row) => formatDate(row.production_date) },
         { key: "product_name", label: "Product Name", render: (row) => (row.product_name === "Common Pool" || !row.product_name) ? "Quarry Material" : row.product_name },
+        { key: "crusher_name", label: "Crusher Name", render: (row) => row.crusher_name || "—" },
         { 
             key: "display_quantity", 
             label: "Quantity", 
@@ -211,11 +221,26 @@ function Production() {
             />
 
             <div className="table-container">
+                {/* Filter Toolbar */}
+                <div style={{ display: "flex", gap: "1rem", alignItems: "center", padding: "1rem", backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                    <label style={{ fontWeight: 600, fontSize: "0.9rem", color: "#475569" }}>Filter by Crusher:</label>
+                    <select
+                        value={crusherFilter}
+                        onChange={(e) => setCrusherFilter(e.target.value)}
+                        style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "0.9rem" }}
+                    >
+                        <option value="">All Crushers</option>
+                        {crushers.map(c => (
+                            <option key={c.crusher_id} value={c.crusher_name}>{c.crusher_name}</option>
+                        ))}
+                    </select>
+                </div>
+
                 {showAddForm && (
                     <div className="form-card">
                         <div className="form-grid">
                         <InputField
-                            label="Production Date"
+                            label="Production Date *"
                             name="production_date"
                             type="date"
                             value={newProduction.production_date}
@@ -226,20 +251,27 @@ function Production() {
                                 })
                             }
                         />
-                        {settings.inventory_mode !== "COMMON_POOL" && (
-                            <SelectField
-                                label="Select Product"
-                                name="product_id"
-                                value={newProduction.product_id}
-                                onChange={(e) =>
-                                    setNewProduction({
-                                        ...newProduction,
-                                        product_id: e.target.value,
-                                    })
-                                }
-                                options={productOptions}
+                        <div className="form-group">
+                            <label>Product Name</label>
+                            <input
+                                type="text"
+                                value="Quarry Material"
+                                disabled
+                                style={{ backgroundColor: "#f1f5f9", cursor: "not-allowed" }}
                             />
-                        )}
+                        </div>
+                        <SelectField
+                            label="Crusher Name"
+                            name="crusher_name"
+                            value={newProduction.crusher_name}
+                            onChange={(e) =>
+                                setNewProduction({
+                                    ...newProduction,
+                                    crusher_name: e.target.value,
+                                })
+                            }
+                            options={[{ value: "", label: "-- Select Crusher --" }, ...crusherOptions]}
+                        />
                         <InputField
                             label="Quantity"
                             name="quantity_tons"
@@ -313,15 +345,15 @@ function Production() {
                     </div>
                 )}
 
-                {productions.length === 0 ? (
+                {productions.filter(p => !crusherFilter || p.crusher_name === crusherFilter).length === 0 ? (
                     <EmptyState
-                        title="No Products Found"
-                        message="Click Add Production to create a record."
+                        title="No Production Records Found"
+                        message="No production records match the selected crusher filter."
                     />
                 ) : (
                     <CrudTable
                         columns={columns}
-                        data={productions}
+                        data={productions.filter(p => !crusherFilter || p.crusher_name === crusherFilter)}
                         keyField="production_id"
                         renderActions={(row) => (
                             <ActionButtons
@@ -351,20 +383,18 @@ function Production() {
                         })
                     }
                 />
-                {settings.inventory_mode !== "COMMON_POOL" && (
-                    <SelectField
-                        label="Product Name"
-                        name="product_id"
-                        value={editData.product_id}
-                        onChange={(e) =>
-                            setEditData({
-                                ...editData,
-                                product_id: e.target.value,
-                            })
-                        }
-                        options={productOptions}
-                    />
-                )}
+                <SelectField
+                    label="Crusher Name"
+                    name="crusher_name"
+                    value={editData.crusher_name}
+                    onChange={(e) =>
+                        setEditData({
+                            ...editData,
+                            crusher_name: e.target.value,
+                        })
+                    }
+                    options={[{ value: "", label: "-- Select Crusher --" }, ...crusherOptions]}
+                />
                 <SelectField
                     label="Units"
                     name="unit"

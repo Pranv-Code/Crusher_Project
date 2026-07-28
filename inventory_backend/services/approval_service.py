@@ -38,7 +38,7 @@ def build_change_details(cursor, req):
         if req_type == "sales_edit":
             cursor.execute("""
                 SELECT s.sales_id, s.sales_date, pt.party_name, pt.party_id, COALESCE(p.product_name, 'Quarry Material') AS product_name, p.product_id,
-                       s.vehicle_number, s.quantity_tons, s.unit, s.price, s.site, s.remarks, s.loading_time, s.unloading_time
+                       s.vehicle_number, s.quantity_tons, s.unit, s.price, s.site, s.remarks, s.chalan_no, s.loading_time, s.unloading_time
                 FROM Sales s
                 LEFT JOIN Product p ON s.product_id = p.product_id
                 JOIN Party pt ON s.party_id = pt.party_id
@@ -112,6 +112,11 @@ def build_change_details(cursor, req):
                 prop_rem = (ref_data.get("remarks") if ref_data.get("remarks") is not None else (ref_data.get("remark") if ref_data.get("remark") is not None else curr_rem)).strip()
                 fields.append({ "field": "Remarks", "current": curr_rem or "—", "proposed": prop_rem or "—", "changed": curr_rem != prop_rem })
 
+                # Chalan No.
+                curr_chal = (sale.get("chalan_no") or "").strip()
+                prop_chal = (ref_data.get("chalan_no") if ref_data.get("chalan_no") is not None else curr_chal).strip()
+                fields.append({ "field": "Chalan No.", "current": curr_chal or "—", "proposed": prop_chal or "—", "changed": curr_chal != prop_chal })
+
                 # Loading Time (Normalized HH:MM comparison)
                 curr_lt = clean_time_str(sale.get("loading_time"))
                 prop_lt = clean_time_str(ref_data.get("loading_time")) if ref_data.get("loading_time") is not None else curr_lt
@@ -139,7 +144,7 @@ def build_change_details(cursor, req):
         elif req_type == "production_edit":
             cursor.execute("""
                 SELECT p.production_id, p.production_date, COALESCE(pr.product_name, 'Quarry Material') AS product_name, pr.product_id,
-                       p.quantity_tons, p.unit, p.cost_per_unit, p.production_cost
+                       p.crusher_name, p.quantity_tons, p.unit, p.cost_per_unit, p.production_cost
                 FROM Production p
                 LEFT JOIN Product pr ON p.product_id = pr.product_id
                 WHERE p.production_id = %s
@@ -170,6 +175,10 @@ def build_change_details(cursor, req):
                 curr_cost = f"₹{float(prod['production_cost']):,.2f}" if prod.get("production_cost") is not None else "—"
                 prop_cost = f"₹{float(ref_data['production_cost']):,.2f}" if ref_data.get("production_cost") is not None else curr_cost
                 fields.append({ "field": "Production Cost", "current": curr_cost, "proposed": prop_cost, "changed": curr_cost != prop_cost })
+
+                curr_crusher = (prod.get("crusher_name") or "").strip()
+                prop_crusher = (ref_data.get("crusher_name") if ref_data.get("crusher_name") is not None else curr_crusher).strip()
+                fields.append({ "field": "Crusher Name", "current": curr_crusher or "—", "proposed": prop_crusher or "—", "changed": curr_crusher != prop_crusher })
 
                 changed_names = [f["field"] for f in fields if f["changed"]]
                 change_details["title"] = f"Edit Production #{ref_id}"
@@ -473,7 +482,7 @@ def action_approval(request_id, manager_id):
                         UPDATE Sales SET
                             sales_date=%s, party_id=%s, product_id=%s, vehicle_number=%s,
                             quantity_tons=%s, unit=%s, site=%s, price=%s,
-                            loading_time=%s, unloading_time=%s, remarks=%s
+                            loading_time=%s, unloading_time=%s, remarks=%s, chalan_no=%s
                         WHERE sales_id=%s
                     """, (
                         ref_data["sales_date"], ref_data["party_id"], ref_data["product_id"], ref_data["vehicle_number"],
@@ -481,6 +490,7 @@ def action_approval(request_id, manager_id):
                         ref_data.get("loading_time") or None,
                         unloading_val or None,
                         ref_data.get("remarks") or None,
+                        ref_data.get("chalan_no") or None,
                         sale_id,
                     ))
                     cursor.execute("DELETE FROM VehicleSale WHERE sales_id=%s", (sale_id,))
@@ -529,6 +539,7 @@ def action_approval(request_id, manager_id):
                         SET
                             production_date=%s,
                             product_id=%s,
+                            crusher_name=%s,
                             unit=%s,
                             quantity_tons=%s,
                             cost_per_unit=%s,
@@ -537,6 +548,7 @@ def action_approval(request_id, manager_id):
                     """, (
                         ref_data["production_date"],
                         ref_data.get("product_id"),
+                        ref_data.get("crusher_name"),
                         ref_data["unit"],
                         new_qty,
                         cpu,

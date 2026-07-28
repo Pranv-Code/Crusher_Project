@@ -101,15 +101,16 @@ export const generateSalesReportPdf = (filteredData, filters, returnsBySaleId = 
 // ── 2. Production Report PDF ─────────────────────────────────────────────────
 export const generateProductionReportPdf = (filteredData, filters, tonsPerBrass = 4.2) => {
     const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
-    const filterText = `Filters: From ${fmtFilterDate(filters.dateFrom)} to ${fmtFilterDate(filters.dateTo)} | Month: ${filters.month || "Any"} | Product: ${filters.product || "All"}`;
+    const filterText = `Filters: From ${fmtFilterDate(filters.dateFrom)} to ${fmtFilterDate(filters.dateTo)} | Month: ${filters.month || "Any"} | Crusher: ${filters.crusher || "All"}`;
 
     drawReportHeader(doc, `Production Report`, filterText);
 
-    const tableColumns = ["#", "Date", "Product", "Qty (MT)", "Qty (Brass)", "Total Cost (Rs.)"];
+    const tableColumns = ["#", "Date", "Product", "Crusher", "Qty (MT)", "Qty (Brass)", "Total Cost (Rs.)"];
     const tableRows = filteredData.map((p, i) => [
         i + 1,
         formatDate(p.production_date),
         p.product_name,
+        p.crusher_name || "—",
         fmtNum(p.quantity_tons),
         fmtNum(tonToBrass(p.quantity_tons, tonsPerBrass)),
         p.production_cost ? formatInr(p.production_cost) : "—"
@@ -129,7 +130,8 @@ export const generateProductionReportPdf = (filteredData, filters, tonsPerBrass 
             2: { halign: "right" },
             3: { halign: "right" },
             4: { halign: "right" },
-            5: { halign: "right" }
+            5: { halign: "right" },
+            6: { halign: "right" }
         },
         margin: { top: 28, bottom: 16 }
     });

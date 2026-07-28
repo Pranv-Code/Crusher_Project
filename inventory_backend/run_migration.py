@@ -129,6 +129,36 @@ def run():
     except Exception as e:
         print(f"Sales unloading_status alter warning: {e}")
 
+    try:
+        cursor.execute("ALTER TABLE Sales ADD COLUMN chalan_no VARCHAR(100) NULL;")
+    except Exception as e:
+        if "Duplicate column name" not in str(e):
+            print(f"Sales chalan_no alter warning: {e}")
+
+    # Crusher Master Table & Production Crusher Column Migration
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Crusher (
+                crusher_id INT AUTO_INCREMENT PRIMARY KEY,
+                crusher_name VARCHAR(100) NOT NULL UNIQUE,
+                status ENUM('Active', 'Inactive') DEFAULT 'Active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cursor.execute("SELECT COUNT(*) AS cnt FROM Crusher;")
+        row = cursor.fetchone()
+        cnt = row['cnt'] if isinstance(row, dict) else row[0]
+        if cnt == 0:
+            cursor.execute("INSERT INTO Crusher (crusher_name, status) VALUES ('Crusher 1', 'Active'), ('Crusher 2', 'Active');")
+    except Exception as e:
+        print(f"Crusher table creation warning: {e}")
+
+    try:
+        cursor.execute("ALTER TABLE Production ADD COLUMN crusher_name VARCHAR(100) NULL;")
+    except Exception as e:
+        if "Duplicate column name" not in str(e):
+            print(f"Production crusher_name alter warning: {e}")
+
     # Enforce ON DELETE RESTRICT for Product references
     try:
         cursor.execute("ALTER TABLE Production ADD CONSTRAINT fk_production_product FOREIGN KEY (product_id) REFERENCES Product(product_id) ON UPDATE CASCADE ON DELETE RESTRICT;")

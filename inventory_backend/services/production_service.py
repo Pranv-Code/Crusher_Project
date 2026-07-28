@@ -14,6 +14,7 @@ def view_production():
         p.production_id,
         p.product_id,
         COALESCE(pr.product_name, 'Quarry Material') AS product_name,
+        p.crusher_name,
         p.production_date,
         p.unit,
         p.quantity_tons,
@@ -74,24 +75,9 @@ def add_production():
         from db import get_system_setting, set_system_setting
         inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
 
-        raw_product_id = data.get("product_id")
-        product_id = raw_product_id if raw_product_id != "" else None
-
-        product = None
-        if product_id:
-            cursor.execute("SELECT product_id, quantity_tons, status FROM Product WHERE product_id=%s", (product_id,))
-            product = cursor.fetchone()
-
-        if inv_mode == "COMMON_POOL":
-            if product and product["status"].lower() != "active":
-                return jsonify({"message": "Cannot add production. Product is Inactive."}), 400
-            product_id = product["product_id"] if product else None
-        else:
-            if not product:
-                return jsonify({"message": "Product selection is required in Product-Wise mode"}), 400
-            if product["status"].lower() != "active":
-                return jsonify({"message": "Cannot add production. Product is Inactive."}), 400
-            product_id = product["product_id"]
+        # Production is added in Quarry Material only (product_id=None)
+        product_id = None
+        crusher_name = (data.get("crusher_name") or "").strip() or None
         qty = unit_convertor(
             data["unit"],
             data["quantity_tons"]
@@ -109,15 +95,17 @@ def add_production():
             (
                 production_date,
                 product_id,
+                crusher_name,
                 unit,
                 quantity_tons,
                 cost_per_unit,
                 production_cost
             )
-            VALUES(%s,%s,%s,%s,%s,%s)
+            VALUES(%s,%s,%s,%s,%s,%s,%s)
         """, (
             data["production_date"],
             product_id,
+            crusher_name,
             data["unit"],
             qty,
             cost_per_unit,
@@ -236,35 +224,23 @@ def update_production(id):
         from db import get_system_setting, set_system_setting
         inv_mode = get_system_setting("inventory_mode", "COMMON_POOL", cursor)
 
-        raw_product_id = data.get("product_id")
-        product_id = raw_product_id if raw_product_id != "" else None
+        # Production is added in Quarry Material only
+        product_id = None
+        crusher_name = (data.get("crusher_name") or "").strip() or None
 
         if inv_mode == "COMMON_POOL":
-            product_id = product_id if product_id else None
             pool_stock = float(get_system_setting("common_pool_stock", "0.0", cursor))
             set_system_setting("common_pool_stock", str(pool_stock - float(old["quantity_tons"]) + float(new_qty)), user_id=user_id, cursor=cursor)
         else:
-            if not product_id:
-                return jsonify({"message": "Product selection is required in Product-Wise mode"}), 400
-            # Remove old quantity from old product
-            cursor.execute("""
-                UPDATE Product
-                SET quantity_tons = quantity_tons - %s
-                WHERE product_id=%s
-            """, (
-                old["quantity_tons"],
-                old["product_id"]
-            ))
-
-            # Add new quantity to selected product
-            cursor.execute("""
-                UPDATE Product
-                SET quantity_tons = quantity_tons + %s
-                WHERE product_id=%s
-            """, (
-                new_qty,
-                product_id
-            ))
+            if old.get("product_id"):
+                cursor.execute("""
+                    UPDATE Product
+                    SET quantity_tons = quantity_tons - %s
+                    WHERE product_id=%s
+                """, (
+                    old["quantity_tons"],
+                    old["product_id"]
+                ))
 
         cost_per_unit = float(data.get("cost_per_unit", 0) or 0)
         total_cost = float(data.get("production_cost", 0) or 0)
@@ -277,6 +253,7 @@ def update_production(id):
             SET
                 production_date=%s,
                 product_id=%s,
+                crusher_name=%s,
                 unit=%s,
                 quantity_tons=%s,
                 cost_per_unit=%s,
@@ -285,6 +262,7 @@ def update_production(id):
         """, (
             data["production_date"],
             product_id,
+            crusher_name,
             data["unit"],
             new_qty,
             cost_per_unit,
