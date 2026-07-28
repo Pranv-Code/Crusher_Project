@@ -22,7 +22,7 @@ import SelectField from "../components/common/SelectField";
 import SearchableSelect from "../components/common/SearchableSelect";
 import EditModal from "../components/modal/EditModal";
 import Pagination from "../components/common/Pagination";
-import { formatDate, formatTime, formatInr, tonToBrass, smartCapitalize } from "../utils/formatUtils";
+import { formatDate, formatTime, formatInr, tonToBrass, brassToTon, smartCapitalize } from "../utils/formatUtils";
 import { getSettings } from "../services/settingsApi";
 
 // ─── Helper: format a quantity cell with dual-unit display ───────────────────
@@ -1570,7 +1570,9 @@ const Sales = () => {
                         }}>
                             <div><strong>Party:</strong> {returnSale.party_name}</div>
                             <div><strong>Product:</strong> {returnSale.product_name} | <strong>Vehicle:</strong> {returnSale.vehicle_number}</div>
-                            <div><strong>Original Sale Quantity:</strong> {parseFloat(returnSale.quantity_tons || 0).toFixed(2)} MT</div>
+                            <div>
+                                <strong>Original Sale Quantity:</strong> {parseFloat(returnSale.quantity_tons || 0).toFixed(2)} MT <span style={{ color: "#0284c7", fontWeight: "600" }}>(≈ {tonToBrass(returnSale.quantity_tons, tonsPerBrass).toFixed(2)} Brass)</span>
+                            </div>
                         </div>
 
                         {returnFormError && (
@@ -1630,6 +1632,25 @@ const Sales = () => {
                                         </select>
                                     </div>
                                 </div>
+
+                                {returnQty && parseFloat(returnQty) > 0 && (
+                                    <div style={{
+                                        marginTop: "-6px",
+                                        fontSize: "0.85rem",
+                                        color: "#0284c7",
+                                        backgroundColor: "#f0f9ff",
+                                        border: "1px solid #bae6fd",
+                                        padding: "6px 12px",
+                                        borderRadius: "6px",
+                                        fontWeight: "600"
+                                    }}>
+                                        💡 Live Conversion: {returnUnit === "tons" ? (
+                                            <><strong>{tonToBrass(returnQty, tonsPerBrass).toFixed(2)} Brass</strong> (at {tonsPerBrass} MT/Brass)</>
+                                        ) : (
+                                            <><strong>{brassToTon(returnQty, tonsPerBrass).toFixed(2)} MT</strong> (at {tonsPerBrass} MT/Brass)</>
+                                        )}
+                                    </div>
+                                )}
 
                                 <div>
                                     <label style={{ display: "block", marginBottom: "6px", fontSize: "0.85rem", fontWeight: "600", color: "#475569" }}>

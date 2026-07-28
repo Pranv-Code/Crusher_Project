@@ -11,7 +11,7 @@ import {
     addGoodsReturn,
     deleteGoodsReturn
 } from "../services/goodsReturnApi";
-import { formatDate } from "../utils/formatUtils";
+import { formatDate, tonToBrass, brassToTon } from "../utils/formatUtils";
 import Button from "../components/common/Button";
 import Pagination from "../components/common/Pagination";
 import "../css/dashboard.css";
@@ -512,13 +512,13 @@ export default function GoodsReturns() {
                                         <option value="">-- Direct Return (No Sale Link) --</option>
                                         {recentSales.map(s => (
                                             <option key={s.sales_id} value={s.sales_id}>
-                                                Sale #{s.sales_id}{s.chalan_no ? ` [Chalan: ${s.chalan_no}]` : ""} | {formatDate(s.sales_date)} | {s.party_name} | {s.quantity_tons} MT ({s.vehicle_number})
+                                                Sale #{s.sales_id}{s.chalan_no ? ` [Chalan: ${s.chalan_no}]` : ""} | {formatDate(s.sales_date)} | {s.party_name} | {s.quantity_tons} MT (≈ {tonToBrass(s.quantity_tons, settings.tons_per_brass || 4.2).toFixed(2)} Brass) ({s.vehicle_number})
                                             </option>
                                         ))}
                                     </select>
                                     {selectedSaleInfo && (
                                         <div style={{ marginTop: "6px", fontSize: "0.8rem", color: "#0284c7", backgroundColor: "#e0f2fe", padding: "6px 10px", borderRadius: "6px" }}>
-                                            ℹ️ Original Sale: <strong>{selectedSaleInfo.quantity_tons} MT</strong> of {selectedSaleInfo.product_name} sold to <strong>{selectedSaleInfo.party_name}</strong>.
+                                            ℹ️ Original Sale: <strong>{selectedSaleInfo.quantity_tons} MT</strong> <span style={{ fontWeight: "600" }}>(≈ {tonToBrass(selectedSaleInfo.quantity_tons, settings.tons_per_brass || 4.2).toFixed(2)} Brass)</span> of {selectedSaleInfo.product_name} sold to <strong>{selectedSaleInfo.party_name}</strong>.
                                         </div>
                                     )}
                                 </div>
@@ -618,6 +618,25 @@ export default function GoodsReturns() {
                                         </select>
                                     </div>
                                 </div>
+
+                                {quantity && parseFloat(quantity) > 0 && (
+                                    <div style={{
+                                        marginTop: "-6px",
+                                        fontSize: "0.85rem",
+                                        color: "#0284c7",
+                                        backgroundColor: "#f0f9ff",
+                                        border: "1px solid #bae6fd",
+                                        padding: "6px 12px",
+                                        borderRadius: "6px",
+                                        fontWeight: "600"
+                                    }}>
+                                        💡 Live Conversion: {unit === "tons" ? (
+                                            <><strong>{tonToBrass(quantity, settings.tons_per_brass || 4.2).toFixed(2)} Brass</strong> (at {settings.tons_per_brass || 4.2} MT/Brass)</>
+                                        ) : (
+                                            <><strong>{brassToTon(quantity, settings.tons_per_brass || 4.2).toFixed(2)} MT</strong> (at {settings.tons_per_brass || 4.2} MT/Brass)</>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Condition radio / selection */}
                                 <div>

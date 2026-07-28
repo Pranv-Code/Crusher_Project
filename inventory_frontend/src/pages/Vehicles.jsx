@@ -13,6 +13,7 @@ import {
 import Button from "../components/common/Button";
 import InputField from "../components/common/InputField";
 import SelectField from "../components/common/SelectField";
+import SearchBar from "../components/common/SearchBar";
 import PageHeader from "../components/common/PageHeader";
 import EmptyState from "../components/common/EmptyState";
 
@@ -25,6 +26,7 @@ import EditModal from "../components/modal/EditModal";
 function Vehicles() {
     const { vehicles, fetchVehicles, fetchActiveVehicles } = useInventory();
     const { isManager, isClerk } = useAuth();
+    const [search, setSearch] = useState("");
     const [showAddForm, setShowAddForm] = useState(false);
 
     const [newVehicle, setNewVehicle] = useState({
@@ -47,6 +49,16 @@ function Vehicles() {
     useEffect(() => {
         fetchVehicles();
     }, []);
+
+    const filteredVehicles = vehicles.filter((v) => {
+        if (!search.trim()) return true;
+        const q = search.toLowerCase().trim();
+        return (
+            v.vehicle_number?.toLowerCase().includes(q) ||
+            v.owner?.toLowerCase().includes(q) ||
+            v.status?.toLowerCase().includes(q)
+        );
+    });
 
     const handleAddVehicle = async () => {
         if (
@@ -213,15 +225,25 @@ function Vehicles() {
                     </div>
                 )}
 
-                {vehicles.length === 0 ? (
+                <SearchBar
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search Vehicle Number or Owner..."
+                />
+
+                {filteredVehicles.length === 0 ? (
                     <EmptyState
                         title="No Vehicles Found"
-                        message={isManager ? "Click Add Vehicle to create one." : "Click Request New Vehicle to request one."}
+                        message={
+                            search.trim()
+                                ? "No vehicles match your search query."
+                                : (isManager ? "Click Add Vehicle to create one." : "Click Request New Vehicle to request one.")
+                        }
                     />
                 ) : (
                     <CrudTable
                         columns={columns}
-                        data={vehicles}
+                        data={filteredVehicles}
                         keyField="vehicle_number"
                         renderActions={isManager ? (row) => (
                             <ActionButtons
